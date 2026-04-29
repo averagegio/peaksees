@@ -1,0 +1,121 @@
+"use client";
+
+import type { MarketPost } from "@/app/lib/mock-markets";
+import { useState } from "react";
+
+function formatUsd(n: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
+}
+
+function MarketPostCard({ post }: { post: MarketPost }) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const [yes, no] = post.outcomes;
+
+  return (
+    <article
+      className="rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm backdrop-blur-md dark:border-zinc-700 dark:bg-zinc-900/95"
+      aria-label={`Prediction market: ${post.question}`}
+    >
+      <header className="flex gap-3">
+        <div
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white ring-2 ring-white/30 dark:ring-zinc-700"
+          style={{ backgroundColor: `hsl(${post.avatarHue} 55% 42%)` }}
+          aria-hidden
+        >
+          {post.creator
+            .split(" ")
+            .map((w) => w[0])
+            .join("")}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="truncate font-semibold text-zinc-900 dark:text-zinc-100">
+              {post.creator}
+            </span>
+            <span className="text-sm text-zinc-500 dark:text-zinc-400">
+              {post.handle}
+            </span>
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+            <span>{post.postedAt}</span>
+            <span className="text-zinc-300 dark:text-zinc-600">·</span>
+            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-700 dark:text-emerald-400">
+              peaksees
+            </span>
+            <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">
+              {post.category}
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <h2 className="mt-4 text-[17px] font-semibold leading-snug tracking-tight text-zinc-900 dark:text-zinc-50">
+        {post.question}
+      </h2>
+
+      <div className="mt-4 space-y-2">
+        {[yes, no].map((outcome) => {
+          const pct = Math.round(outcome.probability * 100);
+          const isPicked = selected === outcome.id;
+          return (
+            <button
+              key={outcome.id}
+              type="button"
+              onClick={() => setSelected(outcome.id)}
+              className={
+                "relative w-full overflow-hidden rounded-xl border px-3 py-2.5 text-left transition-colors " +
+                (isPicked
+                  ? "border-emerald-500/70 bg-emerald-500/[0.08] ring-2 ring-emerald-500/25 dark:border-emerald-400/50 dark:bg-emerald-500/10"
+                  : "border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:border-zinc-600 dark:hover:bg-zinc-800/80")
+              }
+            >
+              <span
+                className="absolute inset-y-0 left-0 bg-emerald-400/25 dark:bg-emerald-500/20"
+                style={{ width: `${pct}%` }}
+                aria-hidden
+              />
+              <span className="relative flex items-center justify-between gap-3">
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                  {outcome.label}
+                </span>
+                <span className="tabular-nums font-semibold text-zinc-700 dark:text-zinc-200">
+                  {pct}%
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <footer className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-3 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+        <span>Vol · {formatUsd(post.volumeUsd)}</span>
+        <span>
+          Settles · {post.endsAtLabel}
+          {selected && (
+            <span className="ml-2 text-emerald-600 dark:text-emerald-400">
+              · You leaned {yes.id === selected ? yes.label : no.label}
+            </span>
+          )}
+        </span>
+      </footer>
+    </article>
+  );
+}
+
+export function PeakFeed({ posts }: { posts: MarketPost[] }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <ul className="mx-auto flex w-full max-w-lg flex-col gap-4 px-3 pb-28 pt-6 sm:gap-5 sm:px-4 sm:pb-24 md:pt-10">
+        {posts.map((post) => (
+          <li key={post.id}>
+            <MarketPostCard post={post} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
