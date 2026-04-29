@@ -3,6 +3,7 @@
 import type { MarketPost } from "@/app/lib/mock-markets";
 import { useState } from "react";
 import type { Peak } from "@/lib/peaks/store";
+import { PostActions } from "@/app/components/post/PostActions";
 
 function formatUsd(n: number) {
   return new Intl.NumberFormat("en-US", {
@@ -110,6 +111,8 @@ function MarketPostCard({ post }: { post: MarketPost }) {
           )}
         </span>
       </footer>
+
+      <PostActions postKey={`market:${post.id}`} title={post.question} />
     </article>
   );
 }
@@ -158,6 +161,7 @@ export function PeakFeed({
                     <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-200">
                       {p.text}
                     </p>
+                    <PostActions postKey={`peak:${p.id}`} title={p.text} />
                   </li>
                 ))}
               </ul>

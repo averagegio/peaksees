@@ -7,7 +7,9 @@ import { LogoutButton } from "@/app/components/LogoutButton";
 import { ProfileEditor } from "@/app/components/profile/ProfileEditor";
 import { PEAKSEES_HEADER_BANNER } from "@/lib/brand";
 import { getSession } from "@/lib/auth/session";
-import { listPeaks } from "@/lib/peaks/store";
+import { getPeakById, listPeaks } from "@/lib/peaks/store";
+import { listPins } from "@/lib/social/pins-store";
+import { MARKET_FEED_FOLLOWING, MARKET_FEED_FOR_YOU, MARKET_FEED_LIVE } from "@/app/lib/mock-markets";
 
 function formatJoined(iso: string) {
   try {
@@ -26,6 +28,22 @@ export default async function DashboardPage() {
 
   const u = session.user;
   const myPeaks = await listPeaks({ mineUserId: u.id, limit: 10 });
+  const pins = await listPins(u.id);
+  const marketById = new Map(
+    [...MARKET_FEED_FOR_YOU, ...MARKET_FEED_FOLLOWING, ...MARKET_FEED_LIVE].map((p) => [p.id, p]),
+  );
+  const pinnedMarkets = pins
+    .filter((k) => k.startsWith("market:"))
+    .map((k) => k.split(":")[1] ?? "")
+    .map((id) => marketById.get(id))
+    .filter(Boolean);
+  const pinnedPeakIds = pins
+    .filter((k) => k.startsWith("peak:"))
+    .map((k) => k.split(":")[1] ?? "")
+    .filter(Boolean);
+  const pinnedPeaksResolved = (
+    await Promise.all(pinnedPeakIds.map((id) => getPeakById(id)))
+  ).filter(Boolean);
 
   return (
     <div className="flex min-h-dvh flex-col bg-gradient-to-b from-zinc-100 to-zinc-200/90 dark:from-zinc-950 dark:to-zinc-900">
@@ -60,7 +78,58 @@ export default async function DashboardPage() {
 
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-8">
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="h-24 bg-gradient-to-r from-emerald-600/90 to-teal-600/80" />
+          <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-6 py-4 dark:border-zinc-800">
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              Pinned
+            </h3>
+            <Link
+              href="/feed"
+              className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+            >
+              Manage in feed
+            </Link>
+          </div>
+          <div className="px-6 py-5">
+            {pins.length === 0 ? (
+              <p className="text-sm text-zinc-600 dark:text-zinc-300">
+                Pin markets or peaks to keep them at the top.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {pinnedMarkets.map((m) => (
+                  <li key={`pm-${m!.id}`} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950">
+                    <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+                      {m!.question}
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      Market · {m!.category}
+                    </p>
+                  </li>
+                ))}
+                {pinnedPeaksResolved.map((p) => (
+                  <li key={`pp-${p!.id}`} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950">
+                    <p className="text-zinc-800 dark:text-zinc-100">{p!.text}</p>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      Peak · {new Date(p!.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="relative h-28 overflow-hidden bg-gradient-to-r from-emerald-600/90 to-teal-600/80 sm:h-32">
+            {u.bannerUrl?.trim() ? (
+              // eslint-disable-next-line @next/next/no-img-element -- data URL banner
+              <img
+                src={u.bannerUrl}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover opacity-95"
+              />
+            ) : null}
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/45 to-teal-600/35" />
+          </div>
           <div className="-mt-10 flex flex-col gap-4 px-6 pb-6">
             {u.avatarUrl?.trim() ? (
               // eslint-disable-next-line @next/next/no-img-element -- data URL avatar
@@ -93,6 +162,7 @@ export default async function DashboardPage() {
               initialDisplayName={u.displayName}
               initialBio={u.bio ?? ""}
               initialAvatarUrl={u.avatarUrl ?? ""}
+              initialBannerUrl={u.bannerUrl ?? ""}
             />
             <dl className="grid gap-4 border-t border-zinc-100 pt-6 text-sm dark:border-zinc-800">
               <div>

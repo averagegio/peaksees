@@ -163,3 +163,33 @@ export async function listPeaks(input: {
 
   return rows.map(toPeak);
 }
+
+export async function getPeakById(id: string): Promise<Peak | null> {
+  if (postgresPool) {
+    await ensurePeaksSchema();
+    const result = await postgresPool.query<PeakRow>(
+      `SELECT p.id, p.user_id, p.text, p.created_at, u.display_name, u.email, u.avatar_url
+       FROM peaks p
+       JOIN users u ON u.id = p.user_id
+       WHERE p.id = $1
+       LIMIT 1`,
+      [id],
+    );
+    return result.rows[0] ? toPeak(result.rows[0]) : null;
+  }
+
+  const row = db
+    .prepare(
+      `SELECT p.id, p.user_id, p.text, p.created_at,
+        u.display_name as display_name,
+        u.email as email,
+        u.avatar_url as avatar_url
+       FROM peaks p
+       JOIN users u ON u.id = p.user_id
+       WHERE p.id = ?
+       LIMIT 1`,
+    )
+    .get(id) as PeakRow | undefined;
+
+  return row ? toPeak(row) : null;
+}

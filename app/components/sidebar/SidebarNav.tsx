@@ -5,6 +5,11 @@ import { usePathname } from "next/navigation";
 
 const items = [
   {
+    href: "/peakpoints",
+    label: "Peakpoints",
+    icon: CoinIcon,
+  },
+  {
     href: "/bookmarks",
     label: "Bookmarks",
     icon: BookmarkIcon,
@@ -63,5 +68,15 @@ function MentionsGlyph({ className }: { className?: string }) {
     >
       @
     </span>
+  );
+}
+
+function CoinIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path d="M12 2c5 0 9 1.8 9 4s-4 4-9 4-9-1.8-9-4 4-4 9-4z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 6v6c0 2.2 4 4 9 4s9-1.8 9-4V6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 12v6c0 2.2 4 4 9 4s9-1.8 9-4v-6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

@@ -30,7 +30,8 @@ db.exec(`
     password_hash TEXT NOT NULL,
     created_at TEXT NOT NULL,
     bio TEXT,
-    avatar_url TEXT
+    avatar_url TEXT,
+    banner_url TEXT
   );
 `);
 
@@ -43,6 +44,9 @@ if (!userColumns.some((column) => column.name === "bio")) {
 if (!userColumns.some((column) => column.name === "avatar_url")) {
   db.exec("ALTER TABLE users ADD COLUMN avatar_url TEXT");
 }
+if (!userColumns.some((column) => column.name === "banner_url")) {
+  db.exec("ALTER TABLE users ADD COLUMN banner_url TEXT");
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS peaks (
@@ -53,6 +57,42 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS peaks_created_at_idx ON peaks(created_at DESC);
   CREATE INDEX IF NOT EXISTS peaks_user_created_at_idx ON peaks(user_id, created_at DESC);
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS comments (
+    id TEXT PRIMARY KEY,
+    post_key TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS comments_post_created_at_idx ON comments(post_key, created_at DESC);
+  CREATE TABLE IF NOT EXISTS comment_upvotes (
+    comment_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (comment_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS comment_upvotes_comment_idx ON comment_upvotes(comment_id);
+
+  CREATE TABLE IF NOT EXISTS pinned_posts (
+    user_id TEXT NOT NULL,
+    post_key TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, post_key)
+  );
+  CREATE INDEX IF NOT EXISTS pinned_posts_user_idx ON pinned_posts(user_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS peakpoints_ledger (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    amount_cents INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    note TEXT
+  );
+  CREATE INDEX IF NOT EXISTS peakpoints_ledger_user_idx ON peakpoints_ledger(user_id, created_at DESC);
 `);
 
 export { db };
