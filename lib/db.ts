@@ -4,12 +4,22 @@ import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_PATH = path.join(DATA_DIR, "peaksees.db");
+function openDbAt(dbPath: string) {
+  mkdirSync(path.dirname(dbPath), { recursive: true });
+  return new Database(dbPath);
+}
 
-mkdirSync(DATA_DIR, { recursive: true });
+const localDbPath = path.join(process.cwd(), "data", "peaksees.db");
+const tmpDbPath = path.join("/tmp", "peaksees.db");
 
-const db = new Database(DB_PATH);
+let db: Database.Database;
+try {
+  db = openDbAt(localDbPath);
+} catch {
+  // Serverless hosts often expose writable /tmp only.
+  db = openDbAt(tmpDbPath);
+}
+
 db.pragma("journal_mode = WAL");
 
 db.exec(`
