@@ -72,7 +72,19 @@ function PriceCard({
   );
 }
 
-export default function PricingPage() {
+export default function PricingPage({
+  searchParams,
+}: {
+  searchParams?: { [key: string]: string | string[] | undefined };
+}) {
+  const rawError = searchParams?.error;
+  const error =
+    typeof rawError === "string"
+      ? rawError
+      : Array.isArray(rawError)
+        ? rawError[0]
+        : "";
+
   return (
     <main className="min-h-dvh bg-gradient-to-b from-zinc-100 to-zinc-200/90 px-4 py-10 dark:from-zinc-950 dark:to-zinc-900">
       <div className="mx-auto w-full max-w-5xl">
@@ -94,6 +106,11 @@ export default function PricingPage() {
               Upgrade to unlock deeper market tools, live features, and priority
               access to Peak.
             </p>
+            {error ? (
+              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200">
+                {error}
+              </div>
+            ) : null}
           </div>
         </header>
 

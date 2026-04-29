@@ -3,6 +3,8 @@
 import MuxPlayer from "@mux/mux-player-react";
 import { useEffect, useRef, useState } from "react";
 
+import { safeJson } from "@/lib/http";
+
 type LiveState = {
   configured: boolean;
   playbackId: string | null;
@@ -39,7 +41,10 @@ export function LiveStreamPanel() {
       setError(null);
       try {
         const res = await fetch("/api/live", { cache: "no-store" });
-        const data = (await res.json()) as LiveState & { error?: string };
+        const data =
+          (await safeJson<(LiveState & { error?: string })>(res)) ?? ({} as LiveState & {
+            error?: string;
+          });
         if (!res.ok) {
           throw new Error(data.error ?? "Unable to load live stream");
         }
@@ -63,7 +68,9 @@ export function LiveStreamPanel() {
     setError(null);
     try {
       const res = await fetch("/api/live", { method: "POST" });
-      const data = (await res.json()) as CreateResult & { error?: string };
+      const data =
+        (await safeJson<(CreateResult & { error?: string })>(res)) ??
+        ({} as CreateResult & { error?: string });
       if (!res.ok) throw new Error(data.error ?? "Unable to create live stream");
       setCreated(data);
       setState((prev) =>
@@ -118,7 +125,9 @@ export function LiveStreamPanel() {
     try {
       // Always create a live stream so we have a valid RTMP target.
       const res = await fetch("/api/live", { method: "POST" });
-      const data = (await res.json()) as CreateResult & { error?: string };
+      const data =
+        (await safeJson<(CreateResult & { error?: string })>(res)) ??
+        ({} as CreateResult & { error?: string });
       if (!res.ok) throw new Error(data.error ?? "Unable to create live stream");
       setCreated(data);
 

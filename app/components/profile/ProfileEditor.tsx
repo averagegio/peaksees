@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { safeJson } from "@/lib/http";
+
 type ProfileEditorProps = {
   initialDisplayName: string;
   initialBio: string;
@@ -34,7 +36,7 @@ export function ProfileEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ displayName, bio, avatarUrl, bannerUrl }),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await safeJson<{ error?: string }>(res)) ?? {};
       if (!res.ok) {
         setError(data.error ?? "Could not save profile");
         return;

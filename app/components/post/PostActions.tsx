@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CommentsDrawer } from "@/app/components/comments/CommentsDrawer";
+import { safeJson } from "@/lib/http";
 
 function CommentIcon() {
   return (
@@ -42,7 +43,7 @@ export function PostActions({
     async function loadPins() {
       try {
         const res = await fetch("/api/pins", { cache: "no-store" });
-        const data = (await res.json()) as { pins?: string[] };
+        const data = (await safeJson<{ pins?: string[] }>(res)) ?? {};
         if (!cancelled && Array.isArray(data.pins)) {
           setPinned(data.pins.includes(postKey));
         }
@@ -62,7 +63,7 @@ export function PostActions({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ postKey }),
     });
-    const data = (await res.json()) as { pinned?: boolean };
+    const data = (await safeJson<{ pinned?: boolean }>(res)) ?? {};
     if (typeof data.pinned === "boolean") setPinned(data.pinned);
   }
 

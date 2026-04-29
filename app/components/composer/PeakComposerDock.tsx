@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PEAKFAB_PRINT } from "@/lib/brand";
+import { safeJson } from "@/lib/http";
 
 type AttachKind = "image" | "video" | "gif";
 
@@ -94,7 +95,7 @@ export function PeakComposerDock() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: postText }),
         });
-        const data = (await res.json()) as { peak?: unknown; error?: string };
+        const data = (await safeJson<{ peak?: unknown; error?: string }>(res)) ?? {};
         if (!res.ok) {
           console.warn("[peaksees compose] failed", data.error ?? "error");
           return;

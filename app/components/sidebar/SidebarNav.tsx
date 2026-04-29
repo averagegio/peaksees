@@ -10,6 +10,11 @@ const items = [
     icon: PricingIcon,
   },
   {
+    href: "/advertisers",
+    label: "Advertisers",
+    icon: MegaphoneIcon,
+  },
+  {
     href: "/peakpoints",
     label: "Peakpoints",
     icon: CoinIcon,
@@ -91,6 +96,15 @@ function PricingIcon({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
       <path d="M7 7h10M7 12h10M7 17h6" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M6 3h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2z" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function MegaphoneIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path d="M3 11v2a2 2 0 002 2h1l3 5h2l-2-5h2l10 3V6L11 9H5a2 2 0 00-2 2z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 9v6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

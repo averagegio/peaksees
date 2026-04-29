@@ -11,13 +11,11 @@ export function getStripe() {
 }
 
 export function getAppUrl() {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.VERCEL_URL?.startsWith("http")
-      ? process.env.VERCEL_URL
-      : process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000"
-  );
+  const explicit = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim();
+  if (explicit) return explicit;
+
+  const vercelUrl = (process.env.VERCEL_URL ?? "").trim();
+  if (!vercelUrl) return "http://localhost:3000";
+  return vercelUrl.startsWith("http") ? vercelUrl : `https://${vercelUrl}`;
 }
 

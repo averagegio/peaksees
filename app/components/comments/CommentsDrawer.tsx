@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { safeJson } from "@/lib/http";
+
 type Comment = {
   id: string;
   displayName: string;
@@ -40,7 +42,8 @@ export function CommentsDrawer({
         const res = await fetch(`/api/comments?postKey=${encodeURIComponent(postKey)}`, {
           cache: "no-store",
         });
-        const data = (await res.json()) as { comments?: Comment[]; error?: string };
+        const data =
+          (await safeJson<{ comments?: Comment[]; error?: string }>(res)) ?? {};
         if (!res.ok) throw new Error(data.error ?? "Failed to load comments");
         if (!cancelled && Array.isArray(data.comments)) setComments(data.comments);
       } catch (e) {
@@ -65,7 +68,7 @@ export function CommentsDrawer({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ postKey, text: t }),
     });
-    const data = (await res.json()) as { error?: string };
+    const data = (await safeJson<{ error?: string }>(res)) ?? {};
     if (!res.ok) {
       setError(data.error ?? "Failed to post comment");
       return;
@@ -78,7 +81,7 @@ export function CommentsDrawer({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ postKey, text: t, query: title }),
         });
-        const peakData = (await peakRes.json()) as { reply?: string };
+        const peakData = (await safeJson<{ reply?: string }>(peakRes)) ?? {};
         if (peakRes.ok && peakData.reply) {
           await fetch("/api/comments", {
             method: "POST",
@@ -94,7 +97,7 @@ export function CommentsDrawer({
     const reload = await fetch(`/api/comments?postKey=${encodeURIComponent(postKey)}`, {
       cache: "no-store",
     });
-    const reloadData = (await reload.json()) as { comments?: Comment[] };
+    const reloadData = (await safeJson<{ comments?: Comment[] }>(reload)) ?? {};
     if (Array.isArray(reloadData.comments)) setComments(reloadData.comments);
   }
 
@@ -107,7 +110,7 @@ export function CommentsDrawer({
     const reload = await fetch(`/api/comments?postKey=${encodeURIComponent(postKey)}`, {
       cache: "no-store",
     });
-    const reloadData = (await reload.json()) as { comments?: Comment[] };
+    const reloadData = (await safeJson<{ comments?: Comment[] }>(reload)) ?? {};
     if (Array.isArray(reloadData.comments)) setComments(reloadData.comments);
   }
 

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { safeJson } from "@/lib/http";
+
 type LedgerEntry = {
   id: string;
   kind: string;
@@ -32,12 +34,17 @@ export function PeakpointsClient() {
       setError(null);
       try {
         const res = await fetch("/api/peakpoints", { cache: "no-store" });
-        const data = (await res.json()) as {
+        const data = (await safeJson<{
           balanceCents?: number;
           ledger?: LedgerEntry[];
           error?: string;
-        };
-        if (!res.ok) throw new Error(data.error ?? "Failed to load Peakpoints");
+        }>(res)) ?? {};
+        if (!res.ok) {
+          throw new Error(
+            data.error ??
+              (res.status === 401 ? "Please log in first" : "Failed to load Peakpoints"),
+          );
+        }
         if (cancelled) return;
         setBalanceCents(Number(data.balanceCents ?? 0));
         setLedger(Array.isArray(data.ledger) ? data.ledger : []);
@@ -65,8 +72,12 @@ export function PeakpointsClient() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ kind: "wallet_topup", amountCents: amount }),
         });
-        const data = (await res.json()) as { url?: string; error?: string };
-        if (!res.ok) throw new Error(data.error ?? "Checkout failed");
+        const data = (await safeJson<{ url?: string; error?: string }>(res)) ?? {};
+        if (!res.ok) {
+          throw new Error(
+            data.error ?? (res.status === 401 ? "Please log in first" : "Checkout failed"),
+          );
+        }
         if (!data.url) throw new Error("Missing checkout url");
         window.location.assign(data.url);
         return;
@@ -77,12 +88,16 @@ export function PeakpointsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, amountCents: amount }),
       });
-      const data = (await res.json()) as {
+      const data = (await safeJson<{
         balanceCents?: number;
         ledger?: LedgerEntry[];
         error?: string;
-      };
-      if (!res.ok) throw new Error(data.error ?? "Action failed");
+      }>(res)) ?? {};
+      if (!res.ok) {
+        throw new Error(
+          data.error ?? (res.status === 401 ? "Please log in first" : "Action failed"),
+        );
+      }
       setBalanceCents(Number(data.balanceCents ?? 0));
       setLedger(Array.isArray(data.ledger) ? data.ledger : []);
     } catch (e) {

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { safeJson } from "@/lib/http";
+
 export function LoginForm({
   nextPath,
 }: {
@@ -25,7 +27,7 @@ export function LoginForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await safeJson<{ error?: string }>(res)) ?? {};
       if (!res.ok) {
         setError(data.error ?? "Login failed");
         return;
@@ -124,7 +126,7 @@ export function SignupForm() {
           displayName: displayName.trim() === "" ? undefined : displayName,
         }),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await safeJson<{ error?: string }>(res)) ?? {};
       if (!res.ok) {
         setError(data.error ?? "Signup failed");
         return;

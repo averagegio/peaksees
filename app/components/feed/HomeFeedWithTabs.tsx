@@ -9,6 +9,7 @@ import {
   MARKET_FEED_FOR_YOU,
   MARKET_FEED_LIVE,
 } from "@/app/lib/mock-markets";
+import { safeJson } from "@/lib/http";
 import type { Peak } from "@/lib/peaks/store";
 
 function FeedTabButton({
@@ -81,7 +82,7 @@ export function HomeFeedWithTabs() {
     async function loadPeaks() {
       try {
         const res = await fetch("/api/peaks?limit=20", { cache: "no-store" });
-        const data = (await res.json()) as { peaks?: Peak[] };
+        const data = (await safeJson<{ peaks?: Peak[] }>(res)) ?? {};
         if (!cancelled && Array.isArray(data.peaks)) setPeaks(data.peaks);
       } catch {
         // ignore
