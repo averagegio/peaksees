@@ -70,6 +70,12 @@ export default async function DashboardPage() {
               >
                 Feed
               </Link>
+              <Link
+                href="/pricing"
+                className="rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
+              >
+                Upgrade plan
+              </Link>
               <LogoutButton className="min-w-[92px]" />
             </div>
           </div>

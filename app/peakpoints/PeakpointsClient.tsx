@@ -59,6 +59,19 @@ export function PeakpointsClient() {
     setBusy(action);
     setError(null);
     try {
+      if (action === "deposit") {
+        const res = await fetch("/api/stripe/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "wallet_topup", amountCents: amount }),
+        });
+        const data = (await res.json()) as { url?: string; error?: string };
+        if (!res.ok) throw new Error(data.error ?? "Checkout failed");
+        if (!data.url) throw new Error("Missing checkout url");
+        window.location.assign(data.url);
+        return;
+      }
+
       const res = await fetch("/api/peakpoints", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -90,7 +103,7 @@ export function PeakpointsClient() {
             {loading ? "…" : formatUsdCents(balanceCents)}
           </p>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-            Stub ledger for now (wire payments to make real).
+            Add money uses Stripe Checkout. Wallet is credited by webhook after payment.
           </p>
         </div>
 
@@ -114,7 +127,7 @@ export function PeakpointsClient() {
             onClick={() => act("deposit")}
             className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
-            {busy === "deposit" ? "Depositing…" : "Deposit"}
+            {busy === "deposit" ? "Opening Checkout…" : "Add money"}
           </button>
           <button
             type="button"
