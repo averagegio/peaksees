@@ -110,6 +110,98 @@ body {
   }
 }
 
+@keyframes sphere-rotate {
+  from {
+    transform: translateZ(0) rotate(0turn);
+  }
+  to {
+    transform: translateZ(0) rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sphere-chip {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .sphere-chip::before {
+    content: "";
+    position: absolute;
+    inset: -60%;
+    border-radius: 999px;
+    opacity: 0.55;
+    z-index: 0;
+    background: conic-gradient(
+      from 0deg,
+      rgb(16 185 129 / 0.0),
+      rgb(16 185 129 / 0.28),
+      rgb(59 130 246 / 0.22),
+      rgb(16 185 129 / 0.0)
+    );
+    animation: sphere-rotate 6.5s linear infinite;
+    filter: blur(10px) saturate(1.2);
+  }
+
+  .sphere-chip::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    z-index: 0;
+    background:
+      radial-gradient(circle at 25% 30%, rgb(255 255 255 / 0.35), transparent 55%),
+      radial-gradient(circle at 65% 70%, rgb(255 255 255 / 0.16), transparent 60%);
+    mix-blend-mode: overlay;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  .sphere-chip > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Colorways */
+  .sphere-chip[data-sphere="trending"]::before {
+    background: conic-gradient(
+      from 0deg,
+      rgb(16 185 129 / 0.0),
+      rgb(16 185 129 / 0.32),
+      rgb(34 211 238 / 0.22),
+      rgb(16 185 129 / 0.0)
+    );
+  }
+  .sphere-chip[data-sphere="news"]::before {
+    background: conic-gradient(
+      from 0deg,
+      rgb(59 130 246 / 0.0),
+      rgb(59 130 246 / 0.32),
+      rgb(168 85 247 / 0.22),
+      rgb(59 130 246 / 0.0)
+    );
+  }
+  .sphere-chip[data-sphere="sports"]::before {
+    background: conic-gradient(
+      from 0deg,
+      rgb(245 158 11 / 0.0),
+      rgb(245 158 11 / 0.34),
+      rgb(239 68 68 / 0.22),
+      rgb(245 158 11 / 0.0)
+    );
+  }
+  .sphere-chip[data-sphere="explore"]::before {
+    background: conic-gradient(
+      from 0deg,
+      rgb(148 163 184 / 0.0),
+      rgb(148 163 184 / 0.26),
+      rgb(34 211 238 / 0.18),
+      rgb(148 163 184 / 0.0)
+    );
+  }
+}
+
 @keyframes click-star-burst {
   0% {
     opacity: 0;

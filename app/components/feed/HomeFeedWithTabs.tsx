@@ -237,7 +237,8 @@ export function HomeFeedWithTabs() {
                   type="button"
                   data-sparkle-click="true"
                   onClick={() => setExplore(item)}
-                  className={`poppy-hover sparkle-hover shrink-0 rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                  data-sphere={item.toLowerCase()}
+                  className={`poppy-hover sparkle-hover sphere-chip shrink-0 rounded-full border px-3 py-1 text-xs font-semibold transition ${
                     explore === item
                       ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                       : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
