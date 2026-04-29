@@ -2,9 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import {
-  PEAKFAB_PRINT,
   PEAKSEES_BG_LOOP,
   PEAKSEES_HEADER_BANNER,
+  PEAKSEES_LANDING_HERO,
 } from "@/lib/brand";
 
 export default async function Home() {
@@ -35,11 +35,11 @@ export default async function Home() {
       <section className="relative z-10 mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 items-center gap-10 px-6 py-10 lg:grid-cols-[1fr_460px] lg:gap-14 lg:px-10">
         <div className="mx-auto w-full max-w-md lg:max-w-xl">
           <Image
-            src={PEAKFAB_PRINT}
-            alt="peaksees mark"
-            width={430}
-            height={430}
-            className="mx-auto h-auto w-full max-w-[280px] object-contain sm:max-w-[340px] lg:max-w-[420px]"
+            src={PEAKSEES_LANDING_HERO}
+            alt="peaksees hero"
+            width={900}
+            height={700}
+            className="mx-auto h-auto w-full max-w-[320px] rounded-2xl border border-zinc-300/80 object-cover shadow-xl shadow-zinc-900/15 dark:border-zinc-700 dark:shadow-black/30 sm:max-w-[420px] lg:max-w-[520px]"
             priority
           />
         </div>
