@@ -32,6 +32,8 @@ export function LoginForm({
       }
       router.refresh();
       router.push(nextPath && nextPath.startsWith("/") ? nextPath : "/feed");
+    } catch {
+      setError("Server error. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -129,6 +131,8 @@ export function SignupForm() {
       }
       router.refresh();
       router.push("/feed");
+    } catch {
+      setError("Server error. Please try again.");
     } finally {
       setBusy(false);
     }
