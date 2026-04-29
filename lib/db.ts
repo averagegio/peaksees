@@ -28,8 +28,16 @@ db.exec(`
     email TEXT NOT NULL UNIQUE,
     display_name TEXT NOT NULL,
     password_hash TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    bio TEXT
   );
 `);
+
+const userColumns = db
+  .prepare("PRAGMA table_info(users)")
+  .all() as Array<{ name: string }>;
+if (!userColumns.some((column) => column.name === "bio")) {
+  db.exec("ALTER TABLE users ADD COLUMN bio TEXT");
+}
 
 export { db };

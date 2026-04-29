@@ -173,3 +173,51 @@ export const MARKET_FEED_FOLLOWING: MarketPost[] = [
     ],
   },
 ];
+
+export const MARKET_FEED_LIVE: MarketPost[] = [
+  {
+    id: "l1",
+    creator: "Kai Stream",
+    handle: "@kai_live",
+    avatarHue: 8,
+    postedAt: "Live now",
+    question: "Will BTC break above $85k before this stream ends tonight?",
+    category: "Live",
+    volumeUsd: 342_000,
+    endsAtLabel: "Tonight",
+    outcomes: [
+      { id: "y", label: "Yes", probability: 0.58 },
+      { id: "n", label: "No", probability: 0.42 },
+    ],
+  },
+  {
+    id: "l2",
+    creator: "Arena Desk",
+    handle: "@arenalive",
+    avatarHue: 280,
+    postedAt: "Live now",
+    question: "Will the underdog complete a comeback in the 2nd half?",
+    category: "Live Sports",
+    volumeUsd: 129_700,
+    endsAtLabel: "In-game",
+    outcomes: [
+      { id: "y", label: "Yes", probability: 0.36 },
+      { id: "n", label: "No", probability: 0.64 },
+    ],
+  },
+  {
+    id: "l3",
+    creator: "Macro Wire",
+    handle: "@macro_wire",
+    avatarHue: 198,
+    postedAt: "Starting in 12m",
+    question: "Will the Fed chair mention 'sticky inflation' in today's remarks?",
+    category: "Live News",
+    volumeUsd: 211_840,
+    endsAtLabel: "Today",
+    outcomes: [
+      { id: "y", label: "Yes", probability: 0.47 },
+      { id: "n", label: "No", probability: 0.53 },
+    ],
+  },
+];

@@ -17,7 +17,8 @@ function MarketPostCard({ post }: { post: MarketPost }) {
 
   return (
     <article
-      className="rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm backdrop-blur-md dark:border-zinc-700 dark:bg-zinc-900/95"
+      data-sparkle-click="true"
+      className="poppy-hover sparkle-hover rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm backdrop-blur-md dark:border-zinc-700 dark:bg-zinc-900/95"
       aria-label={`Prediction market: ${post.question}`}
     >
       <header className="flex gap-3">
@@ -49,6 +50,11 @@ function MarketPostCard({ post }: { post: MarketPost }) {
             <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">
               {post.category}
             </span>
+            {post.postedAt.toLowerCase().includes("live") ? (
+              <span className="rounded-full bg-red-500/15 px-2 py-0.5 font-semibold text-red-600 dark:text-red-400">
+                LIVE
+              </span>
+            ) : null}
           </div>
         </div>
       </header>
@@ -65,6 +71,7 @@ function MarketPostCard({ post }: { post: MarketPost }) {
             <button
               key={outcome.id}
               type="button"
+              data-sparkle-click="true"
               onClick={() => setSelected(outcome.id)}
               className={
                 "relative w-full overflow-hidden rounded-xl border px-3 py-2.5 text-left transition-colors " +
@@ -106,10 +113,23 @@ function MarketPostCard({ post }: { post: MarketPost }) {
   );
 }
 
-export function PeakFeed({ posts }: { posts: MarketPost[] }) {
+export function PeakFeed({
+  posts,
+  contextLabel,
+}: {
+  posts: MarketPost[];
+  contextLabel?: string;
+}) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ul className="mx-auto flex w-full max-w-lg flex-col gap-4 px-3 pb-28 pt-6 sm:gap-5 sm:px-4 sm:pb-24 md:pt-10">
+      <ul className="mx-auto flex w-full max-w-xl flex-col gap-3 px-2 pb-28 pt-4 sm:gap-5 sm:px-4 sm:pb-24 md:pt-8">
+        {contextLabel ? (
+          <li>
+            <div className="rounded-xl border border-zinc-200/90 bg-white/95 px-4 py-2 text-sm text-zinc-600 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-300">
+              Exploring: <span className="font-semibold">{contextLabel}</span>
+            </div>
+          </li>
+        ) : null}
         {posts.map((post) => (
           <li key={post.id}>
             <MarketPostCard post={post} />

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { BackButton } from "@/app/components/BackButton";
 import { LogoutButton } from "@/app/components/LogoutButton";
+import { ProfileEditor } from "@/app/components/profile/ProfileEditor";
 import { PEAKSEES_HEADER_BANNER } from "@/lib/brand";
 import { getSession } from "@/lib/auth/session";
 
@@ -78,6 +79,7 @@ export default async function DashboardPage() {
               </h2>
               <p className="text-zinc-600 dark:text-zinc-400">{u.email}</p>
             </div>
+            <ProfileEditor initialDisplayName={u.displayName} initialBio={u.bio ?? ""} />
             <dl className="grid gap-4 border-t border-zinc-100 pt-6 text-sm dark:border-zinc-800 sm:grid-cols-2">
               <div>
                 <dt className="font-medium text-zinc-500 dark:text-zinc-400">Member since</dt>
@@ -92,8 +94,7 @@ export default async function DashboardPage() {
               <div className="sm:col-span-2">
                 <dt className="font-medium text-zinc-500 dark:text-zinc-400">Bio</dt>
                 <dd className="mt-2 rounded-xl bg-zinc-50 p-4 text-zinc-800 dark:bg-zinc-950 dark:text-zinc-200">
-                  You haven’t added a bio yet — this dashboard is wired for profiles; edit flow can
-                  plug in later.
+                  {u.bio?.trim() ? u.bio : " "}
                 </dd>
               </div>
             </dl>

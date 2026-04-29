@@ -10,6 +10,7 @@ export type StoredUser = {
   displayName: string;
   passwordHash: string;
   createdAt: string;
+  bio: string;
 };
 
 function normalizeEmail(email: string) {
@@ -22,6 +23,7 @@ type SqliteUserRow = {
   display_name: string;
   password_hash: string;
   created_at: string;
+  bio: string | null;
 };
 
 const postgresUrl = process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? "";
@@ -48,9 +50,15 @@ async function ensureUsersSchema() {
           email TEXT NOT NULL UNIQUE,
           display_name TEXT NOT NULL,
           password_hash TEXT NOT NULL,
-          created_at TEXT NOT NULL
+          created_at TEXT NOT NULL,
+          bio TEXT
         );
       `)
+      .then(() =>
+        postgresPool.query(
+          "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT",
+        ),
+      )
       .then(() => undefined);
   }
   await schemaReadyPromise;
@@ -63,6 +71,7 @@ function toStoredUser(row: SqliteUserRow): StoredUser {
     displayName: row.display_name,
     passwordHash: row.password_hash,
     createdAt: row.created_at,
+    bio: row.bio ?? "",
   };
 }
 
@@ -81,14 +90,22 @@ export async function createUser(input: {
       displayName: input.displayName.trim(),
       passwordHash: input.passwordHash,
       createdAt: new Date().toISOString(),
+      bio: "",
     };
 
     const result = await postgresPool.query<SqliteUserRow>(
-      `INSERT INTO users (id, email, display_name, password_hash, created_at)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO users (id, email, display_name, password_hash, created_at, bio)
+       VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (email) DO NOTHING
-       RETURNING id, email, display_name, password_hash, created_at`,
-      [user.id, user.email, user.displayName, user.passwordHash, user.createdAt],
+       RETURNING id, email, display_name, password_hash, created_at, bio`,
+      [
+        user.id,
+        user.email,
+        user.displayName,
+        user.passwordHash,
+        user.createdAt,
+        user.bio,
+      ],
     );
 
     if (!result.rows[0]) {
@@ -110,12 +127,20 @@ export async function createUser(input: {
     displayName: input.displayName.trim(),
     passwordHash: input.passwordHash,
     createdAt: new Date().toISOString(),
+    bio: "",
   };
 
   db.prepare(
-    `INSERT INTO users (id, email, display_name, password_hash, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(user.id, user.email, user.displayName, user.passwordHash, user.createdAt);
+    `INSERT INTO users (id, email, display_name, password_hash, created_at, bio)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(
+    user.id,
+    user.email,
+    user.displayName,
+    user.passwordHash,
+    user.createdAt,
+    user.bio,
+  );
 
   return user;
 }
@@ -127,7 +152,7 @@ export async function getUserByEmail(
   if (postgresPool) {
     await ensureUsersSchema();
     const result = await postgresPool.query<SqliteUserRow>(
-      `SELECT id, email, display_name, password_hash, created_at
+      `SELECT id, email, display_name, password_hash, created_at, bio
        FROM users
        WHERE email = $1
        LIMIT 1`,
@@ -139,7 +164,7 @@ export async function getUserByEmail(
 
   const row = db
     .prepare(
-      `SELECT id, email, display_name, password_hash, created_at
+      `SELECT id, email, display_name, password_hash, created_at, bio
        FROM users
        WHERE email = ?
        LIMIT 1`,
@@ -153,7 +178,7 @@ export async function getUserById(id: string): Promise<StoredUser | null> {
   if (postgresPool) {
     await ensureUsersSchema();
     const result = await postgresPool.query<SqliteUserRow>(
-      `SELECT id, email, display_name, password_hash, created_at
+      `SELECT id, email, display_name, password_hash, created_at, bio
        FROM users
        WHERE id = $1
        LIMIT 1`,
@@ -165,7 +190,7 @@ export async function getUserById(id: string): Promise<StoredUser | null> {
 
   const row = db
     .prepare(
-      `SELECT id, email, display_name, password_hash, created_at
+      `SELECT id, email, display_name, password_hash, created_at, bio
        FROM users
        WHERE id = ?
        LIMIT 1`,
@@ -181,7 +206,38 @@ export function toPublicUser(user: StoredUser) {
     email: user.email,
     displayName: user.displayName,
     createdAt: user.createdAt,
+    bio: user.bio,
   };
+}
+
+export async function updateUserProfile(
+  userId: string,
+  profile: { displayName: string; bio: string },
+): Promise<StoredUser | null> {
+  const displayName = profile.displayName.trim().slice(0, 64);
+  const bio = profile.bio.trim().slice(0, 280);
+  if (displayName.length < 2) {
+    return null;
+  }
+
+  if (postgresPool) {
+    await ensureUsersSchema();
+    const result = await postgresPool.query<SqliteUserRow>(
+      `UPDATE users
+       SET display_name = $2, bio = $3
+       WHERE id = $1
+       RETURNING id, email, display_name, password_hash, created_at, bio`,
+      [userId, displayName, bio],
+    );
+    return result.rows[0] ? toStoredUser(result.rows[0]) : null;
+  }
+
+  db.prepare(`UPDATE users SET display_name = ?, bio = ? WHERE id = ?`).run(
+    displayName,
+    bio,
+    userId,
+  );
+  return getUserById(userId);
 }
 
 export type PublicUser = ReturnType<typeof toPublicUser>;

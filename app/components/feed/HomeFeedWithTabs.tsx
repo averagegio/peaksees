@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import { PeakFeed } from "@/app/components/PeakFeed";
+import { LiveStreamPanel } from "@/app/components/live/LiveStreamPanel";
 import {
   MARKET_FEED_FOLLOWING,
   MARKET_FEED_FOR_YOU,
+  MARKET_FEED_LIVE,
 } from "@/app/lib/mock-markets";
 
 function FeedTabButton({
@@ -22,7 +24,8 @@ function FeedTabButton({
       type="button"
       role="tab"
       aria-selected={active}
-      className={`min-h-8 flex-1 rounded-full px-2.5 py-1 text-[12px] font-medium outline-none ring-emerald-500/35 transition focus-visible:ring-2 sm:py-1.5 sm:text-[13px] ${
+      data-sparkle-click="true"
+      className={`poppy-hover sparkle-hover min-h-8 flex-1 rounded-full px-2.5 py-1 text-[12px] font-medium outline-none ring-emerald-500/35 transition focus-visible:ring-2 sm:py-1.5 sm:text-[13px] ${
         active
           ? "bg-white text-zinc-900 shadow-sm shadow-zinc-300/40 dark:bg-zinc-800 dark:text-emerald-300 dark:shadow-black/45"
           : "text-zinc-600 hover:bg-zinc-100/90 dark:text-zinc-400 dark:hover:bg-zinc-800/92"
@@ -52,7 +55,8 @@ function Spinner({ label }: { label: string }) {
 
 /** Feed tabs hide on scroll down; sentinel at bottom triggers a refresh pulse. */
 export function HomeFeedWithTabs() {
-  const [tab, setTab] = useState<"foryou" | "following">("foryou");
+  const [tab, setTab] = useState<"foryou" | "following" | "live">("foryou");
+  const [explore, setExplore] = useState("Trending");
   const [tabsVisible, setTabsVisible] = useState(true);
   const [bottomRefreshing, setBottomRefreshing] = useState(false);
 
@@ -61,8 +65,14 @@ export function HomeFeedWithTabs() {
   const scrollTopPrev = useRef(0);
   const pulseLock = useRef(false);
   const lastPulseAt = useRef(0);
+  const sparkleLayerRef = useRef<HTMLDivElement>(null);
 
-  const posts = tab === "foryou" ? MARKET_FEED_FOR_YOU : MARKET_FEED_FOLLOWING;
+  const posts =
+    tab === "foryou"
+      ? MARKET_FEED_FOR_YOU
+      : tab === "following"
+        ? MARKET_FEED_FOLLOWING
+        : MARKET_FEED_LIVE;
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -117,19 +127,48 @@ export function HomeFeedWithTabs() {
     return () => io.disconnect();
   }, [tab]);
 
+  useEffect(() => {
+    function spawnSparkles(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest("[data-sparkle-click='true']")) return;
+      const host = sparkleLayerRef.current;
+      if (!host) return;
+
+      for (let i = 0; i < 6; i += 1) {
+        const star = document.createElement("span");
+        star.className = "click-star";
+        const angle = (Math.PI * 2 * i) / 6;
+        const distance = 10 + Math.random() * 16;
+        star.style.setProperty("--dx", `${Math.cos(angle) * distance}px`);
+        star.style.setProperty("--dy", `${Math.sin(angle) * distance}px`);
+        star.style.left = `${event.clientX}px`;
+        star.style.top = `${event.clientY}px`;
+        star.textContent = i % 2 === 0 ? "✦" : "✧";
+        host.appendChild(star);
+        window.setTimeout(() => star.remove(), 560);
+      }
+    }
+
+    window.addEventListener("click", spawnSparkles, { passive: true });
+    return () => window.removeEventListener("click", spawnSparkles);
+  }, []);
+
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col">
+    <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col">
+      <div ref={sparkleLayerRef} className="pointer-events-none fixed inset-0 z-[120]" />
       <section
         className={`shrink-0 overflow-hidden border-b border-zinc-200/65 transition-[max-height,padding,opacity,margin] duration-[320ms] ease-out dark:border-zinc-800 ${
-          tabsVisible ? "pointer-events-auto max-h-24 opacity-100" : "pointer-events-none max-h-0 border-transparent opacity-0"
+          tabsVisible
+            ? "pointer-events-auto max-h-48 opacity-100"
+            : "pointer-events-none max-h-0 border-transparent opacity-0"
         }`}
         aria-hidden={!tabsVisible}
       >
         <div className="px-3 py-2 sm:px-4">
           <div
             role="tablist"
-            aria-label="For you or Following"
-            className="mx-auto flex max-w-[17.5rem] gap-px rounded-full border border-zinc-200/75 bg-white/90 p-[2px] shadow-sm backdrop-blur-sm dark:border-zinc-700/85 dark:bg-zinc-900/80"
+            aria-label="Feed tabs"
+            className="feed-scroll mx-auto flex w-full max-w-[25rem] gap-px overflow-x-auto rounded-full border border-zinc-200/75 bg-white/90 p-[2px] shadow-sm backdrop-blur-sm dark:border-zinc-700/85 dark:bg-zinc-900/80"
           >
             <FeedTabButton
               active={tab === "foryou"}
@@ -149,15 +188,44 @@ export function HomeFeedWithTabs() {
             >
               Following
             </FeedTabButton>
+            <FeedTabButton
+              active={tab === "live"}
+              onClick={() => {
+                setTab("live");
+                setTabsVisible(true);
+              }}
+            >
+              Live
+            </FeedTabButton>
+          </div>
+          <div className="mx-auto mt-3 max-w-lg border-t border-zinc-200/80 pt-3 dark:border-zinc-800">
+            <div className="feed-scroll flex items-center gap-2 overflow-x-auto pb-1">
+              {["Trending", "News", "Sports", "Explore"].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  data-sparkle-click="true"
+                  onClick={() => setExplore(item)}
+                  className={`poppy-hover sparkle-hover shrink-0 rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                    explore === item
+                      ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                      : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
+        className="feed-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
       >
-        <PeakFeed key={tab} posts={posts} />
+        {tab === "live" ? <LiveStreamPanel /> : null}
+        <PeakFeed key={`${tab}-${explore}`} posts={posts} contextLabel={explore} />
         <div ref={sentinelRef} className="h-px w-full shrink-0" aria-hidden />
         {bottomRefreshing ? (
           <Spinner label="Refreshing feed…" />
