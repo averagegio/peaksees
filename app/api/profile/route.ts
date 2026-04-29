@@ -9,7 +9,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { displayName?: string; bio?: string };
+  let body: { displayName?: string; bio?: string; avatarUrl?: string };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -19,6 +19,7 @@ export async function PATCH(request: Request) {
   const displayName =
     typeof body.displayName === "string" ? body.displayName.trim() : "";
   const bio = typeof body.bio === "string" ? body.bio : "";
+  const avatarUrl = typeof body.avatarUrl === "string" ? body.avatarUrl : undefined;
 
   if (displayName.length < 2) {
     return NextResponse.json(
@@ -27,7 +28,24 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const updated = await updateUserProfile(session.user.id, { displayName, bio });
+  if (avatarUrl && avatarUrl.length > 160_000) {
+    return NextResponse.json(
+      { error: "Profile photo is too large" },
+      { status: 400 },
+    );
+  }
+  if (avatarUrl && !avatarUrl.startsWith("data:image/")) {
+    return NextResponse.json(
+      { error: "Profile photo must be an image" },
+      { status: 400 },
+    );
+  }
+
+  const updated = await updateUserProfile(session.user.id, {
+    displayName,
+    bio,
+    avatarUrl,
+  });
   if (!updated) {
     return NextResponse.json({ error: "Unable to update profile" }, { status: 500 });
   }
@@ -39,6 +57,7 @@ export async function PATCH(request: Request) {
       displayName: updated.displayName,
       createdAt: updated.createdAt,
       bio: updated.bio,
+      avatarUrl: updated.avatarUrl,
     },
   });
 }

@@ -5,15 +5,18 @@ import { useState } from "react";
 type ProfileEditorProps = {
   initialDisplayName: string;
   initialBio: string;
+  initialAvatarUrl?: string;
 };
 
 export function ProfileEditor({
   initialDisplayName,
   initialBio,
+  initialAvatarUrl = "",
 }: ProfileEditorProps) {
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState(initialDisplayName);
   const [bio, setBio] = useState(initialBio);
+  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -26,7 +29,7 @@ export function ProfileEditor({
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName, bio }),
+        body: JSON.stringify({ displayName, bio, avatarUrl }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
@@ -65,6 +68,49 @@ export function ProfileEditor({
         </div>
       ) : (
         <div className="space-y-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-950">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- data URL avatar
+                <img
+                  src={avatarUrl}
+                  alt=""
+                  className="h-14 w-14 rounded-2xl object-cover ring-2 ring-white/60 dark:ring-zinc-900"
+                />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-200 text-xs font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                  Photo
+                </div>
+              )}
+              <label className="inline-flex cursor-pointer items-center rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
+                Upload pic
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (!file.type.startsWith("image/")) {
+                      setError("Please choose an image file.");
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      const result =
+                        typeof reader.result === "string" ? reader.result : "";
+                      setAvatarUrl(result);
+                    };
+                    reader.readAsDataURL(file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Keep it small (recommended under ~150KB).
+            </p>
+          </div>
           <div>
             <label
               htmlFor="dashboard-display-name"
@@ -111,6 +157,7 @@ export function ProfileEditor({
               onClick={() => {
                 setDisplayName(initialDisplayName);
                 setBio(initialBio);
+                setAvatarUrl(initialAvatarUrl);
                 setEditing(false);
                 setError(null);
               }}

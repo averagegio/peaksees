@@ -2,6 +2,7 @@
 
 import type { MarketPost } from "@/app/lib/mock-markets";
 import { useState } from "react";
+import type { Peak } from "@/lib/peaks/store";
 
 function formatUsd(n: number) {
   return new Intl.NumberFormat("en-US", {
@@ -116,9 +117,11 @@ function MarketPostCard({ post }: { post: MarketPost }) {
 export function PeakFeed({
   posts,
   contextLabel,
+  peaks = [],
 }: {
   posts: MarketPost[];
   contextLabel?: string;
+  peaks?: Peak[];
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -127,6 +130,37 @@ export function PeakFeed({
           <li>
             <div className="rounded-xl border border-zinc-200/90 bg-white/95 px-4 py-2 text-sm text-zinc-600 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-300">
               Exploring: <span className="font-semibold">{contextLabel}</span>
+            </div>
+          </li>
+        ) : null}
+        {peaks.length > 0 ? (
+          <li>
+            <div className="rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/95">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                Latest peaks
+              </p>
+              <ul className="mt-3 space-y-2">
+                {peaks.slice(0, 6).map((p) => (
+                  <li
+                    key={p.id}
+                    data-sparkle-click="true"
+                    className="sparkle-hover rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold">{p.displayName}</span>
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                        {new Date(p.createdAt).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-200">
+                      {p.text}
+                    </p>
+                  </li>
+                ))}
+              </ul>
             </div>
           </li>
         ) : null}

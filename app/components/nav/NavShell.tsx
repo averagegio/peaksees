@@ -118,11 +118,20 @@ export function NavShell({
             {session ? (
               <Link
                 href="/dashboard"
-                className="flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold text-white ring-2 ring-emerald-500/30"
+                className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white ring-2 ring-emerald-500/30"
                 style={{ backgroundColor: "hsl(160 45% 38%)" }}
                 aria-label={`${session.user.displayName} profile`}
               >
-                {initials(session.user.displayName)}
+                {session.user.avatarUrl?.trim() ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- data URL avatar
+                  <img
+                    src={session.user.avatarUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  initials(session.user.displayName)
+                )}
               </Link>
             ) : (
               <>

@@ -85,24 +85,32 @@ export function PeakComposerDock() {
   }
 
   function handlePost() {
-    // Wire to API later; console for now
-    const payload = {
-      text,
-      attachments: attachments.map((a) => ({ kind: a.kind, name: a.file.name, size: a.file.size })),
-      poll:
-        pollMode && pollOptions.filter((x) => x.trim()).length >= 2
-          ? pollOptions.filter((x) => x.trim())
-          : undefined,
-    };
-    console.warn("[peaksees compose demo]", payload);
-    resetComposer();
-    setModalOpen(false);
+    void (async () => {
+      const postText = text.trim();
+      if (!postText) return;
+      try {
+        const res = await fetch("/api/peaks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: postText }),
+        });
+        const data = (await res.json()) as { peak?: unknown; error?: string };
+        if (!res.ok) {
+          console.warn("[peaksees compose] failed", data.error ?? "error");
+          return;
+        }
+        window.dispatchEvent(
+          new CustomEvent("peaksees:new-peak", { detail: data.peak }),
+        );
+        resetComposer();
+        setModalOpen(false);
+      } catch (e) {
+        console.warn("[peaksees compose] failed", e);
+      }
+    })();
   }
 
-  const canPost =
-    text.trim().length > 0 ||
-    attachments.length > 0 ||
-    (pollMode && pollOptions.filter((o) => o.trim()).length >= 2);
+  const canPost = text.trim().length > 0;
 
   return (
     <div className="pointer-events-none fixed bottom-0 right-0 z-[45] flex flex-col items-end p-3 sm:p-4">

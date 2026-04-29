@@ -7,14 +7,14 @@ import { LogoutButton } from "@/app/components/LogoutButton";
 import { ProfileEditor } from "@/app/components/profile/ProfileEditor";
 import { PEAKSEES_HEADER_BANNER } from "@/lib/brand";
 import { getSession } from "@/lib/auth/session";
+import { listPeaks } from "@/lib/peaks/store";
 
 function formatJoined(iso: string) {
   try {
     const d = new Date(iso);
-    return new Intl.DateTimeFormat("en-US", {
-      dateStyle: "long",
-      timeStyle: "short",
-    }).format(d);
+    const month = new Intl.DateTimeFormat("en-US", { month: "long" }).format(d);
+    const year = new Intl.DateTimeFormat("en-US", { year: "numeric" }).format(d);
+    return `${month}, ${year}`;
   } catch {
     return iso;
   }
@@ -25,6 +25,7 @@ export default async function DashboardPage() {
   if (!session) redirect("/login");
 
   const u = session.user;
+  const myPeaks = await listPeaks({ mineUserId: u.id, limit: 10 });
 
   return (
     <div className="flex min-h-dvh flex-col bg-gradient-to-b from-zinc-100 to-zinc-200/90 dark:from-zinc-950 dark:to-zinc-900">
@@ -61,35 +62,42 @@ export default async function DashboardPage() {
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="h-24 bg-gradient-to-r from-emerald-600/90 to-teal-600/80" />
           <div className="-mt-10 flex flex-col gap-4 px-6 pb-6">
-            <div
-              className="flex h-20 w-20 items-center justify-center rounded-2xl border-4 border-white text-2xl font-bold text-white shadow-md dark:border-zinc-900"
-              style={{ backgroundColor: "hsl(160 45% 38%)" }}
-              aria-hidden
-            >
-              {u.displayName
-                .split(/\s+/)
-                .map((w) => w[0])
-                .join("")
-                .slice(0, 2)
-                .toUpperCase()}
-            </div>
+            {u.avatarUrl?.trim() ? (
+              // eslint-disable-next-line @next/next/no-img-element -- data URL avatar
+              <img
+                src={u.avatarUrl}
+                alt=""
+                className="h-20 w-20 rounded-2xl border-4 border-white object-cover shadow-md dark:border-zinc-900"
+              />
+            ) : (
+              <div
+                className="flex h-20 w-20 items-center justify-center rounded-2xl border-4 border-white text-2xl font-bold text-white shadow-md dark:border-zinc-900"
+                style={{ backgroundColor: "hsl(160 45% 38%)" }}
+                aria-hidden
+              >
+                {u.displayName
+                  .split(/\s+/)
+                  .map((w) => w[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </div>
+            )}
             <div>
               <h2 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">
                 {u.displayName}
               </h2>
               <p className="text-zinc-600 dark:text-zinc-400">{u.email}</p>
             </div>
-            <ProfileEditor initialDisplayName={u.displayName} initialBio={u.bio ?? ""} />
-            <dl className="grid gap-4 border-t border-zinc-100 pt-6 text-sm dark:border-zinc-800 sm:grid-cols-2">
+            <ProfileEditor
+              initialDisplayName={u.displayName}
+              initialBio={u.bio ?? ""}
+              initialAvatarUrl={u.avatarUrl ?? ""}
+            />
+            <dl className="grid gap-4 border-t border-zinc-100 pt-6 text-sm dark:border-zinc-800">
               <div>
                 <dt className="font-medium text-zinc-500 dark:text-zinc-400">Member since</dt>
                 <dd className="mt-1 text-zinc-900 dark:text-zinc-100">{formatJoined(u.createdAt)}</dd>
-              </div>
-              <div>
-                <dt className="font-medium text-zinc-500 dark:text-zinc-400">User ID</dt>
-                <dd className="mt-1 break-all font-mono text-xs text-zinc-700 dark:text-zinc-300">
-                  {u.id}
-                </dd>
               </div>
               <div className="sm:col-span-2">
                 <dt className="font-medium text-zinc-500 dark:text-zinc-400">Bio</dt>
@@ -98,6 +106,45 @@ export default async function DashboardPage() {
                 </dd>
               </div>
             </dl>
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-6 py-4 dark:border-zinc-800">
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              Your peaks
+            </h3>
+            <Link
+              href="/feed"
+              className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+            >
+              View feed
+            </Link>
+          </div>
+          <div className="px-6 py-5">
+            {myPeaks.length === 0 ? (
+              <p className="text-sm text-zinc-600 dark:text-zinc-300">
+                Peaks you post will appear here.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {myPeaks.map((p) => (
+                  <li
+                    key={p.id}
+                    className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                  >
+                    <p className="text-zinc-700 dark:text-zinc-200">{p.text}</p>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      {new Date(p.createdAt).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </section>
       </main>

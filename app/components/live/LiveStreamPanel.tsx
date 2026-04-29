@@ -1,7 +1,7 @@
 "use client";
 
 import MuxPlayer from "@mux/mux-player-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type LiveState = {
   configured: boolean;
@@ -22,9 +22,15 @@ type CreateResult = {
 export function LiveStreamPanel() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [goingLive, setGoingLive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<LiveState | null>(null);
   const [created, setCreated] = useState<CreateResult | null>(null);
+  const [previewOn, setPreviewOn] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaRef = useRef<MediaStream | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +83,92 @@ export function LiveStreamPanel() {
     }
   }
 
+  async function startPreview() {
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: true,
+      });
+      mediaRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setPreviewOn(true);
+    } catch {
+      setError("Camera/mic permission denied.");
+    }
+  }
+
+  function stopPreview() {
+    recorderRef.current?.stop();
+    wsRef.current?.close();
+    wsRef.current = null;
+    recorderRef.current = null;
+    mediaRef.current?.getTracks().forEach((t) => t.stop());
+    mediaRef.current = null;
+    setPreviewOn(false);
+    setGoingLive(false);
+  }
+
+  async function goLiveFromBrowser() {
+    setError(null);
+    setGoingLive(true);
+    try {
+      // Always create a live stream so we have a valid RTMP target.
+      const res = await fetch("/api/live", { method: "POST" });
+      const data = (await res.json()) as CreateResult & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Unable to create live stream");
+      setCreated(data);
+
+      // Relay is required because Mux doesn't accept WebRTC ingest directly.
+      // This must be provided as a public env var for the browser.
+      const relayUrl = (process.env.NEXT_PUBLIC_STREAM_RELAY_URL ?? "").trim();
+      if (!relayUrl) {
+        throw new Error(
+          "Missing NEXT_PUBLIC_STREAM_RELAY_URL (browser->RTMP relay required).",
+        );
+      }
+      if (!mediaRef.current) {
+        await startPreview();
+      }
+      const stream = mediaRef.current;
+      if (!stream) throw new Error("No camera stream available");
+
+      const ws = new WebSocket(relayUrl);
+      wsRef.current = ws;
+      await new Promise<void>((resolve, reject) => {
+        ws.onopen = () => resolve();
+        ws.onerror = () => reject(new Error("Relay connection failed"));
+      });
+
+      ws.send(
+        JSON.stringify({
+          type: "start",
+          rtmpUrl: data.rtmpUrl,
+          streamKey: data.streamKey,
+        }),
+      );
+
+      const recorder = new MediaRecorder(stream, {
+        mimeType: "video/webm;codecs=vp8,opus",
+        videoBitsPerSecond: 2_000_000,
+      });
+      recorderRef.current = recorder;
+      recorder.ondataavailable = async (ev) => {
+        if (!ev.data || ev.data.size === 0) return;
+        if (ws.readyState !== WebSocket.OPEN) return;
+        const buf = await ev.data.arrayBuffer();
+        ws.send(buf);
+      };
+      recorder.start(500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to go live");
+      setGoingLive(false);
+    }
+  }
+
   return (
     <section className="mb-4 rounded-2xl border border-zinc-200/90 bg-white/95 p-3 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/90 sm:p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -101,6 +193,36 @@ export function LiveStreamPanel() {
             muted={false}
             accentColor="#10b981"
             className="aspect-video w-full"
+          />
+        </div>
+      ) : null}
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <button
+          type="button"
+          className="rounded-full border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          onClick={previewOn ? stopPreview : startPreview}
+          disabled={creating || goingLive}
+        >
+          {previewOn ? "Stop camera preview" : "Start camera preview"}
+        </button>
+        <button
+          type="button"
+          className="rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+          onClick={goLiveFromBrowser}
+          disabled={goingLive}
+        >
+          {goingLive ? "Going live..." : "Go live from browser"}
+        </button>
+      </div>
+
+      {previewOn ? (
+        <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700">
+          <video
+            ref={videoRef}
+            muted
+            playsInline
+            className="aspect-video w-full bg-black"
           />
         </div>
       ) : null}

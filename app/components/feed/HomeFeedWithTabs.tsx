@@ -9,6 +9,7 @@ import {
   MARKET_FEED_FOR_YOU,
   MARKET_FEED_LIVE,
 } from "@/app/lib/mock-markets";
+import type { Peak } from "@/lib/peaks/store";
 
 function FeedTabButton({
   active,
@@ -59,6 +60,7 @@ export function HomeFeedWithTabs() {
   const [explore, setExplore] = useState("Trending");
   const [tabsVisible, setTabsVisible] = useState(true);
   const [bottomRefreshing, setBottomRefreshing] = useState(false);
+  const [peaks, setPeaks] = useState<Peak[]>([]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -73,6 +75,35 @@ export function HomeFeedWithTabs() {
       : tab === "following"
         ? MARKET_FEED_FOLLOWING
         : MARKET_FEED_LIVE;
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPeaks() {
+      try {
+        const res = await fetch("/api/peaks?limit=20", { cache: "no-store" });
+        const data = (await res.json()) as { peaks?: Peak[] };
+        if (!cancelled && Array.isArray(data.peaks)) setPeaks(data.peaks);
+      } catch {
+        // ignore
+      }
+    }
+    loadPeaks();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    function onNewPeak(e: Event) {
+      const ce = e as CustomEvent;
+      const peak = ce.detail as Peak | undefined;
+      if (!peak || typeof peak !== "object") return;
+      setPeaks((prev) => [peak, ...prev].slice(0, 30));
+    }
+    window.addEventListener("peaksees:new-peak", onNewPeak as EventListener);
+    return () =>
+      window.removeEventListener("peaksees:new-peak", onNewPeak as EventListener);
+  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -225,7 +256,12 @@ export function HomeFeedWithTabs() {
         className="feed-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
       >
         {tab === "live" ? <LiveStreamPanel /> : null}
-        <PeakFeed key={`${tab}-${explore}`} posts={posts} contextLabel={explore} />
+        <PeakFeed
+          key={`${tab}-${explore}`}
+          posts={posts}
+          contextLabel={explore}
+          peaks={peaks}
+        />
         <div ref={sentinelRef} className="h-px w-full shrink-0" aria-hidden />
         {bottomRefreshing ? (
           <Spinner label="Refreshing feed…" />

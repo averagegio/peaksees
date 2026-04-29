@@ -29,7 +29,8 @@ db.exec(`
     display_name TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    bio TEXT
+    bio TEXT,
+    avatar_url TEXT
   );
 `);
 
@@ -39,5 +40,19 @@ const userColumns = db
 if (!userColumns.some((column) => column.name === "bio")) {
   db.exec("ALTER TABLE users ADD COLUMN bio TEXT");
 }
+if (!userColumns.some((column) => column.name === "avatar_url")) {
+  db.exec("ALTER TABLE users ADD COLUMN avatar_url TEXT");
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS peaks (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS peaks_created_at_idx ON peaks(created_at DESC);
+  CREATE INDEX IF NOT EXISTS peaks_user_created_at_idx ON peaks(user_id, created_at DESC);
+`);
 
 export { db };
