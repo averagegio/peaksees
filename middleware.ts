@@ -9,7 +9,12 @@ export async function middleware(req: NextRequest) {
   const authed = await isSessionCookieValid(token);
   const { pathname } = req.nextUrl;
 
-  if (pathname.startsWith("/dashboard")) {
+  if (
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/feed") ||
+    pathname.startsWith("/bookmarks") ||
+    pathname.startsWith("/mentions")
+  ) {
     if (!authed) {
       const u = req.nextUrl.clone();
       u.pathname = "/login";
@@ -22,7 +27,7 @@ export async function middleware(req: NextRequest) {
   if (pathname === "/login" || pathname === "/signup") {
     if (authed) {
       const u = req.nextUrl.clone();
-      u.pathname = "/dashboard";
+      u.pathname = "/feed";
       u.search = "";
       return NextResponse.redirect(u);
     }
@@ -32,5 +37,12 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/signup"],
+  matcher: [
+    "/dashboard/:path*",
+    "/feed/:path*",
+    "/bookmarks/:path*",
+    "/mentions/:path*",
+    "/login",
+    "/signup",
+  ],
 };

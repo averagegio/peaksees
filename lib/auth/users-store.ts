@@ -1,8 +1,7 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { db } from "@/lib/db";
 
 export type StoredUser = {
   id: string;
@@ -11,26 +10,6 @@ export type StoredUser = {
   passwordHash: string;
   createdAt: string;
 };
-
-type StoreFile = { users: StoredUser[] };
-
-const DATA_PATH = path.join(process.cwd(), "data", "users.json");
-
-async function readStore(): Promise<StoreFile> {
-  try {
-    const raw = await readFile(DATA_PATH, "utf8");
-    const parsed = JSON.parse(raw) as StoreFile;
-    if (!Array.isArray(parsed.users)) return { users: [] };
-    return parsed;
-  } catch {
-    return { users: [] };
-  }
-}
-
-async function writeStore(data: StoreFile): Promise<void> {
-  await mkdir(path.dirname(DATA_PATH), { recursive: true });
-  await writeFile(DATA_PATH, JSON.stringify(data, null, 2), "utf8");
-}
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -41,11 +20,15 @@ export async function createUser(input: {
   passwordHash: string;
   displayName: string;
 }): Promise<StoredUser | { error: "email_taken" }> {
-  const store = await readStore();
   const email = normalizeEmail(input.email);
-  if (store.users.some((u) => normalizeEmail(u.email) === email)) {
+  const existing = db
+    .prepare("SELECT id FROM users WHERE email = ? LIMIT 1")
+    .get(email) as { id: string } | undefined;
+
+  if (existing) {
     return { error: "email_taken" };
   }
+
   const user: StoredUser = {
     id: randomUUID(),
     email,
@@ -53,8 +36,12 @@ export async function createUser(input: {
     passwordHash: input.passwordHash,
     createdAt: new Date().toISOString(),
   };
-  store.users.push(user);
-  await writeStore(store);
+
+  db.prepare(
+    `INSERT INTO users (id, email, display_name, password_hash, created_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(user.id, user.email, user.displayName, user.passwordHash, user.createdAt);
+
   return user;
 }
 
@@ -62,13 +49,61 @@ export async function getUserByEmail(
   email: string,
 ): Promise<StoredUser | null> {
   const e = normalizeEmail(email);
-  const store = await readStore();
-  return store.users.find((u) => normalizeEmail(u.email) === e) ?? null;
+  const row = db
+    .prepare(
+      `SELECT id, email, display_name, password_hash, created_at
+       FROM users
+       WHERE email = ?
+       LIMIT 1`,
+    )
+    .get(e) as
+    | {
+        id: string;
+        email: string;
+        display_name: string;
+        password_hash: string;
+        created_at: string;
+      }
+    | undefined;
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.display_name,
+    passwordHash: row.password_hash,
+    createdAt: row.created_at,
+  };
 }
 
 export async function getUserById(id: string): Promise<StoredUser | null> {
-  const store = await readStore();
-  return store.users.find((u) => u.id === id) ?? null;
+  const row = db
+    .prepare(
+      `SELECT id, email, display_name, password_hash, created_at
+       FROM users
+       WHERE id = ?
+       LIMIT 1`,
+    )
+    .get(id) as
+    | {
+        id: string;
+        email: string;
+        display_name: string;
+        password_hash: string;
+        created_at: string;
+      }
+    | undefined;
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.display_name,
+    passwordHash: row.password_hash,
+    createdAt: row.created_at,
+  };
 }
 
 export function toPublicUser(user: StoredUser) {

@@ -58,7 +58,7 @@ export function NavShell({
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <header className="sticky top-0 z-30 shrink-0 border-b border-zinc-200/90 bg-white/95 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/95">
         <Link
-          href="/"
+          href="/feed"
           className="flex w-full items-center justify-center bg-white px-4 py-3 sm:py-4 dark:bg-zinc-950"
           onClick={() => setOpen(false)}
         >
@@ -79,7 +79,9 @@ export function NavShell({
 
         <div className="flex items-center justify-between gap-3 border-t border-zinc-100 px-3 py-2 dark:border-zinc-800">
           <div className="flex items-center gap-2">
-            {showBackButton && <BackButton fallbackHref="/" label="Back" iconOnly />}
+            {showBackButton && (
+              <BackButton fallbackHref="/feed" label="Back" iconOnly />
+            )}
             <button
               type="button"
               ref={firstFocusableRef}

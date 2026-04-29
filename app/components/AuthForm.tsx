@@ -31,7 +31,7 @@ export function LoginForm({
         return;
       }
       router.refresh();
-      router.push(nextPath && nextPath.startsWith("/") ? nextPath : "/dashboard");
+      router.push(nextPath && nextPath.startsWith("/") ? nextPath : "/feed");
     } finally {
       setBusy(false);
     }
@@ -128,7 +128,7 @@ export function SignupForm() {
         return;
       }
       router.refresh();
-      router.push("/dashboard");
+      router.push("/feed");
     } finally {
       setBusy(false);
     }

@@ -29,7 +29,7 @@ export default async function DashboardPage() {
     <div className="flex min-h-dvh flex-col bg-gradient-to-b from-zinc-100 to-zinc-200/90 dark:from-zinc-950 dark:to-zinc-900">
       <header className="border-b border-zinc-200/90 bg-white px-4 py-5 dark:border-zinc-800 dark:bg-zinc-950">
         <div className="mx-auto flex max-w-2xl flex-col gap-6">
-          <Link href="/" className="mx-auto flex w-full max-w-lg justify-center">
+          <Link href="/feed" className="mx-auto flex w-full max-w-lg justify-center">
             <Image
               src={PEAKSEES_HEADER_BANNER}
               alt="peaksees home"
@@ -43,9 +43,9 @@ export default async function DashboardPage() {
               Your profile
             </h1>
             <div className="flex items-center gap-3">
-              <BackButton fallbackHref="/" iconOnly />
+              <BackButton fallbackHref="/feed" iconOnly />
               <Link
-                href="/"
+                href="/feed"
                 className="text-sm font-medium text-zinc-600 underline-offset-4 hover:text-zinc-900 hover:underline dark:text-zinc-400 dark:hover:text-zinc-100"
               >
                 Feed
