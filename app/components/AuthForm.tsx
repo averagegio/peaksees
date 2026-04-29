@@ -31,7 +31,7 @@ export function LoginForm({
         return;
       }
       router.refresh();
-      router.push(nextPath && nextPath.startsWith("/") ? nextPath : "/feed");
+      router.push(nextPath && nextPath.startsWith("/") ? nextPath : "/dashboard");
     } catch {
       setError("Server error. Please try again.");
     } finally {
@@ -130,7 +130,7 @@ export function SignupForm() {
         return;
       }
       router.refresh();
-      router.push("/feed");
+      router.push("/dashboard");
     } catch {
       setError("Server error. Please try again.");
     } finally {

@@ -50,7 +50,7 @@ export default async function DashboardPage() {
               >
                 Feed
               </Link>
-              <LogoutButton />
+              <LogoutButton className="min-w-[92px]" />
             </div>
           </div>
         </div>
