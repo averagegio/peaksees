@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getMailer } from "@/lib/email/mailer";
+import { getMailer, getMailerMissingEnv } from "@/lib/email/mailer";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -26,25 +26,52 @@ export async function POST(request: Request) {
 
   const mailer = getMailer();
   if (!mailer) {
+    const missing = getMailerMissingEnv();
+    const detail =
+      missing.length > 0
+        ? ` Add: ${missing.map((m) => m.key).join(", ")}.`
+        : " Check SMTP_PORT (default 587) and that EMAIL_FROM / ADVERTISERS_TO_EMAIL resolve (they default to SMTP_USER).";
     return NextResponse.json(
-      { error: "Email is not configured yet." },
+      {
+        error:
+          "Email is not configured on the server." +
+          detail +
+          " Zoho US example: SMTP_HOST=smtp.zoho.com, SMTP_PORT=587, SMTP_USER=you@yourdomain.com, SMTP_PASS=your app password.",
+        missing: missing.map((m) => m.key),
+      },
       { status: 503 },
     );
   }
 
-  await mailer.transporter.sendMail({
-    from: mailer.from,
-    to: mailer.to,
-    replyTo: email,
-    subject: `peaksees advertiser inquiry — ${name}`,
-    text: [
-      `Name: ${name}`,
-      `Email: ${email}`,
-      "",
-      "Description:",
-      description,
-    ].join("\n"),
-  });
+  try {
+    await mailer.transporter.sendMail({
+      from: mailer.from,
+      to: mailer.to,
+      replyTo: email,
+      subject: `peaksees advertiser inquiry — ${name}`,
+      text: [
+        `Name: ${name}`,
+        `Email: ${email}`,
+        "",
+        "Description:",
+        description,
+      ].join("\n"),
+    });
+  } catch (e) {
+    const msg =
+      e && typeof e === "object" && "message" in e
+        ? String((e as { message?: string }).message)
+        : "SMTP send failed";
+    console.error("[advertisers] sendMail:", e);
+    return NextResponse.json(
+      {
+        error:
+          "Could not deliver email. Verify SMTP_HOST, SMTP_PORT (465 SSL vs 587 TLS), SMTP_USER, SMTP_PASS, and that the sender is allowed for your provider.",
+        detail: process.env.NODE_ENV === "development" ? msg : undefined,
+      },
+      { status: 502 },
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

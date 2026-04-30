@@ -23,9 +23,20 @@ export function AdvertisersForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, description }),
       });
-      const data = (await safeJson<{ error?: string }>(res)) ?? {};
+      const data =
+        (await safeJson<{
+          error?: string;
+          detail?: string;
+          missing?: string[];
+        }>(res)) ?? {};
       if (!res.ok) {
-        setError(data.error ?? "Could not send message");
+        const parts: string[] = [];
+        if (data.error) parts.push(data.error);
+        if (data.missing?.length) {
+          parts.push(`Set these in the server environment: ${data.missing.join(", ")}.`);
+        }
+        if (data.detail) parts.push(`(${data.detail})`);
+        setError(parts.length > 0 ? parts.join(" ") : "Could not send message");
         return;
       }
       setSent(true);
