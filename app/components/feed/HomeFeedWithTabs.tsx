@@ -11,6 +11,8 @@ import {
 } from "@/app/lib/mock-markets";
 import { safeJson } from "@/lib/http";
 import type { Peak } from "@/lib/peaks/store";
+import type { Market } from "@/lib/markets/store";
+import type { MarketPost } from "@/app/lib/mock-markets";
 
 function FeedTabButton({
   active,
@@ -62,6 +64,7 @@ export function HomeFeedWithTabs() {
   const [tabsVisible, setTabsVisible] = useState(true);
   const [bottomRefreshing, setBottomRefreshing] = useState(false);
   const [peaks, setPeaks] = useState<Peak[]>([]);
+  const [generatedMarkets, setGeneratedMarkets] = useState<Market[]>([]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -77,6 +80,26 @@ export function HomeFeedWithTabs() {
         ? MARKET_FEED_FOLLOWING
         : MARKET_FEED_LIVE;
 
+  const generatedAsPosts: MarketPost[] = generatedMarkets.map((m) => {
+    const yesP = Number(m.yesProbability) || 0.5;
+    const noP = Number(m.noProbability) || 1 - yesP;
+    return {
+      id: m.id.startsWith("market:") ? m.id.slice("market:".length) : m.id,
+      creator: "Peak AI",
+      handle: "@peak",
+      avatarHue: 160,
+      postedAt: "Today",
+      question: m.question,
+      category: m.category,
+      volumeUsd: Math.round((m.volumeCents ?? 0) / 100),
+      endsAtLabel: m.endsAt,
+      outcomes: [
+        { id: "y", label: "Yes", probability: yesP },
+        { id: "n", label: "No", probability: noP },
+      ],
+    };
+  });
+
   useEffect(() => {
     let cancelled = false;
     async function loadPeaks() {
@@ -89,6 +112,23 @@ export function HomeFeedWithTabs() {
       }
     }
     loadPeaks();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMarkets() {
+      try {
+        const res = await fetch("/api/markets?limit=60", { cache: "no-store" });
+        const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
+        if (!cancelled && Array.isArray(data.markets)) setGeneratedMarkets(data.markets);
+      } catch {
+        // ignore
+      }
+    }
+    void loadMarkets();
     return () => {
       cancelled = true;
     };
@@ -260,7 +300,7 @@ export function HomeFeedWithTabs() {
         {tab === "live" ? <LiveStreamPanel /> : null}
         <PeakFeed
           key={`${tab}-${explore}`}
-          posts={posts}
+          posts={[...generatedAsPosts, ...posts]}
           contextLabel={explore}
           peaks={peaks}
         />

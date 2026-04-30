@@ -4,6 +4,7 @@ import type { MarketPost } from "@/app/lib/mock-markets";
 import { useState } from "react";
 import type { Peak } from "@/lib/peaks/store";
 import { PostActions } from "@/app/components/post/PostActions";
+import { MarketTradeBox } from "@/app/components/market/MarketTradeBox";
 
 function formatUsd(n: number) {
   return new Intl.NumberFormat("en-US", {
@@ -16,6 +17,7 @@ function formatUsd(n: number) {
 function MarketPostCard({ post }: { post: MarketPost }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [yes, no] = post.outcomes;
+  const yesP = Number(yes?.probability ?? 0.5);
 
   return (
     <article
@@ -111,6 +113,8 @@ function MarketPostCard({ post }: { post: MarketPost }) {
           )}
         </span>
       </footer>
+
+      <MarketTradeBox marketId={`market:${post.id}`} yesProbability={yesP} />
 
       <PostActions postKey={`market:${post.id}`} title={post.question} />
     </article>

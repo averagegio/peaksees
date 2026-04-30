@@ -93,6 +93,33 @@ db.exec(`
     note TEXT
   );
   CREATE INDEX IF NOT EXISTS peakpoints_ledger_user_idx ON peakpoints_ledger(user_id, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS markets (
+    id TEXT PRIMARY KEY,
+    question TEXT NOT NULL,
+    category TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    source TEXT NOT NULL,
+    yes_probability REAL NOT NULL,
+    no_probability REAL NOT NULL,
+    volume_cents INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS markets_created_at_idx ON markets(created_at DESC);
+  CREATE INDEX IF NOT EXISTS markets_category_created_at_idx ON markets(category, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS market_trades (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    market_id TEXT NOT NULL,
+    side TEXT NOT NULL, -- yes | no
+    price_cents INTEGER NOT NULL, -- 1..99, price per $1 share
+    shares_x1000 INTEGER NOT NULL, -- shares * 1000 for precision
+    cost_cents INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS market_trades_user_created_at_idx ON market_trades(user_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS market_trades_market_created_at_idx ON market_trades(market_id, created_at DESC);
 `);
 
 export { db };
