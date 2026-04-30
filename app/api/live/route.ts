@@ -2,11 +2,10 @@ import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth/session";
 import {
-  getConfiguredMuxIds,
-  getMuxClient,
-  hasMuxCredentials,
-  readPlaybackId,
-} from "@/lib/live/mux";
+  createLiveKitJoinToken,
+  getLiveKitConfig,
+  hasLiveKitServerCredentials,
+} from "@/lib/live/livekit";
 
 export const runtime = "nodejs";
 
@@ -16,93 +15,69 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { playbackId: envPlaybackId, liveStreamId } = getConfiguredMuxIds();
-  const mux = getMuxClient();
+  const { url, roomName } = getLiveKitConfig();
+  const configured = hasLiveKitServerCredentials() && Boolean(url);
 
-  if (!mux) {
-    return NextResponse.json({
-      configured: Boolean(envPlaybackId),
-      playbackId: envPlaybackId || null,
-      status: "offline",
-      source: envPlaybackId ? "env_playback_id" : "none",
-      canCreate: false,
-    });
-  }
-
-  if (!liveStreamId) {
-    return NextResponse.json({
-      configured: Boolean(envPlaybackId),
-      playbackId: envPlaybackId || null,
-      status: "offline",
-      source: envPlaybackId ? "env_playback_id" : "mux_missing_stream_id",
-      canCreate: true,
-    });
-  }
-
-  try {
-    const stream = await mux.video.liveStreams.retrieve(liveStreamId);
-    const streamPlaybackId = readPlaybackId(
-      stream.playback_ids as Array<{ id: string; policy?: string }> | undefined,
-    );
-
-    return NextResponse.json({
-      configured: Boolean(streamPlaybackId || envPlaybackId),
-      playbackId: streamPlaybackId || envPlaybackId || null,
-      status: stream.status ?? "unknown",
-      source: "mux_live_stream",
-      canCreate: true,
-      liveStreamId: stream.id,
-    });
-  } catch {
-    return NextResponse.json({
-      configured: Boolean(envPlaybackId),
-      playbackId: envPlaybackId || null,
-      status: "offline",
-      source: "mux_error",
-      canCreate: true,
-    });
-  }
+  return NextResponse.json({
+    configured,
+    url: configured ? url : null,
+    roomName,
+    provider: "livekit" as const,
+  });
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!hasMuxCredentials()) {
+  if (!hasLiveKitServerCredentials()) {
     return NextResponse.json(
-      { error: "Set MUX_TOKEN_ID and MUX_TOKEN_SECRET first." },
+      {
+        error:
+          "Set LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and NEXT_PUBLIC_LIVEKIT_URL (wss://…).",
+      },
       { status: 400 },
     );
   }
 
-  const mux = getMuxClient();
-  if (!mux) {
-    return NextResponse.json({ error: "Mux client unavailable" }, { status: 500 });
+  const { url, roomName } = getLiveKitConfig();
+  if (!url) {
+    return NextResponse.json(
+      { error: "Set NEXT_PUBLIC_LIVEKIT_URL to your LiveKit WebSocket URL." },
+      { status: 400 },
+    );
+  }
+
+  let role: "publisher" | "viewer" = "viewer";
+  try {
+    const body = (await request.json().catch(() => ({}))) as {
+      role?: string;
+    };
+    if (body.role === "publisher" || body.role === "viewer") {
+      role = body.role;
+    }
+  } catch {
+    // default viewer
   }
 
   try {
-    const stream = await mux.video.liveStreams.create({
-      playback_policy: ["public"],
-      new_asset_settings: { playback_policy: ["public"] },
-      latency_mode: "low",
+    const token = await createLiveKitJoinToken({
+      identity: session.user.id,
+      name: session.user.displayName,
+      role,
+      roomName,
     });
-    const playbackId = readPlaybackId(
-      stream.playback_ids as Array<{ id: string; policy?: string }> | undefined,
-    );
 
     return NextResponse.json({
-      liveStreamId: stream.id,
-      playbackId: playbackId || null,
-      streamKey: stream.stream_key,
-      status: stream.status ?? "idle",
-      rtmpUrl: "rtmp://global-live.mux.com:5222/app",
+      token,
+      url,
+      roomName,
+      role,
     });
-  } catch {
-    return NextResponse.json(
-      { error: "Could not create a Mux live stream right now." },
-      { status: 500 },
-    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Could not create LiveKit token";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { safeJson } from "@/lib/http";
@@ -17,6 +18,7 @@ export function ProfileEditor({
   initialAvatarUrl = "",
   initialBannerUrl = "",
 }: ProfileEditorProps) {
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState(initialDisplayName);
   const [bio, setBio] = useState(initialBio);
@@ -36,13 +38,29 @@ export function ProfileEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ displayName, bio, avatarUrl, bannerUrl }),
       });
-      const data = (await safeJson<{ error?: string }>(res)) ?? {};
+      const data =
+        (await safeJson<{
+          error?: string;
+          user?: {
+            displayName: string;
+            bio?: string | null;
+            avatarUrl?: string | null;
+            bannerUrl?: string | null;
+          };
+        }>(res)) ?? {};
       if (!res.ok) {
         setError(data.error ?? "Could not save profile");
         return;
       }
-      setSaved(true);
+      if (data.user) {
+        setDisplayName(data.user.displayName);
+        setBio(data.user.bio ?? "");
+        setAvatarUrl(data.user.avatarUrl ?? "");
+        setBannerUrl(data.user.bannerUrl ?? "");
+      }
       setEditing(false);
+      setSaved(true);
+      router.refresh();
     } catch {
       setError("Could not save profile");
     } finally {
@@ -54,9 +72,22 @@ export function ProfileEditor({
     <div className="space-y-3">
       {!editing ? (
         <div className="space-y-3">
+          {saved ? (
+            <p
+              className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/50 dark:text-emerald-200"
+              role="status"
+              aria-live="polite"
+            >
+              Profile saved. Your new photo and header are shown above.
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={() => {
+              setDisplayName(initialDisplayName);
+              setBio(initialBio);
+              setAvatarUrl(initialAvatarUrl);
+              setBannerUrl(initialBannerUrl);
               setEditing(true);
               setSaved(false);
               setError(null);
@@ -65,11 +96,6 @@ export function ProfileEditor({
           >
             Edit profile
           </button>
-          {saved ? (
-            <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-              Profile updated.
-            </p>
-          ) : null}
         </div>
       ) : (
         <div className="space-y-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-950">

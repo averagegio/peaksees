@@ -125,28 +125,28 @@ export default async function DashboardPage() {
           </div>
         </section>
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="relative h-28 overflow-hidden bg-gradient-to-r from-emerald-600/90 to-teal-600/80 sm:h-32">
+          <div className="relative z-0 h-28 overflow-hidden bg-gradient-to-r from-emerald-600/90 to-teal-600/80 sm:h-32">
             {u.bannerUrl?.trim() ? (
               // eslint-disable-next-line @next/next/no-img-element -- data URL banner
               <img
                 src={u.bannerUrl}
                 alt=""
-                className="absolute inset-0 h-full w-full object-cover opacity-95"
+                className="absolute inset-0 z-0 h-full w-full object-cover opacity-95"
               />
             ) : null}
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/45 to-teal-600/35" />
+            <div className="absolute inset-0 z-[1] bg-gradient-to-r from-emerald-600/45 to-teal-600/35" />
           </div>
-          <div className="-mt-10 flex flex-col gap-4 px-6 pb-6">
+          <div className="relative z-10 -mt-10 flex flex-col gap-4 px-6 pb-6">
             {u.avatarUrl?.trim() ? (
               // eslint-disable-next-line @next/next/no-img-element -- data URL avatar
               <img
                 src={u.avatarUrl}
                 alt=""
-                className="h-20 w-20 rounded-2xl border-4 border-white object-cover shadow-md dark:border-zinc-900"
+                className="relative z-10 h-20 w-20 rounded-2xl border-4 border-white bg-white object-cover shadow-lg ring-2 ring-zinc-200/80 dark:border-zinc-900 dark:bg-zinc-900 dark:ring-zinc-700/80"
               />
             ) : (
               <div
-                className="flex h-20 w-20 items-center justify-center rounded-2xl border-4 border-white text-2xl font-bold text-white shadow-md dark:border-zinc-900"
+                className="relative z-10 flex h-20 w-20 items-center justify-center rounded-2xl border-4 border-white text-2xl font-bold text-white shadow-lg ring-2 ring-zinc-200/80 dark:border-zinc-900 dark:ring-zinc-700/80"
                 style={{ backgroundColor: "hsl(160 45% 38%)" }}
                 aria-hidden
               >
