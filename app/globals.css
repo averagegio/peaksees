@@ -202,6 +202,132 @@ body {
   }
 }
 
+@keyframes peak-ticker {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.market-ticker {
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.market-ticker__track {
+  display: inline-flex;
+  gap: 1rem;
+  padding-left: 0.25rem;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .market-ticker__track {
+    animation: peak-ticker 12s linear infinite;
+  }
+}
+
+@keyframes nav-shimmer {
+  0% {
+    transform: translate3d(-40%, 0, 0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate3d(140%, 0, 0);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nav-chip-motion {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    transition: transform 200ms ease, border-color 200ms ease, background-color 200ms ease;
+  }
+  .nav-chip-motion:active {
+    transform: scale(0.96);
+  }
+  .nav-chip-motion::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(255 255 255 / 0.14),
+      transparent
+    );
+    transform: translate3d(-40%, 0, 0);
+    opacity: 0;
+  }
+  .nav-chip-motion:hover::after,
+  .nav-chip-motion:focus-visible::after {
+    animation: nav-shimmer 900ms ease-out 1;
+  }
+  .nav-chip-motion > * {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+@keyframes slot-roll-up {
+  0% {
+    transform: translate3d(0, 0%, 0);
+  }
+  70% {
+    transform: translate3d(0, 0%, 0);
+  }
+  80% {
+    transform: translate3d(0, -50%, 0);
+  }
+  95% {
+    transform: translate3d(0, -50%, 0);
+  }
+  100% {
+    transform: translate3d(0, 0%, 0);
+  }
+}
+
+.slot-roll {
+  display: inline-block;
+  position: relative;
+  height: 1.1em;
+  line-height: 1.1em;
+  overflow: hidden;
+  vertical-align: -0.1em;
+}
+
+.slot-roll__inner {
+  display: inline-flex;
+  flex-direction: column;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .slot-roll__inner {
+    will-change: transform;
+    animation: slot-roll-up 8.5s ease-in-out infinite;
+  }
+  /* Slightly different cadence per chip */
+  .slot-roll[data-slot-speed="slow"] .slot-roll__inner {
+    animation-duration: 10.5s;
+  }
+  .slot-roll[data-slot-speed="med"] .slot-roll__inner {
+    animation-duration: 9.2s;
+  }
+  .slot-roll[data-slot-speed="fast"] .slot-roll__inner {
+    animation-duration: 8.0s;
+  }
+}
+
 @keyframes click-star-burst {
   0% {
     opacity: 0;

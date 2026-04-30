@@ -5,6 +5,11 @@ import { usePathname } from "next/navigation";
 
 const items = [
   {
+    href: "/peakstats",
+    label: "Peakstats",
+    icon: TrophyIcon,
+  },
+  {
     href: "/pricing",
     label: "Pricing",
     icon: PricingIcon,
@@ -105,6 +110,18 @@ function MegaphoneIcon({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
       <path d="M3 11v2a2 2 0 002 2h1l3 5h2l-2-5h2l10 3V6L11 9H5a2 2 0 00-2 2z" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M16 9v6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function TrophyIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path d="M8 21h8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 17v4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7 4h10v4a5 5 0 01-10 0V4z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 6H3v2a4 4 0 004 4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M19 6h2v2a4 4 0 01-4 4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

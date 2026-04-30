@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: { text?: string };
+  let body: { text?: string; expiresAt?: string | null };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -34,6 +34,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Post text required" }, { status: 400 });
   }
 
-  const peak = await createPeak({ userId: session.user.id, text });
+  const expiresAt =
+    typeof body.expiresAt === "string" && body.expiresAt.trim()
+      ? body.expiresAt
+      : null;
+  const peak = await createPeak({ userId: session.user.id, text, expiresAt });
   return NextResponse.json({ peak });
 }

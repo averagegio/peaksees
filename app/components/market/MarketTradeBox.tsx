@@ -11,24 +11,20 @@ export function MarketTradeBox({
   marketId: string;
   yesProbability: number;
 }) {
-  const [side, setSide] = useState<"yes" | "no">("yes");
   const [amountCents, setAmountCents] = useState(500);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [balanceCents, setBalanceCents] = useState<number | null>(null);
 
-  const priceCents = useMemo(() => {
-    const p = side === "yes" ? yesProbability : 1 - yesProbability;
-    const cents = Math.round(p * 100);
+  const yesPriceCents = useMemo(() => {
+    const cents = Math.round(Number(yesProbability) * 100);
     return Math.min(99, Math.max(1, cents));
-  }, [side, yesProbability]);
-
-  const estShares = useMemo(() => {
-    const cost = Math.max(0, Math.floor(amountCents));
-    if (!Number.isFinite(cost) || cost <= 0) return 0;
-    return cost / priceCents;
-  }, [amountCents, priceCents]);
+  }, [yesProbability]);
+  const noPriceCents = useMemo(() => {
+    const cents = Math.round((1 - Number(yesProbability)) * 100);
+    return Math.min(99, Math.max(1, cents));
+  }, [yesProbability]);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,7 +45,7 @@ export function MarketTradeBox({
     };
   }, []);
 
-  async function submit() {
+  async function submit(side: "yes" | "no") {
     setBusy(true);
     setError(null);
     setOk(null);
@@ -92,19 +88,7 @@ export function MarketTradeBox({
         ) : null}
       </div>
 
-      <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-        <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
-          Side
-          <select
-            value={side}
-            onChange={(e) => setSide(e.target.value === "no" ? "no" : "yes")}
-            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-          >
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-          </select>
-        </label>
-
+      <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
         <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
           Amount (cents)
           <input
@@ -117,20 +101,28 @@ export function MarketTradeBox({
           />
         </label>
 
-        <div className="sm:self-end">
+        <div className="flex gap-2 sm:self-end">
           <button
             type="button"
-            onClick={submit}
+            onClick={() => submit("yes")}
             disabled={busy}
-            className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+            className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
           >
-            {busy ? "Buying…" : "Buy"}
+            {busy ? "Buying…" : `Buy Yes · ${yesPriceCents}¢`}
+          </button>
+          <button
+            type="button"
+            onClick={() => submit("no")}
+            disabled={busy}
+            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          >
+            {busy ? "Buying…" : `Buy No · ${noPriceCents}¢`}
           </button>
         </div>
       </div>
 
       <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-        Price: {priceCents}¢ / share · Est. shares: {estShares.toFixed(2)}
+        You’ll get more shares at lower price. Trades spend Peakpoints immediately.
       </p>
 
       {ok ? (

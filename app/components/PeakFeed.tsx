@@ -1,10 +1,12 @@
 "use client";
 
 import type { MarketPost } from "@/app/lib/mock-markets";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Peak } from "@/lib/peaks/store";
 import { PostActions } from "@/app/components/post/PostActions";
 import { MarketTradeBox } from "@/app/components/market/MarketTradeBox";
+import { PeakOpinionChip } from "@/app/components/market/PeakOpinionChip";
+import { ShareMarketButton } from "@/app/components/market/ShareMarketButton";
 
 function formatUsd(n: number) {
   return new Intl.NumberFormat("en-US", {
@@ -14,13 +16,29 @@ function formatUsd(n: number) {
   }).format(n);
 }
 
+function tickerParts(post: MarketPost) {
+  const yesPct = Math.round((post.outcomes[0]?.probability ?? 0.5) * 100);
+  const noPct = 100 - yesPct;
+  return [
+    `VOL ${formatUsd(post.volumeUsd)}`,
+    `YES ${yesPct}%`,
+    `NO ${noPct}%`,
+    `SETTLES ${post.endsAtLabel}`,
+    post.category.toUpperCase(),
+  ];
+}
+
 function MarketPostCard({ post }: { post: MarketPost }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [yes, no] = post.outcomes;
   const yesP = Number(yes?.probability ?? 0.5);
+  const cardRef = useRef<HTMLElement | null>(null);
 
   return (
     <article
+      ref={(el) => {
+        cardRef.current = el;
+      }}
       data-sparkle-click="true"
       className="poppy-hover sparkle-hover rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm backdrop-blur-md dark:border-zinc-700 dark:bg-zinc-900/95"
       aria-label={`Prediction market: ${post.question}`}
@@ -102,19 +120,38 @@ function MarketPostCard({ post }: { post: MarketPost }) {
         })}
       </div>
 
-      <footer className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-3 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-        <span>Vol · {formatUsd(post.volumeUsd)}</span>
-        <span>
-          Settles · {post.endsAtLabel}
-          {selected && (
-            <span className="ml-2 text-emerald-600 dark:text-emerald-400">
-              · You leaned {yes.id === selected ? yes.label : no.label}
-            </span>
-          )}
-        </span>
+      <footer className="mt-4 border-t border-zinc-100 pt-3 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+        <div className="market-ticker">
+          <div className="market-ticker__track">
+            {[...tickerParts(post), ...tickerParts(post)].map((t, i) => (
+              <span key={`${post.id}-tick-${i}`} className="shrink-0">
+                <span className="text-zinc-300 dark:text-zinc-600">·</span>{" "}
+                <span className="font-semibold text-zinc-700 dark:text-zinc-200">{t}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+        {selected ? (
+          <div className="mt-2 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+            You leaned {yes.id === selected ? yes.label : no.label}
+          </div>
+        ) : null}
       </footer>
 
+      <PeakOpinionChip
+        question={post.question}
+        crowdYes={yesP}
+        enabled={selected !== null}
+      />
+
       <MarketTradeBox marketId={`market:${post.id}`} yesProbability={yesP} />
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <ShareMarketButton
+          getNode={() => cardRef.current}
+          filenameBase={post.question}
+        />
+      </div>
 
       <PostActions postKey={`market:${post.id}`} title={post.question} />
     </article>
@@ -165,6 +202,11 @@ export function PeakFeed({
                     <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-200">
                       {p.text}
                     </p>
+                    {p.expiresAt ? (
+                      <p className="mt-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                        Expires {new Date(p.expiresAt).toLocaleString()}
+                      </p>
+                    ) : null}
                     <PostActions postKey={`peak:${p.id}`} title={p.text} />
                   </li>
                 ))}

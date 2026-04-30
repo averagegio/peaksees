@@ -13,6 +13,7 @@ import { safeJson } from "@/lib/http";
 import type { Peak } from "@/lib/peaks/store";
 import type { Market } from "@/lib/markets/store";
 import type { MarketPost } from "@/app/lib/mock-markets";
+import Link from "next/link";
 
 function FeedTabButton({
   active,
@@ -286,23 +287,80 @@ export function HomeFeedWithTabs() {
             </FeedTabButton>
           </div>
           <div className="mx-auto mt-3 max-w-lg border-t border-zinc-200/80 pt-3 dark:border-zinc-800">
-            <div className="feed-scroll flex items-center gap-2 overflow-x-auto pb-1">
-              {["Trending", "News", "Sports", "Explore"].map((item) => (
+            <div className="-mx-3 feed-scroll flex items-center gap-4 overflow-x-auto px-3 pb-1">
+              {["Trending", "News", "Sports", "Culture"].map((item) => {
+                const color =
+                  item === "Trending"
+                    ? "text-emerald-700 dark:text-emerald-300"
+                    : item === "News"
+                      ? "text-sky-700 dark:text-sky-300"
+                      : item === "Sports"
+                        ? "text-amber-700 dark:text-amber-300"
+                        : "text-violet-700 dark:text-violet-300";
+                const inactive =
+                  item === "Trending"
+                    ? "text-emerald-700/60 hover:text-emerald-800 dark:text-emerald-300/65 dark:hover:text-emerald-200"
+                    : item === "News"
+                      ? "text-sky-700/60 hover:text-sky-800 dark:text-sky-300/65 dark:hover:text-sky-200"
+                      : item === "Sports"
+                        ? "text-amber-700/60 hover:text-amber-800 dark:text-amber-300/65 dark:hover:text-amber-200"
+                        : "text-violet-700/60 hover:text-violet-800 dark:text-violet-300/65 dark:hover:text-violet-200";
+                return (
                 <button
                   key={item}
                   type="button"
                   data-sparkle-click="true"
                   onClick={() => setExplore(item)}
-                  data-sphere={item.toLowerCase()}
-                  className={`poppy-hover sparkle-hover sphere-chip shrink-0 rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                  className={`group sparkle-hover nav-chip-motion shrink-0 rounded-none px-0 py-1 text-[13px] font-semibold tracking-tight transition ${
                     explore === item
-                      ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                      : "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                      ? color
+                      : inactive
                   }`}
                 >
-                  {item}
+                  <span className="sr-only">{item}</span>
+                  <span
+                    className="slot-roll"
+                    data-slot-speed={
+                      item === "Trending"
+                        ? "fast"
+                        : item === "News"
+                          ? "med"
+                          : item === "Sports"
+                            ? "slow"
+                            : "med"
+                    }
+                    aria-hidden
+                  >
+                    <span className="slot-roll__inner">
+                      <span>{item}</span>
+                      <span>{item}</span>
+                    </span>
+                  </span>
+                  <span
+                    aria-hidden
+                    className={`mt-1 block h-[2px] w-full rounded-full transition ${
+                      explore === item
+                        ? "bg-current/70"
+                        : "bg-transparent"
+                    }`}
+                  />
                 </button>
-              ))}
+                );
+              })}
+              <Link
+                href="/peakstats"
+                data-sparkle-click="true"
+                className="group sparkle-hover nav-chip-motion shrink-0 px-0 py-1 text-[13px] font-semibold tracking-tight text-fuchsia-700/65 transition hover:text-fuchsia-800 dark:text-fuchsia-300/70 dark:hover:text-fuchsia-200"
+              >
+                <span className="sr-only">Peakstats</span>
+                <span className="slot-roll" data-slot-speed="slow" aria-hidden>
+                  <span className="slot-roll__inner">
+                    <span>Peakstats</span>
+                    <span>Peakstats</span>
+                  </span>
+                </span>
+                <span aria-hidden className="mt-1 block h-[2px] w-full rounded-full bg-transparent group-hover:bg-current/35" />
+              </Link>
             </div>
           </div>
         </div>

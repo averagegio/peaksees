@@ -26,6 +26,7 @@ export async function POST(request: Request) {
   const yes = clamp01(Number(body.outcomes?.yes ?? 0.55));
   const no = clamp01(Number(body.outcomes?.no ?? 1 - yes));
   const prob = clamp01((yes + (1 - no)) / 2);
+  const crowdYes = yes;
 
   const openaiKey = process.env.OPENAI_API_KEY ?? "";
   const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
@@ -80,7 +81,15 @@ export async function POST(request: Request) {
       if (reply) {
         return NextResponse.json({
           reply,
-          meta: { prob, used: "openai", model, web: Boolean(webSummary) },
+          meta: {
+            prob,
+            probYes: prob,
+            crowdYes,
+            disagree: Math.abs(prob - crowdYes) >= 0.08,
+            used: "openai",
+            model,
+            web: Boolean(webSummary),
+          },
         });
       }
     } catch {
@@ -96,7 +105,14 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     reply,
-    meta: { prob, used: "heuristic", web: Boolean(webSummary) },
+    meta: {
+      prob,
+      probYes: prob,
+      crowdYes,
+      disagree: Math.abs(prob - crowdYes) >= 0.08,
+      used: "heuristic",
+      web: Boolean(webSummary),
+    },
   });
 }
 

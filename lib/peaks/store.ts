@@ -14,6 +14,7 @@ export type Peak = {
   avatarUrl: string;
   text: string;
   createdAt: string;
+  expiresAt: string | null;
 };
 
 type PeakRow = {
@@ -21,6 +22,7 @@ type PeakRow = {
   user_id: string;
   text: string;
   created_at: string;
+  expires_at: string | null;
   display_name: string;
   email: string;
   avatar_url: string | null;
@@ -46,9 +48,13 @@ async function ensurePeaksSchema() {
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL,
           text TEXT NOT NULL,
-          created_at TEXT NOT NULL
+          created_at TEXT NOT NULL,
+          expires_at TEXT
         );
       `)
+      .then(() =>
+        postgresPool.query("ALTER TABLE peaks ADD COLUMN IF NOT EXISTS expires_at TEXT"),
+      )
       .then(() => undefined);
   }
   await peaksSchemaReady;
@@ -71,40 +77,44 @@ function toPeak(row: PeakRow): Peak {
     avatarUrl: row.avatar_url ?? "",
     text: row.text,
     createdAt: row.created_at,
+    expiresAt: row.expires_at ?? null,
   };
 }
 
 export async function createPeak(input: {
   userId: string;
   text: string;
+  expiresAt?: string | null;
 }): Promise<Peak> {
   const text = input.text.trim().slice(0, 280);
   const createdAt = new Date().toISOString();
+  const expiresAt =
+    typeof input.expiresAt === "string" && input.expiresAt.trim()
+      ? input.expiresAt
+      : null;
   const id = randomUUID();
 
   if (postgresPool) {
     await ensurePeaksSchema();
     const result = await postgresPool.query<PeakRow>(
-      `INSERT INTO peaks (id, user_id, text, created_at)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, user_id, text, created_at,
+      `INSERT INTO peaks (id, user_id, text, created_at, expires_at)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, user_id, text, created_at, expires_at,
          (SELECT display_name FROM users WHERE id = $2) AS display_name,
          (SELECT email FROM users WHERE id = $2) AS email,
          (SELECT avatar_url FROM users WHERE id = $2) AS avatar_url`,
-      [id, input.userId, text, createdAt],
+      [id, input.userId, text, createdAt, expiresAt],
     );
     return toPeak(result.rows[0]);
   }
 
-  db.prepare(`INSERT INTO peaks (id, user_id, text, created_at) VALUES (?, ?, ?, ?)`).run(
-    id,
-    input.userId,
-    text,
-    createdAt,
-  );
+  db.prepare(
+    `INSERT INTO peaks (id, user_id, text, created_at, expires_at) VALUES (?, ?, ?, ?, ?)`,
+  ).run(id, input.userId, text, createdAt, expiresAt);
   const row = db
     .prepare(
       `SELECT p.id, p.user_id, p.text, p.created_at,
+        p.expires_at as expires_at,
         u.display_name as display_name,
         u.email as email,
         u.avatar_url as avatar_url
@@ -122,19 +132,21 @@ export async function listPeaks(input: {
   limit?: number;
 }): Promise<Peak[]> {
   const limit = Math.min(50, Math.max(1, input.limit ?? 20));
+  const nowIso = new Date().toISOString();
 
   if (postgresPool) {
     await ensurePeaksSchema();
     const params: unknown[] = [];
-    let where = "";
+    let where = "WHERE (p.expires_at IS NULL OR p.expires_at > $1)";
+    params.push(nowIso);
     if (input.mineUserId) {
-      where = "WHERE p.user_id = $1";
+      where += ` AND p.user_id = $2`;
       params.push(input.mineUserId);
     }
     params.push(limit);
     const limitParam = params.length;
     const result = await postgresPool.query<PeakRow>(
-      `SELECT p.id, p.user_id, p.text, p.created_at, u.display_name, u.email, u.avatar_url
+      `SELECT p.id, p.user_id, p.text, p.created_at, p.expires_at, u.display_name, u.email, u.avatar_url
        FROM peaks p
        JOIN users u ON u.id = p.user_id
        ${where}
@@ -147,18 +159,19 @@ export async function listPeaks(input: {
 
   const rows = db
     .prepare(
-      `SELECT p.id, p.user_id, p.text, p.created_at,
+      `SELECT p.id, p.user_id, p.text, p.created_at, p.expires_at,
         u.display_name as display_name,
         u.email as email,
         u.avatar_url as avatar_url
        FROM peaks p
        JOIN users u ON u.id = p.user_id
-       ${input.mineUserId ? "WHERE p.user_id = ?" : ""}
+       WHERE (p.expires_at IS NULL OR p.expires_at > ?)
+       ${input.mineUserId ? "AND p.user_id = ?" : ""}
        ORDER BY p.created_at DESC
        LIMIT ?`,
     )
     .all(
-      ...(input.mineUserId ? [input.mineUserId, limit] : [limit]),
+      ...(input.mineUserId ? [nowIso, input.mineUserId, limit] : [nowIso, limit]),
     ) as PeakRow[];
 
   return rows.map(toPeak);

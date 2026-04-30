@@ -53,11 +53,19 @@ db.exec(`
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     text TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    expires_at TEXT
   );
   CREATE INDEX IF NOT EXISTS peaks_created_at_idx ON peaks(created_at DESC);
   CREATE INDEX IF NOT EXISTS peaks_user_created_at_idx ON peaks(user_id, created_at DESC);
 `);
+
+const peakColumns = db
+  .prepare("PRAGMA table_info(peaks)")
+  .all() as Array<{ name: string }>;
+if (!peakColumns.some((column) => column.name === "expires_at")) {
+  db.exec("ALTER TABLE peaks ADD COLUMN expires_at TEXT");
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS comments (

@@ -18,6 +18,11 @@ export type AttachedFile = {
 export function PeakComposerDock() {
   const [modalOpen, setModalOpen] = useState(false);
   const [text, setText] = useState("");
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [expiresPreset, setExpiresPreset] = useState<
+    "never" | "1h" | "6h" | "24h" | "7d" | "30d"
+  >("never");
   const [pollMode, setPollMode] = useState(false);
   const [pollOptions, setPollOptions] = useState(["", ""]);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
@@ -90,10 +95,11 @@ export function PeakComposerDock() {
       const postText = text.trim();
       if (!postText) return;
       try {
+        const expiresAt = presetToIso(expiresPreset);
         const res = await fetch("/api/peaks", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: postText }),
+          body: JSON.stringify({ text: postText, expiresAt }),
         });
         const data = (await safeJson<{ peak?: unknown; error?: string }>(res)) ?? {};
         if (!res.ok) {
@@ -112,6 +118,31 @@ export function PeakComposerDock() {
   }
 
   const canPost = text.trim().length > 0;
+
+  async function suggest() {
+    setSuggesting(true);
+    setSuggestionError(null);
+    try {
+      const res = await fetch("/api/peak/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seed: text.trim().slice(0, 200) }),
+      });
+      const data =
+        (await safeJson<{ suggestion?: string; error?: string }>(res)) ?? {};
+      if (!res.ok) {
+        setSuggestionError(data.error ?? "Could not get suggestion");
+        return;
+      }
+      if (data.suggestion) {
+        setText((prev) => (prev.trim().length === 0 ? data.suggestion! : `${prev.trim()}\n\n${data.suggestion}`));
+      }
+    } catch {
+      setSuggestionError("Could not get suggestion");
+    } finally {
+      setSuggesting(false);
+    }
+  }
 
   return (
     <div className="pointer-events-none fixed bottom-0 right-0 z-[45] flex flex-col items-end p-3 sm:p-4">
@@ -198,6 +229,43 @@ export function PeakComposerDock() {
                 rows={5}
                 className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50/80 px-3 py-2.5 text-[15px] leading-relaxed text-zinc-900 outline-none ring-emerald-500/20 placeholder:text-zinc-400 focus:border-emerald-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               />
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={suggest}
+                  disabled={suggesting}
+                  className="rounded-full border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-800 hover:bg-violet-100 disabled:opacity-60 dark:border-violet-900/60 dark:bg-violet-950/40 dark:text-violet-200 dark:hover:bg-violet-950/70"
+                >
+                  {suggesting ? "Peak is suggesting…" : "Suggest a peak"}
+                </button>
+                {suggestionError ? (
+                  <span className="text-xs font-semibold text-red-600 dark:text-red-400">
+                    {suggestionError}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                  Set time
+                  <select
+                    value={expiresPreset}
+                    onChange={(e) =>
+                      setExpiresPreset(
+                        (e.target.value as typeof expiresPreset) ?? "never",
+                      )
+                    }
+                    className="ml-2 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                  >
+                    <option value="never">Never</option>
+                    <option value="1h">1 hour</option>
+                    <option value="6h">6 hours</option>
+                    <option value="24h">24 hours</option>
+                    <option value="7d">7 days</option>
+                    <option value="30d">30 days</option>
+                  </select>
+                </label>
+              </div>
 
               {pollMode && (
                 <div className="mt-4 rounded-xl border border-emerald-200/80 bg-emerald-50/50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/30">
@@ -404,4 +472,22 @@ export function PeakComposerDock() {
       )}
     </div>
   );
+}
+
+function presetToIso(
+  preset: "never" | "1h" | "6h" | "24h" | "7d" | "30d",
+): string | null {
+  if (preset === "never") return null;
+  const now = Date.now();
+  const ms =
+    preset === "1h"
+      ? 60 * 60 * 1000
+      : preset === "6h"
+        ? 6 * 60 * 60 * 1000
+        : preset === "24h"
+          ? 24 * 60 * 60 * 1000
+          : preset === "7d"
+            ? 7 * 24 * 60 * 60 * 1000
+            : 30 * 24 * 60 * 60 * 1000;
+  return new Date(now + ms).toISOString();
 }
