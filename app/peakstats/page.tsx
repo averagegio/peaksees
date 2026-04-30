@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BackButton } from "@/app/components/BackButton";
+import { ProfileLink } from "@/app/components/profile/ProfileLink";
 import { getSession } from "@/lib/auth/session";
 import { listPeakstatsLeaderboard } from "@/lib/peakpoints/leaderboard";
 
@@ -49,27 +50,36 @@ export default async function PeakstatsPage() {
                   <span className="w-8 shrink-0 text-sm font-extrabold text-zinc-500 dark:text-zinc-400">
                     #{idx + 1}
                   </span>
-                  {r.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- data URL avatars
-                    <img
-                      src={r.avatarUrl}
-                      alt=""
-                      className="h-10 w-10 shrink-0 rounded-xl object-cover ring-2 ring-zinc-200 dark:ring-zinc-800"
-                    />
-                  ) : (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-sm font-bold text-white">
-                      {r.displayName
-                        .split(/\s+/)
-                        .map((w) => w[0])
-                        .join("")
-                        .slice(0, 2)
-                        .toUpperCase()}
-                    </div>
-                  )}
+                  <ProfileLink
+                    href={`/u/${encodeURIComponent(r.userId)}`}
+                    className="group relative shrink-0"
+                    ariaLabel={`Open ${r.displayName} profile`}
+                  >
+                    {r.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- data URL avatars
+                      <img
+                        src={r.avatarUrl}
+                        alt=""
+                        className="h-10 w-10 rounded-xl object-cover ring-2 ring-zinc-200 transition group-hover:scale-[1.02] dark:ring-zinc-800"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-sm font-bold text-white transition group-hover:scale-[1.02]">
+                        {r.displayName
+                          .split(/\s+/)
+                          .map((w) => w[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </div>
+                    )}
+                  </ProfileLink>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                    <ProfileLink
+                      href={`/u/${encodeURIComponent(r.userId)}`}
+                      className="truncate text-sm font-semibold text-zinc-900 hover:underline dark:text-zinc-100"
+                    >
                       {r.displayName}
-                    </p>
+                    </ProfileLink>
                     <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
                       {r.email}
                     </p>

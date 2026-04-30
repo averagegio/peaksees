@@ -7,6 +7,7 @@ import { PostActions } from "@/app/components/post/PostActions";
 import { MarketTradeBox } from "@/app/components/market/MarketTradeBox";
 import { PeakOpinionChip } from "@/app/components/market/PeakOpinionChip";
 import { ShareMarketButton } from "@/app/components/market/ShareMarketButton";
+import { ProfileLink } from "@/app/components/profile/ProfileLink";
 
 function formatUsd(n: number) {
   return new Intl.NumberFormat("en-US", {
@@ -33,6 +34,7 @@ function MarketPostCard({ post }: { post: MarketPost }) {
   const [yes, no] = post.outcomes;
   const yesP = Number(yes?.probability ?? 0.5);
   const cardRef = useRef<HTMLElement | null>(null);
+  const handleSlug = encodeURIComponent(post.handle.replace(/^@/, ""));
 
   return (
     <article
@@ -44,24 +46,36 @@ function MarketPostCard({ post }: { post: MarketPost }) {
       aria-label={`Prediction market: ${post.question}`}
     >
       <header className="flex gap-3">
-        <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white ring-2 ring-white/30 dark:ring-zinc-700"
-          style={{ backgroundColor: `hsl(${post.avatarHue} 55% 42%)` }}
-          aria-hidden
+        <ProfileLink
+          href={`/p/${handleSlug}`}
+          className="group shrink-0"
+          ariaLabel={`Open ${post.creator} profile`}
         >
-          {post.creator
-            .split(" ")
-            .map((w) => w[0])
-            .join("")}
-        </div>
+          <div
+            className="flex h-11 w-11 items-center justify-center rounded-full text-sm font-semibold text-white ring-2 ring-white/30 transition group-hover:scale-[1.03] dark:ring-zinc-700"
+            style={{ backgroundColor: `hsl(${post.avatarHue} 55% 42%)` }}
+            aria-hidden
+          >
+            {post.creator
+              .split(" ")
+              .map((w) => w[0])
+              .join("")}
+          </div>
+        </ProfileLink>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="truncate font-semibold text-zinc-900 dark:text-zinc-100">
+            <ProfileLink
+              href={`/p/${handleSlug}`}
+              className="truncate font-semibold text-zinc-900 hover:underline dark:text-zinc-100"
+            >
               {post.creator}
-            </span>
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
+            </ProfileLink>
+            <ProfileLink
+              href={`/p/${handleSlug}`}
+              className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
+            >
               {post.handle}
-            </span>
+            </ProfileLink>
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
             <span>{post.postedAt}</span>
@@ -191,7 +205,12 @@ export function PeakFeed({
                     className="sparkle-hover rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold">{p.displayName}</span>
+                      <ProfileLink
+                        href={`/u/${encodeURIComponent(p.userId)}`}
+                        className="font-semibold hover:underline"
+                      >
+                        {p.displayName}
+                      </ProfileLink>
                       <span className="text-xs text-zinc-500 dark:text-zinc-400">
                         {new Date(p.createdAt).toLocaleDateString(undefined, {
                           month: "short",

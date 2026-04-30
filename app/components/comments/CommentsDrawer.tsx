@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { safeJson } from "@/lib/http";
+import { ProfileLink } from "@/app/components/profile/ProfileLink";
 
 type Comment = {
   id: string;
+  userId: string;
   displayName: string;
   avatarUrl: string;
   text: string;
@@ -166,18 +168,31 @@ export function CommentsDrawer({
                 <li key={c.id} className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-3">
-                      {c.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- data URL avatar
-                        <img src={c.avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
-                      ) : (
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-200 text-xs font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-                          {c.displayName.slice(0, 1).toUpperCase()}
-                        </div>
-                      )}
+                      <ProfileLink
+                        href={`/u/${encodeURIComponent(c.userId)}`}
+                        className="group shrink-0"
+                        ariaLabel={`Open ${c.displayName} profile`}
+                      >
+                        {c.avatarUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- data URL avatar
+                          <img
+                            src={c.avatarUrl}
+                            alt=""
+                            className="h-9 w-9 rounded-full object-cover transition group-hover:scale-[1.03]"
+                          />
+                        ) : (
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-200 text-xs font-bold text-zinc-700 transition group-hover:scale-[1.03] dark:bg-zinc-800 dark:text-zinc-200">
+                            {c.displayName.slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
+                      </ProfileLink>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                        <ProfileLink
+                          href={`/u/${encodeURIComponent(c.userId)}`}
+                          className="truncate text-sm font-semibold text-zinc-900 hover:underline dark:text-zinc-100"
+                        >
                           {c.displayName}
-                        </p>
+                        </ProfileLink>
                         <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-200">
                           {c.text}
                         </p>
