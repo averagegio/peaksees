@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getMailer, getMailerMissingEnv } from "@/lib/email/mailer";
+import { getSmtpDeliveryHint } from "@/lib/email/smtp-errors";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
         error:
           "Email is not configured on the server." +
           detail +
-          " Zoho US example: SMTP_HOST=smtp.zoho.com, SMTP_PORT=587, SMTP_USER=you@yourdomain.com, SMTP_PASS=your app password.",
+          " Zoho examples: domain/organization mailbox → SMTP_HOST=smtppro.zoho.com; personal Zoho Mail → smtp.zoho.com (EU datacenter may use a different host — copy from Zoho Mail SMTP settings). Ports 465 SSL or 587 TLS. SMTP_USER=you@yourdomain.com, SMTP_PASS=app-specific password.",
         missing: missing.map((m) => m.key),
       },
       { status: 503 },
@@ -62,12 +63,17 @@ export async function POST(request: Request) {
       e && typeof e === "object" && "message" in e
         ? String((e as { message?: string }).message)
         : "SMTP send failed";
+    const hint = getSmtpDeliveryHint(e);
     console.error("[advertisers] sendMail:", e);
     return NextResponse.json(
       {
-        error:
-          "Could not deliver email. Verify SMTP_HOST, SMTP_PORT (465 SSL vs 587 TLS), SMTP_USER, SMTP_PASS, and that the sender is allowed for your provider.",
-        detail: process.env.NODE_ENV === "development" ? msg : undefined,
+        error: `Could not deliver email. ${hint}`,
+        hint,
+        detail:
+          process.env.NODE_ENV === "development" ||
+          (process.env.SMTP_DEBUG ?? "").trim() === "1"
+            ? msg
+            : undefined,
       },
       { status: 502 },
     );

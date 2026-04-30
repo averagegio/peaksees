@@ -26,16 +26,18 @@ export function AdvertisersForm() {
       const data =
         (await safeJson<{
           error?: string;
+          hint?: string;
           detail?: string;
           missing?: string[];
         }>(res)) ?? {};
       if (!res.ok) {
         const parts: string[] = [];
         if (data.error) parts.push(data.error);
+        else if (data.hint) parts.push(data.hint);
         if (data.missing?.length) {
           parts.push(`Set these in the server environment: ${data.missing.join(", ")}.`);
         }
-        if (data.detail) parts.push(`(${data.detail})`);
+        if (data.detail) parts.push(`Technical: ${data.detail}`);
         setError(parts.length > 0 ? parts.join(" ") : "Could not send message");
         return;
       }

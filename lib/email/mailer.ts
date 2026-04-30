@@ -13,7 +13,8 @@ export function getMailerMissingEnv(): MailerMissing {
   if (!host) {
     missing.push({
       key: "SMTP_HOST",
-      hint: "e.g. smtp.zoho.com (Zoho US) or your provider’s SMTP host",
+      hint:
+        "Use the outgoing SMTP server your provider lists for your account (Zoho domain/org mail often uses smtppro.zoho.com; personal @zohomail.com uses smtp.zoho.com — EU/other regions may differ; check Zoho Mail → SMTP / server configuration).",
     });
   }
   if (!user) {
@@ -54,13 +55,25 @@ export function getMailer() {
     return null;
   }
 
-  const secure = port === 465;
+  const secureExplicit = (process.env.SMTP_SECURE ?? "").trim().toLowerCase();
+  const secure =
+    secureExplicit === "true" || secureExplicit === "1"
+      ? true
+      : secureExplicit === "false" || secureExplicit === "0"
+        ? false
+        : port === 465;
 
   const transporter = nodemailer.createTransport({
     host,
     port,
     secure,
     auth: { user, pass },
+    connectionTimeout: 25_000,
+    greetingTimeout: 20_000,
+    socketTimeout: 25_000,
+    tls: {
+      minVersion: "TLSv1.2",
+    },
     ...(port === 587 && !secure
       ? {
           requireTLS: true,
