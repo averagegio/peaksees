@@ -121,7 +121,9 @@ export function HomeFeedWithTabs() {
     let cancelled = false;
     async function loadMarkets() {
       try {
-        const res = await fetch("/api/markets?limit=60", { cache: "no-store" });
+        const res = await fetch("/api/markets?limit=60&autogen=1&count=5", {
+          cache: "no-store",
+        });
         const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
         if (!cancelled && Array.isArray(data.markets)) setGeneratedMarkets(data.markets);
       } catch {
@@ -186,6 +188,19 @@ export function HomeFeedWithTabs() {
           pulseLock.current = true;
 
           setBottomRefreshing(true);
+          // On refresh pulse, fetch markets with autogen enabled.
+          // Rate-limited server-side to avoid excessive generation.
+          void (async () => {
+            try {
+              const res = await fetch("/api/markets?limit=60&autogen=1&count=5", {
+                cache: "no-store",
+              });
+              const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
+              if (Array.isArray(data.markets)) setGeneratedMarkets(data.markets);
+            } catch {
+              // ignore
+            }
+          })();
           window.setTimeout(() => {
             pulseLock.current = false;
             setBottomRefreshing(false);
