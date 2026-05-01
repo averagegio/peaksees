@@ -1,5 +1,5 @@
+import { HomeFeedWithTabs } from "@/app/components/feed/HomeFeedWithTabs";
 import { FeedChrome } from "@/app/components/feed/FeedChrome";
-import { FeedWithStories } from "@/app/feed/FeedWithStories";
 
 export default async function FeedPage({
   searchParams,
@@ -11,7 +11,7 @@ export default async function FeedPage({
     typeof sp.m === "string" && sp.m.trim() ? sp.m.trim() : undefined;
   return (
     <FeedChrome showBackButton={false}>
-      <FeedWithStories highlightMarketId={highlight} />
+      <HomeFeedWithTabs highlightMarketId={highlight} />
     </FeedChrome>
   );
 }
