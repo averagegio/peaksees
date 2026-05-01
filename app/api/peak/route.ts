@@ -7,6 +7,33 @@ function clamp01(x: number) {
   return Math.max(0, Math.min(1, x));
 }
 
+function extractProbYesFromText(text: string): number | null {
+  // Try to find a probability in the model output.
+  // Accept forms like "62%", "62 %", "P=0.62", "0.62", "62 percent".
+  const t = text.toLowerCase();
+
+  // Prefer explicit percents.
+  const percentMatches = [...t.matchAll(/(\d{1,3}(?:\.\d+)?)\s*(%|percent)\b/g)];
+  for (const m of percentMatches) {
+    const raw = Number(m[1]);
+    if (!Number.isFinite(raw)) continue;
+    if (raw < 0 || raw > 100) continue;
+    return clamp01(raw / 100);
+  }
+
+  // Then look for 0..1 decimals (e.g. 0.62) only if it appears probability-ish.
+  // Keep it conservative to avoid grabbing unrelated numbers (years, counts, etc).
+  const decimalMatches = [...t.matchAll(/\b(?:p\s*=\s*)?(0?\.\d{1,3}|1\.0{1,3}|0|1)\b/g)];
+  for (const m of decimalMatches) {
+    const raw = Number(m[1]);
+    if (!Number.isFinite(raw)) continue;
+    if (raw < 0 || raw > 1) continue;
+    return clamp01(raw);
+  }
+
+  return null;
+}
+
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -79,13 +106,15 @@ export async function POST(request: Request) {
 
       const reply = resp.choices[0]?.message?.content?.trim() || "";
       if (reply) {
+        const modelProbYes = extractProbYesFromText(reply);
+        const probYes = modelProbYes ?? prob;
         return NextResponse.json({
           reply,
           meta: {
             prob,
-            probYes: prob,
+            probYes,
             crowdYes,
-            disagree: Math.abs(prob - crowdYes) >= 0.08,
+            disagree: Math.abs(probYes - crowdYes) >= 0.08,
             used: "openai",
             model,
             web: Boolean(webSummary),
