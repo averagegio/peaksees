@@ -43,11 +43,16 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   count: number;
   minIntervalMs: number;
   dailyCap: number;
+  category?: string;
 }): Promise<{ generated: number }> {
   const openaiKey = (process.env.OPENAI_API_KEY ?? "").trim();
   if (!openaiKey) return { generated: 0 };
   const model = (process.env.OPENAI_MODEL ?? "gpt-4o-mini").trim();
   const tavilyKey = (process.env.TAVILY_API_KEY ?? "").trim();
+  const category =
+    typeof input.category === "string" && input.category.trim()
+      ? input.category.trim().slice(0, 24)
+      : "";
 
   const count = Math.max(1, Math.min(10, Math.floor(input.count)));
   const since = new Date(Date.now() - input.minIntervalMs).toISOString();
@@ -55,10 +60,11 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   dayStart.setHours(0, 0, 0, 0);
   const dayStartIso = dayStart.toISOString();
 
-  const recentCount = await countMarkets({ sinceIso: since, sourcePrefix: "peak_" });
+  const sourcePrefix = category ? `peak_${category.toLowerCase()}_` : "peak_";
+  const recentCount = await countMarkets({ sinceIso: since, sourcePrefix });
   if (recentCount > 0) return { generated: 0 };
 
-  const todayCount = await countMarkets({ sinceIso: dayStartIso, sourcePrefix: "peak_" });
+  const todayCount = await countMarkets({ sinceIso: dayStartIso, sourcePrefix });
   if (todayCount >= input.dailyCap) return { generated: 0 };
 
   const signals = await fetchTrendSignals(tavilyKey);
@@ -72,6 +78,9 @@ export async function maybeGenerateMarketsOnRefresh(input: {
 
   const user =
     `Generate ${count} markets.\n\n` +
+    (category
+      ? `Category: ${category}. Every item MUST use exactly this category value.\n\n`
+      : "") +
     `Signals:\n${signals}\n\n` +
     "Return ONLY valid JSON: an array of objects with keys:\n" +
     `- question: string\n- category: string\n- daysToResolve: number (1..90)\n- yesProbability: number (0.05..0.95)\n` +
@@ -90,13 +99,14 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   const parsed = safeParse(raw);
   if (!parsed) return { generated: 0 };
 
-  const existing = await listMarkets({ limit: 200 });
+  const existing = await listMarkets({ limit: 200, category: category || undefined });
   const existingSet = new Set(existing.map((m) => normalizeQuestion(m.question)));
 
   let createdCount = 0;
   for (const item of parsed) {
     const question = typeof item.question === "string" ? item.question.trim() : "";
-    const category = typeof item.category === "string" ? item.category.trim() : "Culture";
+    const rawCategory = typeof item.category === "string" ? item.category.trim() : "Culture";
+    const finalCategory = category || rawCategory || "Culture";
     const daysToResolve = Math.floor(Number(item.daysToResolve ?? 30));
     const yesProbability = Number(item.yesProbability ?? 0.5);
     if (question.length < 8) continue;
@@ -110,9 +120,9 @@ export async function maybeGenerateMarketsOnRefresh(input: {
     const endsAt = new Date(Date.now() + daysToResolve * 24 * 60 * 60 * 1000).toISOString();
     await createMarket({
       question,
-      category: category.slice(0, 24),
+      category: finalCategory.slice(0, 24),
       endsAt,
-      source: "peak_refresh",
+      source: category ? `peak_${category.toLowerCase()}_refresh` : "peak_refresh",
       yesProbability,
     });
     existingSet.add(norm);

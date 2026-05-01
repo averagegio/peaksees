@@ -14,6 +14,7 @@ export async function GET(request: Request) {
   const limit = Math.floor(Number(url.searchParams.get("limit") ?? "50"));
   const autogen = url.searchParams.get("autogen") === "1";
   const count = Math.floor(Number(url.searchParams.get("count") ?? "5"));
+  const category = (url.searchParams.get("category") ?? "").trim();
 
   if (autogen) {
     // Generate a small batch per refresh, but rate-limit + cap daily total.
@@ -21,9 +22,13 @@ export async function GET(request: Request) {
       count,
       minIntervalMs: 60_000,
       dailyCap: 100,
+      category: category || undefined,
     });
   }
-  const markets = await listMarkets({ limit: Number.isFinite(limit) ? limit : 50 });
+  const markets = await listMarkets({
+    limit: Number.isFinite(limit) ? limit : 50,
+    category: category || undefined,
+  });
   return NextResponse.json({ markets });
 }
 

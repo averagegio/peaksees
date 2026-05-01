@@ -105,6 +105,12 @@ export function HomeFeedWithTabs({
     };
   });
 
+  const marketCategory =
+    explore === "Trending" ? "" : explore === "News" ? "News" : explore === "Sports" ? "Sports" : "Culture";
+  const marketsUrl = `/api/markets?limit=60&autogen=1&count=5${
+    marketCategory ? `&category=${encodeURIComponent(marketCategory)}` : ""
+  }`;
+
   useEffect(() => {
     let cancelled = false;
     async function loadPeaks() {
@@ -126,7 +132,7 @@ export function HomeFeedWithTabs({
     let cancelled = false;
     async function loadMarkets() {
       try {
-        const res = await fetch("/api/markets?limit=60&autogen=1&count=5", {
+        const res = await fetch(marketsUrl, {
           cache: "no-store",
         });
         const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
@@ -139,7 +145,7 @@ export function HomeFeedWithTabs({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [marketsUrl]);
 
   useEffect(() => {
     function onNewPeak(e: Event) {
@@ -197,7 +203,7 @@ export function HomeFeedWithTabs({
           // Rate-limited server-side to avoid excessive generation.
           void (async () => {
             try {
-              const res = await fetch("/api/markets?limit=60&autogen=1&count=5", {
+              const res = await fetch(marketsUrl, {
                 cache: "no-store",
               });
               const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};

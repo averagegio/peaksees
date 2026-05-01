@@ -123,10 +123,36 @@ function rowToMarket(row: {
 
 export async function listMarkets(input: {
   limit: number;
+  category?: string;
 }): Promise<Market[]> {
   const limit = Math.max(1, Math.min(200, Math.floor(input.limit)));
+  const category =
+    typeof input.category === "string" && input.category.trim()
+      ? input.category.trim().slice(0, 24)
+      : "";
   if (postgresPool) {
     await ensureSchema();
+    if (category) {
+      const result = await postgresPool.query<{
+        id: string;
+        question: string;
+        category: string;
+        ends_at: string;
+        created_at: string;
+        source: string;
+        yes_probability: number;
+        no_probability: number;
+        volume_cents: number;
+      }>(
+        `SELECT id, question, category, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+         FROM markets
+         WHERE category = $2
+         ORDER BY created_at DESC
+         LIMIT $1`,
+        [limit, category],
+      );
+      return result.rows.map(rowToMarket);
+    }
     const result = await postgresPool.query<{
       id: string;
       question: string;
@@ -147,14 +173,24 @@ export async function listMarkets(input: {
     return result.rows.map(rowToMarket);
   }
 
-  const rows = db
-    .prepare(
-      `SELECT id, question, category, ends_at, created_at, source, yes_probability, no_probability, volume_cents
-       FROM markets
-       ORDER BY created_at DESC
-       LIMIT ?`,
-    )
-    .all(limit) as Array<{
+  const rows = (category
+    ? db
+        .prepare(
+          `SELECT id, question, category, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+           FROM markets
+           WHERE category = ?
+           ORDER BY created_at DESC
+           LIMIT ?`,
+        )
+        .all(category, limit)
+    : db
+        .prepare(
+          `SELECT id, question, category, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+           FROM markets
+           ORDER BY created_at DESC
+           LIMIT ?`,
+        )
+        .all(limit)) as Array<{
     id: string;
     question: string;
     category: string;
