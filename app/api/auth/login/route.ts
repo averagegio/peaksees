@@ -5,8 +5,6 @@ import { verifyPassword } from "@/lib/auth/password";
 import { createSessionToken } from "@/lib/auth/session";
 import { getUserByEmail, toPublicUser } from "@/lib/auth/users-store";
 
-export const runtime = "nodejs";
-
 export async function POST(request: Request) {
   let body: { email?: string; password?: string };
   try {

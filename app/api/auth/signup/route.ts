@@ -5,8 +5,6 @@ import { hashPassword } from "@/lib/auth/password";
 import { createSessionToken } from "@/lib/auth/session";
 import { createUser } from "@/lib/auth/users-store";
 
-export const runtime = "nodejs";
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
