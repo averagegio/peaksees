@@ -59,7 +59,11 @@ function Spinner({ label }: { label: string }) {
 }
 
 /** Feed tabs hide on scroll down; sentinel at bottom triggers a refresh pulse. */
-export function HomeFeedWithTabs() {
+export function HomeFeedWithTabs({
+  highlightMarketId,
+}: {
+  highlightMarketId?: string;
+} = {}) {
   const [tab, setTab] = useState<"foryou" | "following" | "live">("foryou");
   const [explore, setExplore] = useState("Trending");
   const [tabsVisible, setTabsVisible] = useState(true);
@@ -214,6 +218,22 @@ export function HomeFeedWithTabs() {
     io.observe(sent);
     return () => io.disconnect();
   }, [tab]);
+
+  useEffect(() => {
+    const id = highlightMarketId?.trim();
+    if (!id) return undefined;
+    const timer = window.setTimeout(() => {
+      const root = scrollRef.current;
+      if (!root || typeof CSS === "undefined" || typeof CSS.escape !== "function") return;
+      try {
+        const el = root.querySelector(`[data-market-id="${CSS.escape(id)}"]`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch {
+        // ignore
+      }
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [highlightMarketId, tab, explore, peaks, generatedMarkets]);
 
   useEffect(() => {
     function spawnSparkles(event: MouseEvent) {

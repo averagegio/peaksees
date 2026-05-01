@@ -38,6 +38,7 @@ function MarketPostCard({ post }: { post: MarketPost }) {
 
   return (
     <article
+      data-market-id={post.id}
       ref={(el) => {
         cardRef.current = el;
       }}
@@ -164,6 +165,8 @@ function MarketPostCard({ post }: { post: MarketPost }) {
         <ShareMarketButton
           getNode={() => cardRef.current}
           filenameBase={post.question}
+          marketId={post.id}
+          question={post.question}
         />
       </div>
 
