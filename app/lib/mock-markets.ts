@@ -12,6 +12,8 @@ export type MarketPost = {
   postedAt: string;
   question: string;
   category: string;
+  subcategory?: string;
+  hashtags?: string[];
   volumeUsd: number;
   endsAtLabel: string;
   outcomes: [Outcome, Outcome];

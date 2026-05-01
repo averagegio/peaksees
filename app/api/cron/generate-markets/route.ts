@@ -98,6 +98,15 @@ export async function POST(request: Request) {
     const m = await createMarket({
       question,
       category: category.slice(0, 24),
+      subcategory:
+        typeof item.subcategory === "string" ? item.subcategory.trim().slice(0, 32) : "",
+      hashtags: Array.isArray(item.hashtags)
+        ? item.hashtags
+            .filter((t) => typeof t === "string")
+            .map((t) => (t as string).trim())
+            .filter((t) => /^#[^\s#]{2,32}$/.test(t))
+            .slice(0, 6)
+        : [],
       endsAt,
       source: "peak_daily",
       yesProbability,
@@ -155,6 +164,8 @@ async function tavilySummary(tavilyKey: string, query: string) {
 type GeneratedMarket = {
   question?: unknown;
   category?: unknown;
+  subcategory?: unknown;
+  hashtags?: unknown;
   daysToResolve?: unknown;
   yesProbability?: unknown;
 };

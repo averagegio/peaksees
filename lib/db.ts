@@ -106,6 +106,8 @@ db.exec(`
     id TEXT PRIMARY KEY,
     question TEXT NOT NULL,
     category TEXT NOT NULL,
+    subcategory TEXT,
+    hashtags_json TEXT,
     ends_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
     source TEXT NOT NULL,
@@ -129,5 +131,22 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS market_trades_user_created_at_idx ON market_trades(user_id, created_at DESC);
   CREATE INDEX IF NOT EXISTS market_trades_market_created_at_idx ON market_trades(market_id, created_at DESC);
 `);
+
+const marketColumns = db
+  .prepare("PRAGMA table_info(markets)")
+  .all() as Array<{ name: string }>;
+if (!marketColumns.some((column) => column.name === "subcategory")) {
+  db.exec("ALTER TABLE markets ADD COLUMN subcategory TEXT");
+}
+if (!marketColumns.some((column) => column.name === "hashtags_json")) {
+  db.exec("ALTER TABLE markets ADD COLUMN hashtags_json TEXT");
+}
+try {
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS markets_category_subcategory_created_at_idx ON markets(category, subcategory, created_at DESC)",
+  );
+} catch {
+  // ignore
+}
 
 export { db };

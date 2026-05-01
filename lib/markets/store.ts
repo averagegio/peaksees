@@ -9,6 +9,8 @@ export type Market = {
   id: string;
   question: string;
   category: string;
+  subcategory: string;
+  hashtags: string[];
   endsAt: string;
   createdAt: string;
   source: string;
@@ -50,6 +52,8 @@ async function ensureSchema() {
           id TEXT PRIMARY KEY,
           question TEXT NOT NULL,
           category TEXT NOT NULL,
+          subcategory TEXT,
+          hashtags_json TEXT,
           ends_at TEXT NOT NULL,
           created_at TEXT NOT NULL,
           source TEXT NOT NULL,
@@ -60,12 +64,27 @@ async function ensureSchema() {
       `)
       .then(() =>
         postgresPool.query(
+          "ALTER TABLE markets ADD COLUMN IF NOT EXISTS subcategory TEXT",
+        ),
+      )
+      .then(() =>
+        postgresPool.query(
+          "ALTER TABLE markets ADD COLUMN IF NOT EXISTS hashtags_json TEXT",
+        ),
+      )
+      .then(() =>
+        postgresPool.query(
           "CREATE INDEX IF NOT EXISTS markets_created_at_idx ON markets(created_at DESC)",
         ),
       )
       .then(() =>
         postgresPool.query(
           "CREATE INDEX IF NOT EXISTS markets_category_created_at_idx ON markets(category, created_at DESC)",
+        ),
+      )
+      .then(() =>
+        postgresPool.query(
+          "CREATE INDEX IF NOT EXISTS markets_category_subcategory_created_at_idx ON markets(category, subcategory, created_at DESC)",
         ),
       )
       .then(() =>
@@ -101,6 +120,8 @@ function rowToMarket(row: {
   id: string;
   question: string;
   category: string;
+  subcategory: string | null;
+  hashtags_json: string | null;
   ends_at: string;
   created_at: string;
   source: string;
@@ -108,10 +129,24 @@ function rowToMarket(row: {
   no_probability: number;
   volume_cents: number;
 }): Market {
+  let hashtags: string[] = [];
+  const raw = row.hashtags_json ?? "";
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        hashtags = parsed.filter((t) => typeof t === "string").slice(0, 8) as string[];
+      }
+    } catch {
+      // ignore
+    }
+  }
   return {
     id: row.id,
     question: row.question,
     category: row.category,
+    subcategory: row.subcategory ?? "",
+    hashtags,
     endsAt: row.ends_at,
     createdAt: row.created_at,
     source: row.source,
@@ -137,6 +172,8 @@ export async function listMarkets(input: {
         id: string;
         question: string;
         category: string;
+        subcategory: string | null;
+        hashtags_json: string | null;
         ends_at: string;
         created_at: string;
         source: string;
@@ -144,7 +181,7 @@ export async function listMarkets(input: {
         no_probability: number;
         volume_cents: number;
       }>(
-        `SELECT id, question, category, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+        `SELECT id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents
          FROM markets
          WHERE category = $2
          ORDER BY created_at DESC
@@ -157,6 +194,8 @@ export async function listMarkets(input: {
       id: string;
       question: string;
       category: string;
+      subcategory: string | null;
+      hashtags_json: string | null;
       ends_at: string;
       created_at: string;
       source: string;
@@ -164,7 +203,7 @@ export async function listMarkets(input: {
       no_probability: number;
       volume_cents: number;
     }>(
-      `SELECT id, question, category, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+      `SELECT id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents
        FROM markets
        ORDER BY created_at DESC
        LIMIT $1`,
@@ -176,7 +215,7 @@ export async function listMarkets(input: {
   const rows = (category
     ? db
         .prepare(
-          `SELECT id, question, category, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+          `SELECT id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents
            FROM markets
            WHERE category = ?
            ORDER BY created_at DESC
@@ -185,7 +224,7 @@ export async function listMarkets(input: {
         .all(category, limit)
     : db
         .prepare(
-          `SELECT id, question, category, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+          `SELECT id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents
            FROM markets
            ORDER BY created_at DESC
            LIMIT ?`,
@@ -194,6 +233,8 @@ export async function listMarkets(input: {
     id: string;
     question: string;
     category: string;
+    subcategory: string | null;
+    hashtags_json: string | null;
     ends_at: string;
     created_at: string;
     source: string;
@@ -207,6 +248,8 @@ export async function listMarkets(input: {
 export async function createMarket(input: {
   question: string;
   category: string;
+  subcategory?: string;
+  hashtags?: string[];
   endsAt: string;
   source: string;
   yesProbability: number;
@@ -215,16 +258,30 @@ export async function createMarket(input: {
   const createdAt = new Date().toISOString();
   const yesP = clampProbability(input.yesProbability);
   const noP = clampProbability(1 - yesP);
+  const subcategory =
+    typeof input.subcategory === "string" ? input.subcategory.trim().slice(0, 32) : "";
+  const hashtagsJson =
+    Array.isArray(input.hashtags) && input.hashtags.length
+      ? JSON.stringify(
+          input.hashtags
+            .filter((t) => typeof t === "string")
+            .map((t) => t.trim())
+            .filter(Boolean)
+            .slice(0, 8),
+        )
+      : "";
 
   if (postgresPool) {
     await ensureSchema();
     await postgresPool.query(
-      `INSERT INTO markets (id, question, category, ends_at, created_at, source, yes_probability, no_probability, volume_cents)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0)`,
+      `INSERT INTO markets (id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0)`,
       [
         id,
         input.question,
         input.category,
+        subcategory || null,
+        hashtagsJson || null,
         input.endsAt,
         createdAt,
         input.source,
@@ -236,6 +293,8 @@ export async function createMarket(input: {
       id,
       question: input.question,
       category: input.category,
+      subcategory,
+      hashtags: hashtagsJson ? (JSON.parse(hashtagsJson) as string[]) : [],
       endsAt: input.endsAt,
       createdAt,
       source: input.source,
@@ -246,12 +305,14 @@ export async function createMarket(input: {
   }
 
   db.prepare(
-    `INSERT INTO markets (id, question, category, ends_at, created_at, source, yes_probability, no_probability, volume_cents)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+    `INSERT INTO markets (id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
   ).run(
     id,
     input.question,
     input.category,
+    subcategory || null,
+    hashtagsJson || null,
     input.endsAt,
     createdAt,
     input.source,
@@ -263,6 +324,8 @@ export async function createMarket(input: {
     id,
     question: input.question,
     category: input.category,
+    subcategory,
+    hashtags: hashtagsJson ? (JSON.parse(hashtagsJson) as string[]) : [],
     endsAt: input.endsAt,
     createdAt,
     source: input.source,

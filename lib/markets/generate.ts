@@ -67,14 +67,15 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   const todayCount = await countMarkets({ sinceIso: dayStartIso, sourcePrefix });
   if (todayCount >= input.dailyCap) return { generated: 0 };
 
-  const signals = await fetchTrendSignals(tavilyKey);
+  const signals = await fetchTrendSignals({ tavilyKey, category: category || undefined });
   const client = new OpenAI({ apiKey: openaiKey });
 
   const system =
     "You are Peak, an expert prediction-market market maker. " +
     "Generate crisp YES/NO markets that are culturally relevant and time-bounded. " +
     "No slurs, explicit sexual content, or private personal data. " +
-    "Questions must be specific and resolve within 90 days.";
+    "Questions must be specific and resolve within 90 days. " +
+    "Every market must be anchored to a concrete, timely signal.";
 
   const user =
     `Generate ${count} markets.\n\n` +
@@ -82,8 +83,12 @@ export async function maybeGenerateMarketsOnRefresh(input: {
       ? `Category: ${category}. Every item MUST use exactly this category value.\n\n`
       : "") +
     `Signals:\n${signals}\n\n` +
+    "Rules:\n" +
+    "- Each market MUST reference a named event/person/team/product mentioned in the signals.\n" +
+    "- Provide subcategory and hashtags that match the nav category.\n" +
+    "- Hashtags: 3..6 tags, each starts with #, no spaces.\n\n" +
     "Return ONLY valid JSON: an array of objects with keys:\n" +
-    `- question: string\n- category: string\n- daysToResolve: number (1..90)\n- yesProbability: number (0.05..0.95)\n` +
+    `- question: string\n- category: string\n- subcategory: string\n- hashtags: string[]\n- daysToResolve: number (1..90)\n- yesProbability: number (0.05..0.95)\n` +
     "No markdown, no extra text.";
 
   const resp = await client.chat.completions.create({
@@ -107,6 +112,15 @@ export async function maybeGenerateMarketsOnRefresh(input: {
     const question = typeof item.question === "string" ? item.question.trim() : "";
     const rawCategory = typeof item.category === "string" ? item.category.trim() : "Culture";
     const finalCategory = category || rawCategory || "Culture";
+    const subcategory =
+      typeof (item as any).subcategory === "string" ? String((item as any).subcategory).trim() : "";
+    const hashtags = Array.isArray((item as any).hashtags)
+      ? ((item as any).hashtags as unknown[])
+          .filter((t) => typeof t === "string")
+          .map((t) => String(t).trim())
+          .filter((t) => /^#[^\s#]{2,32}$/.test(t))
+          .slice(0, 6)
+      : [];
     const daysToResolve = Math.floor(Number(item.daysToResolve ?? 30));
     const yesProbability = Number(item.yesProbability ?? 0.5);
     if (question.length < 8) continue;
@@ -121,6 +135,8 @@ export async function maybeGenerateMarketsOnRefresh(input: {
     await createMarket({
       question,
       category: finalCategory.slice(0, 24),
+      subcategory,
+      hashtags,
       endsAt,
       source: category ? `peak_${category.toLowerCase()}_refresh` : "peak_refresh",
       yesProbability,
@@ -154,23 +170,78 @@ async function countMarkets(input: { sinceIso: string; sourcePrefix: string }) {
   return Number(row?.c ?? 0);
 }
 
-async function fetchTrendSignals(tavilyKey: string) {
-  if (!tavilyKey) return "- Use broad cultural topics across X, TikTok, and major news.";
-  const q = "today's top culture + news trends across X, TikTok, and headlines";
+async function fetchTrendSignals(input: { tavilyKey: string; category?: string }) {
+  const key = (input.tavilyKey ?? "").trim();
+  if (!key) return "- Tavily not configured. Set TAVILY_API_KEY for current events.";
+
+  const category = (input.category ?? "").trim();
+  const now = new Date().toISOString().slice(0, 10);
+  const baseQueries = [
+    `top breaking headlines today ${now}`,
+    `site:x.com trending OR viral today ${now}`,
+    `site:tiktok.com trending today ${now}`,
+    `site:reddit.com top posts today ${now}`,
+  ];
+  const categoryQueries =
+    category === "News"
+      ? [
+          `geopolitics headlines today ${now}`,
+          `macroeconomics headlines today ${now}`,
+          `site:reddit.com r/worldnews top today ${now}`,
+        ]
+      : category === "Sports"
+        ? [
+            `sports injuries and matchups today ${now}`,
+            `site:reddit.com r/nba OR r/nfl OR r/soccer top today ${now}`,
+          ]
+        : category === "Culture"
+          ? [
+              `pop culture trending music movies creators today ${now}`,
+              `site:reddit.com r/popculturechat OR r/movies OR r/gaming top today ${now}`,
+            ]
+          : [];
+
+  const chunks: string[] = [];
+  for (const q of [...baseQueries, ...categoryQueries]) {
+    chunks.push(`Query: ${q}\n${await tavilySignals(key, q)}`);
+  }
+  return chunks.join("\n\n").slice(0, 2400);
+}
+
+async function tavilySignals(key: string, query: string) {
   try {
     const r = await fetch("https://api.tavily.com/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        api_key: tavilyKey,
-        query: q,
-        search_depth: "basic",
-        max_results: 8,
+        api_key: key,
+        query,
+        search_depth: "advanced",
+        max_results: 6,
         include_answer: true,
+        include_images: false,
+        include_raw_content: false,
       }),
     });
-    const j = (await r.json()) as { answer?: string };
-    return typeof j.answer === "string" ? j.answer.slice(0, 1200) : "- Trends unavailable.";
+    const j = (await r.json()) as {
+      answer?: string;
+      results?: Array<{ title?: string; url?: string }>;
+    };
+    const lines: string[] = [];
+    if (typeof j.answer === "string" && j.answer.trim()) {
+      lines.push(j.answer.trim().slice(0, 420));
+    }
+    const results = Array.isArray(j.results) ? j.results.slice(0, 5) : [];
+    if (results.length) {
+      lines.push("Sources:");
+      for (const it of results) {
+        const t = typeof it.title === "string" ? it.title.trim() : "";
+        const u = typeof it.url === "string" ? it.url.trim() : "";
+        if (!t && !u) continue;
+        lines.push(`- ${t || u}${u ? ` (${u})` : ""}`.slice(0, 220));
+      }
+    }
+    return lines.join("\n").trim() || "- No signals.";
   } catch {
     return "- Trends unavailable.";
   }
@@ -179,6 +250,8 @@ async function fetchTrendSignals(tavilyKey: string) {
 type GenItem = {
   question?: unknown;
   category?: unknown;
+  subcategory?: unknown;
+  hashtags?: unknown;
   daysToResolve?: unknown;
   yesProbability?: unknown;
 };

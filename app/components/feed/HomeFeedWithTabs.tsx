@@ -96,6 +96,8 @@ export function HomeFeedWithTabs({
       postedAt: "Today",
       question: m.question,
       category: m.category,
+      subcategory: m.subcategory || undefined,
+      hashtags: Array.isArray(m.hashtags) && m.hashtags.length ? m.hashtags : undefined,
       volumeUsd: Math.round((m.volumeCents ?? 0) / 100),
       endsAtLabel: m.endsAt,
       outcomes: [

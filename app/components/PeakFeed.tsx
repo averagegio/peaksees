@@ -99,6 +99,18 @@ function MarketPostCard({ post }: { post: MarketPost }) {
       <h2 className="mt-4 text-[17px] font-semibold leading-snug tracking-tight text-zinc-900 dark:text-zinc-50">
         {post.question}
       </h2>
+      {Array.isArray(post.hashtags) && post.hashtags.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {post.hashtags.slice(0, 6).map((t) => (
+            <span
+              key={`${post.id}-tag-${t}`}
+              className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       <div className="mt-4 space-y-2">
         {[yes, no].map((outcome) => {
