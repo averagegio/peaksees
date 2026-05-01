@@ -67,14 +67,15 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   const todayCount = await countMarkets({ sinceIso: dayStartIso, sourcePrefix });
   if (todayCount >= input.dailyCap) return { generated: 0 };
 
-  const signals = await fetchTrendSignals(tavilyKey);
+  const signals = await fetchTrendSignals({ tavilyKey, category: category || undefined });
   const client = new OpenAI({ apiKey: openaiKey });
 
   const system =
     "You are Peak, an expert prediction-market market maker. " +
     "Generate crisp YES/NO markets that are culturally relevant and time-bounded. " +
     "No slurs, explicit sexual content, or private personal data. " +
-    "Questions must be specific and resolve within 90 days.";
+    "Questions must be specific and resolve within 90 days. " +
+    "Never generate generic questions; each market must be anchored to a concrete, timely signal.";
 
   const user =
     `Generate ${count} markets.\n\n` +
@@ -82,6 +83,11 @@ export async function maybeGenerateMarketsOnRefresh(input: {
       ? `Category: ${category}. Every item MUST use exactly this category value.\n\n`
       : "") +
     `Signals:\n${signals}\n\n` +
+    "Rules:\n" +
+    "- Every question MUST clearly tie to a specific signal above (headline/event/person/product/release/match).\n" +
+    "- Avoid vague templates like “Will inflation go down” or “Will a celebrity do X” without a named event.\n" +
+    "- Use proper nouns where appropriate.\n" +
+    "- Resolution within 90 days (daysToResolve 1..90).\n\n" +
     "Return ONLY valid JSON: an array of objects with keys:\n" +
     `- question: string\n- category: string\n- daysToResolve: number (1..90)\n- yesProbability: number (0.05..0.95)\n` +
     "No markdown, no extra text.";
@@ -154,23 +160,69 @@ async function countMarkets(input: { sinceIso: string; sourcePrefix: string }) {
   return Number(row?.c ?? 0);
 }
 
-async function fetchTrendSignals(tavilyKey: string) {
-  if (!tavilyKey) return "- Use broad cultural topics across X, TikTok, and major news.";
-  const q = "today's top culture + news trends across X, TikTok, and headlines";
+async function fetchTrendSignals(input: { tavilyKey: string; category?: string }) {
+  const { tavilyKey } = input;
+  if (!tavilyKey) return "- Tavily not configured. Set TAVILY_API_KEY for current events.";
+
+  const category = (input.category ?? "").trim();
+  const now = new Date().toISOString().slice(0, 10);
+  const baseQueries = [
+    `top breaking headlines today ${now}`,
+    `what is trending on X today ${now}`,
+    `what is trending on TikTok today ${now}`,
+  ];
+  const categoryQuery =
+    category === "News"
+      ? [`major political and economic headlines today ${now}`]
+      : category === "Sports"
+        ? [`sports schedule + injuries + playoffs updates today ${now}`]
+        : category === "Culture"
+          ? [`pop culture trends music movies creators drama today ${now}`]
+          : [];
+
+  const queries = [...baseQueries, ...categoryQuery];
+  const chunks: string[] = [];
+  for (const q of queries) {
+    const chunk = await tavilySearchToSignals({ tavilyKey, query: q });
+    chunks.push(`Query: ${q}\n${chunk}`);
+  }
+  return chunks.join("\n\n").slice(0, 2200);
+}
+
+async function tavilySearchToSignals(input: { tavilyKey: string; query: string }) {
   try {
     const r = await fetch("https://api.tavily.com/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        api_key: tavilyKey,
-        query: q,
-        search_depth: "basic",
+        api_key: input.tavilyKey,
+        query: input.query,
+        search_depth: "advanced",
         max_results: 8,
         include_answer: true,
+        include_images: false,
+        include_raw_content: false,
       }),
     });
-    const j = (await r.json()) as { answer?: string };
-    return typeof j.answer === "string" ? j.answer.slice(0, 1200) : "- Trends unavailable.";
+    const j = (await r.json()) as {
+      answer?: string;
+      results?: Array<{ title?: string; url?: string; content?: string }>;
+    };
+    const lines: string[] = [];
+    if (typeof j.answer === "string" && j.answer.trim()) {
+      lines.push(j.answer.trim().slice(0, 650));
+    }
+    const results = Array.isArray(j.results) ? j.results.slice(0, 6) : [];
+    if (results.length) {
+      lines.push("Sources:");
+      for (const it of results) {
+        const title = typeof it.title === "string" ? it.title.trim() : "";
+        const url = typeof it.url === "string" ? it.url.trim() : "";
+        if (!title && !url) continue;
+        lines.push(`- ${title || url}${url ? ` (${url})` : ""}`.slice(0, 220));
+      }
+    }
+    return lines.join("\n").trim() || "- No signals.";
   } catch {
     return "- Trends unavailable.";
   }
