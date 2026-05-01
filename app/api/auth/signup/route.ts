@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       email: outcome.email,
       displayName: outcome.displayName,
       createdAt: outcome.createdAt,
+      location: outcome.location,
     },
   });
   attachSessionCookie(res, token);

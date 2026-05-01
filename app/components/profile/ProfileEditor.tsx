@@ -8,6 +8,7 @@ import { safeJson } from "@/lib/http";
 type ProfileEditorProps = {
   initialDisplayName: string;
   initialBio: string;
+  initialLocation?: string;
   initialAvatarUrl?: string;
   initialBannerUrl?: string;
 };
@@ -15,6 +16,7 @@ type ProfileEditorProps = {
 export function ProfileEditor({
   initialDisplayName,
   initialBio,
+  initialLocation = "",
   initialAvatarUrl = "",
   initialBannerUrl = "",
 }: ProfileEditorProps) {
@@ -22,6 +24,7 @@ export function ProfileEditor({
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState(initialDisplayName);
   const [bio, setBio] = useState(initialBio);
+  const [location, setLocation] = useState(initialLocation);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [bannerUrl, setBannerUrl] = useState(initialBannerUrl);
   const [busy, setBusy] = useState(false);
@@ -36,7 +39,7 @@ export function ProfileEditor({
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName, bio, avatarUrl, bannerUrl }),
+        body: JSON.stringify({ displayName, bio, location, avatarUrl, bannerUrl }),
       });
       const data =
         (await safeJson<{
@@ -44,6 +47,7 @@ export function ProfileEditor({
           user?: {
             displayName: string;
             bio?: string | null;
+            location?: string | null;
             avatarUrl?: string | null;
             bannerUrl?: string | null;
           };
@@ -55,6 +59,7 @@ export function ProfileEditor({
       if (data.user) {
         setDisplayName(data.user.displayName);
         setBio(data.user.bio ?? "");
+        setLocation(data.user.location ?? "");
         setAvatarUrl(data.user.avatarUrl ?? "");
         setBannerUrl(data.user.bannerUrl ?? "");
       }
@@ -86,6 +91,7 @@ export function ProfileEditor({
             onClick={() => {
               setDisplayName(initialDisplayName);
               setBio(initialBio);
+              setLocation(initialLocation);
               setAvatarUrl(initialAvatarUrl);
               setBannerUrl(initialBannerUrl);
               setEditing(true);
@@ -222,6 +228,25 @@ export function ProfileEditor({
               placeholder="Add your bio..."
             />
           </div>
+          <div>
+            <label
+              htmlFor="dashboard-location"
+              className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+            >
+              Location (city/region)
+            </label>
+            <input
+              id="dashboard-location"
+              value={location}
+              onChange={(event) => setLocation(event.target.value)}
+              maxLength={64}
+              placeholder="e.g. Austin, TX"
+              className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:border-emerald-500 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+            />
+            <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+              Used only to improve Trending markets (local-ish signals).
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -236,6 +261,7 @@ export function ProfileEditor({
               onClick={() => {
                 setDisplayName(initialDisplayName);
                 setBio(initialBio);
+                setLocation(initialLocation);
                 setAvatarUrl(initialAvatarUrl);
                 setBannerUrl(initialBannerUrl);
                 setEditing(false);

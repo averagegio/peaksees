@@ -71,6 +71,7 @@ export function HomeFeedWithTabs({
   const [bottomRefreshing, setBottomRefreshing] = useState(false);
   const [peaks, setPeaks] = useState<Peak[]>([]);
   const [generatedMarkets, setGeneratedMarkets] = useState<Market[]>([]);
+  const [geo, setGeo] = useState<string>("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -123,11 +124,31 @@ export function HomeFeedWithTabs({
     typeof Intl !== "undefined"
       ? Intl.DateTimeFormat().resolvedOptions().timeZone ?? ""
       : "";
+  const geoParam = marketCategory ? "" : geo;
   const marketsUrl = `/api/markets?limit=60&autogen=1&count=5${
     marketCategory ? `&category=${encodeURIComponent(marketCategory)}` : ""
   }${activeSubcat ? `&subcategory=${encodeURIComponent(activeSubcat)}` : ""}${
     tz ? `&tz=${encodeURIComponent(tz)}` : ""
-  }`;
+  }${geoParam ? `&geo=${encodeURIComponent(geoParam)}` : ""}`;
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadGeo() {
+      try {
+        const res = await fetch("/api/me", { cache: "no-store" });
+        const data =
+          (await safeJson<{ user?: { location?: string | null } | null }>(res)) ?? {};
+        const loc = data.user?.location ?? "";
+        if (!cancelled) setGeo(typeof loc === "string" ? loc.trim().slice(0, 64) : "");
+      } catch {
+        // ignore
+      }
+    }
+    void loadGeo();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     // Reset subcategory when switching nav chips.
