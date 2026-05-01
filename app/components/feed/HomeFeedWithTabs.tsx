@@ -449,9 +449,6 @@ export function HomeFeedWithTabs({
               >
                 {showLatestPeaks ? "Hide latest peaks" : "Show latest peaks"}
               </button>
-              <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                Saves DB calls when hidden
-              </span>
             </div>
           </div>
         </div>
