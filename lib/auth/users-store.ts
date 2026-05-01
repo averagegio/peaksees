@@ -11,7 +11,6 @@ export type StoredUser = {
   passwordHash: string;
   createdAt: string;
   bio: string;
-  location: string;
   avatarUrl: string;
   bannerUrl: string;
 };
@@ -27,7 +26,6 @@ type SqliteUserRow = {
   password_hash: string;
   created_at: string;
   bio: string | null;
-  location: string | null;
   avatar_url: string | null;
   banner_url: string | null;
 };
@@ -58,7 +56,6 @@ async function ensureUsersSchema() {
           password_hash TEXT NOT NULL,
           created_at TEXT NOT NULL,
           bio TEXT,
-          location TEXT,
           avatar_url TEXT,
           banner_url TEXT
         );
@@ -66,11 +63,6 @@ async function ensureUsersSchema() {
       .then(() =>
         postgresPool.query(
           "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT",
-        ),
-      )
-      .then(() =>
-        postgresPool.query(
-          "ALTER TABLE users ADD COLUMN IF NOT EXISTS location TEXT",
         ),
       )
       .then(() =>
@@ -96,7 +88,6 @@ function toStoredUser(row: SqliteUserRow): StoredUser {
     passwordHash: row.password_hash,
     createdAt: row.created_at,
     bio: row.bio ?? "",
-    location: row.location ?? "",
     avatarUrl: row.avatar_url ?? "",
     bannerUrl: row.banner_url ?? "",
   };
@@ -118,16 +109,15 @@ export async function createUser(input: {
       passwordHash: input.passwordHash,
       createdAt: new Date().toISOString(),
       bio: "",
-      location: "",
       avatarUrl: "",
       bannerUrl: "",
     };
 
     const result = await postgresPool.query<SqliteUserRow>(
-      `INSERT INTO users (id, email, display_name, password_hash, created_at, bio, location, avatar_url, banner_url)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO users (id, email, display_name, password_hash, created_at, bio, avatar_url, banner_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (email) DO NOTHING
-       RETURNING id, email, display_name, password_hash, created_at, bio, location, avatar_url, banner_url`,
+       RETURNING id, email, display_name, password_hash, created_at, bio, avatar_url, banner_url`,
       [
         user.id,
         user.email,
@@ -135,7 +125,6 @@ export async function createUser(input: {
         user.passwordHash,
         user.createdAt,
         user.bio,
-        user.location,
         user.avatarUrl,
         user.bannerUrl,
       ],
@@ -161,14 +150,13 @@ export async function createUser(input: {
     passwordHash: input.passwordHash,
     createdAt: new Date().toISOString(),
     bio: "",
-    location: "",
     avatarUrl: "",
     bannerUrl: "",
   };
 
   db.prepare(
-    `INSERT INTO users (id, email, display_name, password_hash, created_at, bio, location, avatar_url, banner_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO users (id, email, display_name, password_hash, created_at, bio, avatar_url, banner_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     user.id,
     user.email,
@@ -176,7 +164,6 @@ export async function createUser(input: {
     user.passwordHash,
     user.createdAt,
     user.bio,
-    user.location,
     user.avatarUrl,
     user.bannerUrl,
   );
@@ -191,7 +178,7 @@ export async function getUserByEmail(
   if (postgresPool) {
     await ensureUsersSchema();
     const result = await postgresPool.query<SqliteUserRow>(
-      `SELECT id, email, display_name, password_hash, created_at, bio, location, avatar_url, banner_url
+      `SELECT id, email, display_name, password_hash, created_at, bio, avatar_url, banner_url
        FROM users
        WHERE email = $1
        LIMIT 1`,
@@ -203,7 +190,7 @@ export async function getUserByEmail(
 
   const row = db
     .prepare(
-      `SELECT id, email, display_name, password_hash, created_at, bio, location, avatar_url, banner_url
+      `SELECT id, email, display_name, password_hash, created_at, bio, avatar_url, banner_url
        FROM users
        WHERE email = ?
        LIMIT 1`,
@@ -217,7 +204,7 @@ export async function getUserById(id: string): Promise<StoredUser | null> {
   if (postgresPool) {
     await ensureUsersSchema();
     const result = await postgresPool.query<SqliteUserRow>(
-      `SELECT id, email, display_name, password_hash, created_at, bio, location, avatar_url, banner_url
+      `SELECT id, email, display_name, password_hash, created_at, bio, avatar_url, banner_url
        FROM users
        WHERE id = $1
        LIMIT 1`,
@@ -229,7 +216,7 @@ export async function getUserById(id: string): Promise<StoredUser | null> {
 
   const row = db
     .prepare(
-      `SELECT id, email, display_name, password_hash, created_at, bio, location, avatar_url, banner_url
+      `SELECT id, email, display_name, password_hash, created_at, bio, avatar_url, banner_url
        FROM users
        WHERE id = ?
        LIMIT 1`,
@@ -246,7 +233,6 @@ export function toPublicUser(user: StoredUser) {
     displayName: user.displayName,
     createdAt: user.createdAt,
     bio: user.bio,
-    location: user.location,
     avatarUrl: user.avatarUrl,
     bannerUrl: user.bannerUrl,
   };
@@ -254,12 +240,10 @@ export function toPublicUser(user: StoredUser) {
 
 export async function updateUserProfile(
   userId: string,
-  profile: { displayName: string; bio: string; location?: string; avatarUrl?: string; bannerUrl?: string },
+  profile: { displayName: string; bio: string; avatarUrl?: string; bannerUrl?: string },
 ): Promise<StoredUser | null> {
   const displayName = profile.displayName.trim().slice(0, 64);
   const bio = profile.bio.trim().slice(0, 280);
-  const location =
-    typeof profile.location === "string" ? profile.location.trim().slice(0, 64) : "";
   const avatarUrl =
     typeof profile.avatarUrl === "string" ? profile.avatarUrl.trim() : undefined;
   const bannerUrl =
@@ -274,33 +258,31 @@ export async function updateUserProfile(
       `UPDATE users
        SET display_name = $2,
            bio = $3,
-           location = $4,
-           avatar_url = COALESCE($5, avatar_url),
-           banner_url = COALESCE($6, banner_url)
+           avatar_url = COALESCE($4, avatar_url),
+           banner_url = COALESCE($5, banner_url)
        WHERE id = $1
-       RETURNING id, email, display_name, password_hash, created_at, bio, location, avatar_url, banner_url`,
-      [userId, displayName, bio, location, avatarUrl ?? null, bannerUrl ?? null],
+       RETURNING id, email, display_name, password_hash, created_at, bio, avatar_url, banner_url`,
+      [userId, displayName, bio, avatarUrl ?? null, bannerUrl ?? null],
     );
     return result.rows[0] ? toStoredUser(result.rows[0]) : null;
   }
 
   if (typeof avatarUrl === "string" && typeof bannerUrl === "string") {
     db.prepare(
-      `UPDATE users SET display_name = ?, bio = ?, location = ?, avatar_url = ?, banner_url = ? WHERE id = ?`,
-    ).run(displayName, bio, location, avatarUrl, bannerUrl, userId);
+      `UPDATE users SET display_name = ?, bio = ?, avatar_url = ?, banner_url = ? WHERE id = ?`,
+    ).run(displayName, bio, avatarUrl, bannerUrl, userId);
   } else if (typeof avatarUrl === "string") {
     db.prepare(
-      `UPDATE users SET display_name = ?, bio = ?, location = ?, avatar_url = ? WHERE id = ?`,
-    ).run(displayName, bio, location, avatarUrl, userId);
+      `UPDATE users SET display_name = ?, bio = ?, avatar_url = ? WHERE id = ?`,
+    ).run(displayName, bio, avatarUrl, userId);
   } else if (typeof bannerUrl === "string") {
     db.prepare(
-      `UPDATE users SET display_name = ?, bio = ?, location = ?, banner_url = ? WHERE id = ?`,
-    ).run(displayName, bio, location, bannerUrl, userId);
+      `UPDATE users SET display_name = ?, bio = ?, banner_url = ? WHERE id = ?`,
+    ).run(displayName, bio, bannerUrl, userId);
   } else {
-    db.prepare(`UPDATE users SET display_name = ?, bio = ?, location = ? WHERE id = ?`).run(
+    db.prepare(`UPDATE users SET display_name = ?, bio = ? WHERE id = ?`).run(
       displayName,
       bio,
-      location,
       userId,
     );
   }

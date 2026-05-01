@@ -167,7 +167,6 @@ export default async function DashboardPage() {
             <ProfileEditor
               initialDisplayName={u.displayName}
               initialBio={u.bio ?? ""}
-              initialLocation={(u as any).location ?? ""}
               initialAvatarUrl={u.avatarUrl ?? ""}
               initialBannerUrl={u.bannerUrl ?? ""}
             />

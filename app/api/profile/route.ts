@@ -12,7 +12,6 @@ export async function PATCH(request: Request) {
   let body: {
     displayName?: string;
     bio?: string;
-    location?: string;
     avatarUrl?: string;
     bannerUrl?: string;
   };
@@ -25,7 +24,6 @@ export async function PATCH(request: Request) {
   const displayName =
     typeof body.displayName === "string" ? body.displayName.trim() : "";
   const bio = typeof body.bio === "string" ? body.bio : "";
-  const location = typeof body.location === "string" ? body.location : "";
   const avatarUrl = typeof body.avatarUrl === "string" ? body.avatarUrl : undefined;
   const bannerUrl = typeof body.bannerUrl === "string" ? body.bannerUrl : undefined;
 
@@ -64,7 +62,6 @@ export async function PATCH(request: Request) {
   const updated = await updateUserProfile(session.user.id, {
     displayName,
     bio,
-    location,
     avatarUrl,
     bannerUrl,
   });
@@ -79,7 +76,6 @@ export async function PATCH(request: Request) {
       displayName: updated.displayName,
       createdAt: updated.createdAt,
       bio: updated.bio,
-      location: updated.location,
       avatarUrl: updated.avatarUrl,
       bannerUrl: updated.bannerUrl,
     },

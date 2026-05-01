@@ -85,9 +85,6 @@ export default async function UserProfilePage({
                 {u.displayName}
               </h1>
               <p className="text-sm text-zinc-600 dark:text-zinc-400">{u.email}</p>
-              {u.location?.trim() ? (
-                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{u.location}</p>
-              ) : null}
             </div>
 
             <dl className="grid gap-4 border-t border-zinc-100 pt-6 text-sm dark:border-zinc-800">

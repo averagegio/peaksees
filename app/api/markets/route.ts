@@ -17,7 +17,6 @@ export async function GET(request: Request) {
   const category = (url.searchParams.get("category") ?? "").trim();
   const subcategory = (url.searchParams.get("subcategory") ?? "").trim();
   const tz = (url.searchParams.get("tz") ?? "").trim();
-  const geo = (url.searchParams.get("geo") ?? "").trim();
 
   if (autogen) {
     // Generate a small batch per refresh, but rate-limit + cap daily total.
@@ -28,7 +27,6 @@ export async function GET(request: Request) {
       category: category || undefined,
       subcategory: subcategory || undefined,
       tz: tz || undefined,
-      geo: geo || undefined,
     });
   }
   const markets = await listMarkets({

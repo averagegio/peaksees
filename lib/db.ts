@@ -30,7 +30,6 @@ db.exec(`
     password_hash TEXT NOT NULL,
     created_at TEXT NOT NULL,
     bio TEXT,
-    location TEXT,
     avatar_url TEXT,
     banner_url TEXT
   );
@@ -41,9 +40,6 @@ const userColumns = db
   .all() as Array<{ name: string }>;
 if (!userColumns.some((column) => column.name === "bio")) {
   db.exec("ALTER TABLE users ADD COLUMN bio TEXT");
-}
-if (!userColumns.some((column) => column.name === "location")) {
-  db.exec("ALTER TABLE users ADD COLUMN location TEXT");
 }
 if (!userColumns.some((column) => column.name === "avatar_url")) {
   db.exec("ALTER TABLE users ADD COLUMN avatar_url TEXT");

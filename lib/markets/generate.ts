@@ -46,7 +46,6 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   category?: string;
   subcategory?: string;
   tz?: string;
-  geo?: string;
 }): Promise<{ generated: number }> {
   const openaiKey = (process.env.OPENAI_API_KEY ?? "").trim();
   if (!openaiKey) return { generated: 0 };
@@ -63,10 +62,6 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   const tz =
     typeof input.tz === "string" && input.tz.trim()
       ? input.tz.trim().slice(0, 64)
-      : "";
-  const geo =
-    typeof input.geo === "string" && input.geo.trim()
-      ? input.geo.trim().slice(0, 64)
       : "";
 
   const count = Math.max(1, Math.min(10, Math.floor(input.count)));
@@ -86,7 +81,6 @@ export async function maybeGenerateMarketsOnRefresh(input: {
     tavilyKey,
     category: category || undefined,
     tz: tz || undefined,
-    geo: geo || undefined,
   });
   const client = new OpenAI({ apiKey: openaiKey });
 
@@ -211,18 +205,17 @@ async function countMarkets(input: { sinceIso: string; sourcePrefix: string }) {
   return Number(row?.c ?? 0);
 }
 
-async function fetchTrendSignals(input: { tavilyKey: string; category?: string; tz?: string; geo?: string }) {
+async function fetchTrendSignals(input: { tavilyKey: string; category?: string; tz?: string }) {
   const key = (input.tavilyKey ?? "").trim();
   if (!key) return "- Tavily not configured. Set TAVILY_API_KEY for current events.";
 
   const category = (input.category ?? "").trim();
   const tz = (input.tz ?? "").trim();
-  const geo = (input.geo ?? "").trim();
   const now = new Date().toISOString().slice(0, 10);
   const baseQueries = [
     `top breaking headlines today ${now}`,
-    `site:x.com trending OR viral today ${now}${geo ? ` ${geo}` : ""}${tz ? ` ${tz}` : ""}`,
-    `site:tiktok.com trending today ${now}${geo ? ` ${geo}` : ""}${tz ? ` ${tz}` : ""}`,
+    `site:x.com trending OR viral today ${now}${tz ? ` ${tz}` : ""}`,
+    `site:tiktok.com trending today ${now}${tz ? ` ${tz}` : ""}`,
     `site:reddit.com top posts today ${now}`,
   ];
   const categoryQueries =
