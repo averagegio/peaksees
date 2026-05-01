@@ -67,6 +67,7 @@ export function HomeFeedWithTabs({
   const [tab, setTab] = useState<"foryou" | "following" | "live">("foryou");
   const [explore, setExplore] = useState("Trending");
   const [subcat, setSubcat] = useState<string>("");
+  const [showLatestPeaks, setShowLatestPeaks] = useState(false);
   const [tabsVisible, setTabsVisible] = useState(true);
   const [bottomRefreshing, setBottomRefreshing] = useState(false);
   const [peaks, setPeaks] = useState<Peak[]>([]);
@@ -139,21 +140,22 @@ export function HomeFeedWithTabs({
   }, [explore]);
 
   useEffect(() => {
+    if (!showLatestPeaks) return undefined;
     let cancelled = false;
     async function loadPeaks() {
       try {
-        const res = await fetch("/api/peaks?limit=20", { cache: "no-store" });
+        const res = await fetch("/api/peaks?limit=12", { cache: "no-store" });
         const data = (await safeJson<{ peaks?: Peak[] }>(res)) ?? {};
         if (!cancelled && Array.isArray(data.peaks)) setPeaks(data.peaks);
       } catch {
         // ignore
       }
     }
-    loadPeaks();
+    void loadPeaks();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showLatestPeaks]);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,6 +178,7 @@ export function HomeFeedWithTabs({
 
   useEffect(() => {
     function onNewPeak(e: Event) {
+      if (!showLatestPeaks) return;
       const ce = e as CustomEvent;
       const peak = ce.detail as Peak | undefined;
       if (!peak || typeof peak !== "object") return;
@@ -184,7 +187,7 @@ export function HomeFeedWithTabs({
     window.addEventListener("peaksees:new-peak", onNewPeak as EventListener);
     return () =>
       window.removeEventListener("peaksees:new-peak", onNewPeak as EventListener);
-  }, []);
+  }, [showLatestPeaks]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -434,6 +437,22 @@ export function HomeFeedWithTabs({
                 ))}
               </div>
             ) : null}
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                data-sparkle-click="true"
+                onClick={() => {
+                  setShowLatestPeaks((v) => !v);
+                  if (showLatestPeaks) setPeaks([]);
+                }}
+                className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
+                {showLatestPeaks ? "Hide latest peaks" : "Show latest peaks"}
+              </button>
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                Saves DB calls when hidden
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -447,7 +466,7 @@ export function HomeFeedWithTabs({
           key={`${tab}-${explore}`}
           posts={[...generatedAsPosts, ...posts]}
           contextLabel={explore}
-          peaks={peaks}
+          peaks={showLatestPeaks ? peaks : []}
         />
         <div ref={sentinelRef} className="h-px w-full shrink-0" aria-hidden />
         {bottomRefreshing ? (
