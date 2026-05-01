@@ -44,6 +44,8 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   minIntervalMs: number;
   dailyCap: number;
   category?: string;
+  subcategory?: string;
+  tz?: string;
 }): Promise<{ generated: number }> {
   const openaiKey = (process.env.OPENAI_API_KEY ?? "").trim();
   if (!openaiKey) return { generated: 0 };
@@ -52,6 +54,14 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   const category =
     typeof input.category === "string" && input.category.trim()
       ? input.category.trim().slice(0, 24)
+      : "";
+  const requestedSubcategory =
+    typeof input.subcategory === "string" && input.subcategory.trim()
+      ? input.subcategory.trim().slice(0, 32)
+      : "";
+  const tz =
+    typeof input.tz === "string" && input.tz.trim()
+      ? input.tz.trim().slice(0, 64)
       : "";
 
   const count = Math.max(1, Math.min(10, Math.floor(input.count)));
@@ -67,8 +77,18 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   const todayCount = await countMarkets({ sinceIso: dayStartIso, sourcePrefix });
   if (todayCount >= input.dailyCap) return { generated: 0 };
 
-  const signals = await fetchTrendSignals({ tavilyKey, category: category || undefined });
+  const signals = await fetchTrendSignals({
+    tavilyKey,
+    category: category || undefined,
+    tz: tz || undefined,
+  });
   const client = new OpenAI({ apiKey: openaiKey });
+
+  const allowed = allowedSubcategories(category);
+  const forcedSubcategory =
+    requestedSubcategory && allowed.includes(requestedSubcategory)
+      ? requestedSubcategory
+      : "";
 
   const system =
     "You are Peak, an expert prediction-market market maker. " +
@@ -82,6 +102,11 @@ export async function maybeGenerateMarketsOnRefresh(input: {
     (category
       ? `Category: ${category}. Every item MUST use exactly this category value.\n\n`
       : "") +
+    (forcedSubcategory
+      ? `Subcategory: ${forcedSubcategory}. Every item MUST use exactly this subcategory value.\n\n`
+      : allowed.length
+        ? `Allowed subcategories for ${category}: ${allowed.join(", ")}.\n\n`
+        : "") +
     `Signals:\n${signals}\n\n` +
     "Rules:\n" +
     "- Each market MUST reference a named event/person/team/product mentioned in the signals.\n" +
@@ -112,8 +137,17 @@ export async function maybeGenerateMarketsOnRefresh(input: {
     const question = typeof item.question === "string" ? item.question.trim() : "";
     const rawCategory = typeof item.category === "string" ? item.category.trim() : "Culture";
     const finalCategory = category || rawCategory || "Culture";
+    const rawSubcategory =
+      typeof (item as any).subcategory === "string"
+        ? String((item as any).subcategory).trim()
+        : "";
     const subcategory =
-      typeof (item as any).subcategory === "string" ? String((item as any).subcategory).trim() : "";
+      forcedSubcategory ||
+      (allowed.length
+        ? allowed.includes(rawSubcategory)
+          ? rawSubcategory
+          : ""
+        : rawSubcategory);
     const hashtags = Array.isArray((item as any).hashtags)
       ? ((item as any).hashtags as unknown[])
           .filter((t) => typeof t === "string")
@@ -127,6 +161,7 @@ export async function maybeGenerateMarketsOnRefresh(input: {
     if (daysToResolve < 1 || daysToResolve > 90) continue;
     if (!Number.isFinite(yesProbability) || yesProbability < 0.05 || yesProbability > 0.95)
       continue;
+    if (allowed.length && !forcedSubcategory && !subcategory) continue;
 
     const norm = normalizeQuestion(question);
     if (existingSet.has(norm)) continue;
@@ -170,16 +205,17 @@ async function countMarkets(input: { sinceIso: string; sourcePrefix: string }) {
   return Number(row?.c ?? 0);
 }
 
-async function fetchTrendSignals(input: { tavilyKey: string; category?: string }) {
+async function fetchTrendSignals(input: { tavilyKey: string; category?: string; tz?: string }) {
   const key = (input.tavilyKey ?? "").trim();
   if (!key) return "- Tavily not configured. Set TAVILY_API_KEY for current events.";
 
   const category = (input.category ?? "").trim();
+  const tz = (input.tz ?? "").trim();
   const now = new Date().toISOString().slice(0, 10);
   const baseQueries = [
     `top breaking headlines today ${now}`,
-    `site:x.com trending OR viral today ${now}`,
-    `site:tiktok.com trending today ${now}`,
+    `site:x.com trending OR viral today ${now}${tz ? ` ${tz}` : ""}`,
+    `site:tiktok.com trending today ${now}${tz ? ` ${tz}` : ""}`,
     `site:reddit.com top posts today ${now}`,
   ];
   const categoryQueries =
@@ -206,6 +242,19 @@ async function fetchTrendSignals(input: { tavilyKey: string; category?: string }
     chunks.push(`Query: ${q}\n${await tavilySignals(key, q)}`);
   }
   return chunks.join("\n\n").slice(0, 2400);
+}
+
+function allowedSubcategories(category: string): string[] {
+  if (category === "News") {
+    return ["politics", "econ", "global", "eu", "tech", "science", "commodities", "ai"];
+  }
+  if (category === "Sports") {
+    return ["nba", "nfl", "wnba", "soccer", "hockey", "golf", "olympics", "niche"];
+  }
+  if (category === "Culture") {
+    return ["celebs", "fashion", "music", "events", "local", "tv", "streaming", "netflix", "art"];
+  }
+  return [];
 }
 
 async function tavilySignals(key: string, query: string) {

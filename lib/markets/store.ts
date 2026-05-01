@@ -159,14 +159,42 @@ function rowToMarket(row: {
 export async function listMarkets(input: {
   limit: number;
   category?: string;
+  subcategory?: string;
 }): Promise<Market[]> {
   const limit = Math.max(1, Math.min(200, Math.floor(input.limit)));
   const category =
     typeof input.category === "string" && input.category.trim()
       ? input.category.trim().slice(0, 24)
       : "";
+  const subcategory =
+    typeof input.subcategory === "string" && input.subcategory.trim()
+      ? input.subcategory.trim().slice(0, 32)
+      : "";
   if (postgresPool) {
     await ensureSchema();
+    if (category && subcategory) {
+      const result = await postgresPool.query<{
+        id: string;
+        question: string;
+        category: string;
+        subcategory: string | null;
+        hashtags_json: string | null;
+        ends_at: string;
+        created_at: string;
+        source: string;
+        yes_probability: number;
+        no_probability: number;
+        volume_cents: number;
+      }>(
+        `SELECT id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+         FROM markets
+         WHERE category = $2 AND subcategory = $3
+         ORDER BY created_at DESC
+         LIMIT $1`,
+        [limit, category, subcategory],
+      );
+      return result.rows.map(rowToMarket);
+    }
     if (category) {
       const result = await postgresPool.query<{
         id: string;
@@ -212,16 +240,26 @@ export async function listMarkets(input: {
     return result.rows.map(rowToMarket);
   }
 
-  const rows = (category
+  const rows = (category && subcategory
     ? db
         .prepare(
           `SELECT id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents
            FROM markets
-           WHERE category = ?
+           WHERE category = ? AND subcategory = ?
            ORDER BY created_at DESC
            LIMIT ?`,
         )
-        .all(category, limit)
+        .all(category, subcategory, limit)
+    : category
+      ? db
+          .prepare(
+            `SELECT id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+             FROM markets
+             WHERE category = ?
+             ORDER BY created_at DESC
+             LIMIT ?`,
+          )
+          .all(category, limit)
     : db
         .prepare(
           `SELECT id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents
