@@ -1,12 +1,21 @@
 import "server-only";
 
-import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
+import type Database from "better-sqlite3";
+
+function loadBetterSqlite3(): typeof import("better-sqlite3") {
+  // Avoid static import of native better-sqlite3 during build-time evaluation.
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+  const req = eval("require") as NodeRequire;
+  return req("better-sqlite3") as typeof import("better-sqlite3");
+}
+
 function openDbAt(dbPath: string) {
   mkdirSync(path.dirname(dbPath), { recursive: true });
-  return new Database(dbPath);
+  const BetterSqlite3 = loadBetterSqlite3();
+  return new BetterSqlite3(dbPath);
 }
 
 const localDbPath = path.join(process.cwd(), "data", "peaksees.db");
