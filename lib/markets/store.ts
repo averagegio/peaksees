@@ -12,6 +12,8 @@ export type Market = {
   subcategory: string;
   hashtags: string[];
   endsAt: string;
+  resolvedSide: MarketSide | null;
+  resolvedAt: string | null;
   createdAt: string;
   source: string;
   yesProbability: number;
@@ -55,6 +57,8 @@ async function ensureSchema() {
           subcategory TEXT,
           hashtags_json TEXT,
           ends_at TEXT NOT NULL,
+          resolved_side TEXT,
+          resolved_at TEXT,
           created_at TEXT NOT NULL,
           source TEXT NOT NULL,
           yes_probability REAL NOT NULL,
@@ -70,6 +74,16 @@ async function ensureSchema() {
       .then(() =>
         postgresPool.query(
           "ALTER TABLE markets ADD COLUMN IF NOT EXISTS hashtags_json TEXT",
+        ),
+      )
+      .then(() =>
+        postgresPool.query(
+          "ALTER TABLE markets ADD COLUMN IF NOT EXISTS resolved_side TEXT",
+        ),
+      )
+      .then(() =>
+        postgresPool.query(
+          "ALTER TABLE markets ADD COLUMN IF NOT EXISTS resolved_at TEXT",
         ),
       )
       .then(() =>
@@ -97,9 +111,21 @@ async function ensureSchema() {
             price_cents INTEGER NOT NULL,
             shares_x1000 INTEGER NOT NULL,
             cost_cents INTEGER NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            settled_at TEXT,
+            payout_cents INTEGER NOT NULL DEFAULT 0
           );
         `),
+      )
+      .then(() =>
+        postgresPool.query(
+          "ALTER TABLE market_trades ADD COLUMN IF NOT EXISTS settled_at TEXT",
+        ),
+      )
+      .then(() =>
+        postgresPool.query(
+          "ALTER TABLE market_trades ADD COLUMN IF NOT EXISTS payout_cents INTEGER NOT NULL DEFAULT 0",
+        ),
       )
       .then(() =>
         postgresPool.query(
@@ -109,6 +135,11 @@ async function ensureSchema() {
       .then(() =>
         postgresPool.query(
           "CREATE INDEX IF NOT EXISTS market_trades_market_created_at_idx ON market_trades(market_id, created_at DESC)",
+        ),
+      )
+      .then(() =>
+        postgresPool.query(
+          "CREATE INDEX IF NOT EXISTS market_trades_market_settled_idx ON market_trades(market_id, settled_at)",
         ),
       )
       .then(() => undefined);
@@ -123,6 +154,8 @@ function rowToMarket(row: {
   subcategory: string | null;
   hashtags_json: string | null;
   ends_at: string;
+  resolved_side: string | null;
+  resolved_at: string | null;
   created_at: string;
   source: string;
   yes_probability: number;
@@ -148,6 +181,11 @@ function rowToMarket(row: {
     subcategory: row.subcategory ?? "",
     hashtags,
     endsAt: row.ends_at,
+    resolvedSide:
+      row.resolved_side === "yes" || row.resolved_side === "no"
+        ? (row.resolved_side as MarketSide)
+        : null,
+    resolvedAt: row.resolved_at ?? null,
     createdAt: row.created_at,
     source: row.source,
     yesProbability: Number(row.yes_probability),
@@ -180,13 +218,15 @@ export async function listMarkets(input: {
         subcategory: string | null;
         hashtags_json: string | null;
         ends_at: string;
+        resolved_side: string | null;
+        resolved_at: string | null;
         created_at: string;
         source: string;
         yes_probability: number;
         no_probability: number;
         volume_cents: number;
       }>(
-        `SELECT id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+        `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
          FROM markets
          WHERE category = $2 AND subcategory = $3
          ORDER BY created_at DESC
@@ -203,13 +243,15 @@ export async function listMarkets(input: {
         subcategory: string | null;
         hashtags_json: string | null;
         ends_at: string;
+        resolved_side: string | null;
+        resolved_at: string | null;
         created_at: string;
         source: string;
         yes_probability: number;
         no_probability: number;
         volume_cents: number;
       }>(
-        `SELECT id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+        `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
          FROM markets
          WHERE category = $2
          ORDER BY created_at DESC
@@ -225,13 +267,15 @@ export async function listMarkets(input: {
       subcategory: string | null;
       hashtags_json: string | null;
       ends_at: string;
+      resolved_side: string | null;
+      resolved_at: string | null;
       created_at: string;
       source: string;
       yes_probability: number;
       no_probability: number;
       volume_cents: number;
     }>(
-      `SELECT id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+      `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
        FROM markets
        ORDER BY created_at DESC
        LIMIT $1`,
@@ -243,7 +287,7 @@ export async function listMarkets(input: {
   const rows = (category && subcategory
     ? db
         .prepare(
-          `SELECT id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+          `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
            FROM markets
            WHERE category = ? AND subcategory = ?
            ORDER BY created_at DESC
@@ -253,7 +297,7 @@ export async function listMarkets(input: {
     : category
       ? db
           .prepare(
-            `SELECT id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+            `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
              FROM markets
              WHERE category = ?
              ORDER BY created_at DESC
@@ -262,7 +306,7 @@ export async function listMarkets(input: {
           .all(category, limit)
     : db
         .prepare(
-          `SELECT id, question, category, subcategory, hashtags_json, ends_at, created_at, source, yes_probability, no_probability, volume_cents
+          `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
            FROM markets
            ORDER BY created_at DESC
            LIMIT ?`,
@@ -274,6 +318,8 @@ export async function listMarkets(input: {
     subcategory: string | null;
     hashtags_json: string | null;
     ends_at: string;
+    resolved_side: string | null;
+    resolved_at: string | null;
     created_at: string;
     source: string;
     yes_probability: number;
@@ -334,6 +380,8 @@ export async function createMarket(input: {
       subcategory,
       hashtags: hashtagsJson ? (JSON.parse(hashtagsJson) as string[]) : [],
       endsAt: input.endsAt,
+      resolvedSide: null,
+      resolvedAt: null,
       createdAt,
       source: input.source,
       yesProbability: yesP,
@@ -365,6 +413,8 @@ export async function createMarket(input: {
     subcategory,
     hashtags: hashtagsJson ? (JSON.parse(hashtagsJson) as string[]) : [],
     endsAt: input.endsAt,
+    resolvedSide: null,
+    resolvedAt: null,
     createdAt,
     source: input.source,
     yesProbability: yesP,

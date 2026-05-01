@@ -33,6 +33,8 @@ async function ensureSchema() {
           question TEXT NOT NULL,
           category TEXT NOT NULL,
           ends_at TEXT NOT NULL,
+          resolved_side TEXT,
+          resolved_at TEXT,
           created_at TEXT NOT NULL,
           source TEXT NOT NULL,
           yes_probability REAL NOT NULL,
@@ -50,9 +52,31 @@ async function ensureSchema() {
             price_cents INTEGER NOT NULL,
             shares_x1000 INTEGER NOT NULL,
             cost_cents INTEGER NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            settled_at TEXT,
+            payout_cents INTEGER NOT NULL DEFAULT 0
           );
         `),
+      )
+      .then(() =>
+        postgresPool.query(
+          "ALTER TABLE markets ADD COLUMN IF NOT EXISTS resolved_side TEXT",
+        ),
+      )
+      .then(() =>
+        postgresPool.query(
+          "ALTER TABLE markets ADD COLUMN IF NOT EXISTS resolved_at TEXT",
+        ),
+      )
+      .then(() =>
+        postgresPool.query(
+          "ALTER TABLE market_trades ADD COLUMN IF NOT EXISTS settled_at TEXT",
+        ),
+      )
+      .then(() =>
+        postgresPool.query(
+          "ALTER TABLE market_trades ADD COLUMN IF NOT EXISTS payout_cents INTEGER NOT NULL DEFAULT 0",
+        ),
       )
       .then(() =>
         postgresPool.query(`
@@ -69,6 +93,11 @@ async function ensureSchema() {
       .then(() =>
         postgresPool.query(
           "CREATE INDEX IF NOT EXISTS peakpoints_ledger_user_idx ON peakpoints_ledger(user_id, created_at DESC)",
+        ),
+      )
+      .then(() =>
+        postgresPool.query(
+          "CREATE INDEX IF NOT EXISTS market_trades_market_settled_idx ON market_trades(market_id, settled_at)",
         ),
       )
       .then(() => undefined);

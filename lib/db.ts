@@ -109,6 +109,8 @@ db.exec(`
     subcategory TEXT,
     hashtags_json TEXT,
     ends_at TEXT NOT NULL,
+    resolved_side TEXT,
+    resolved_at TEXT,
     created_at TEXT NOT NULL,
     source TEXT NOT NULL,
     yes_probability REAL NOT NULL,
@@ -126,7 +128,9 @@ db.exec(`
     price_cents INTEGER NOT NULL, -- 1..99, price per $1 share
     shares_x1000 INTEGER NOT NULL, -- shares * 1000 for precision
     cost_cents INTEGER NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    settled_at TEXT,
+    payout_cents INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX IF NOT EXISTS market_trades_user_created_at_idx ON market_trades(user_id, created_at DESC);
   CREATE INDEX IF NOT EXISTS market_trades_market_created_at_idx ON market_trades(market_id, created_at DESC);
@@ -141,9 +145,32 @@ if (!marketColumns.some((column) => column.name === "subcategory")) {
 if (!marketColumns.some((column) => column.name === "hashtags_json")) {
   db.exec("ALTER TABLE markets ADD COLUMN hashtags_json TEXT");
 }
+if (!marketColumns.some((column) => column.name === "resolved_side")) {
+  db.exec("ALTER TABLE markets ADD COLUMN resolved_side TEXT");
+}
+if (!marketColumns.some((column) => column.name === "resolved_at")) {
+  db.exec("ALTER TABLE markets ADD COLUMN resolved_at TEXT");
+}
 try {
   db.exec(
     "CREATE INDEX IF NOT EXISTS markets_category_subcategory_created_at_idx ON markets(category, subcategory, created_at DESC)",
+  );
+} catch {
+  // ignore
+}
+
+const tradeColumns = db
+  .prepare("PRAGMA table_info(market_trades)")
+  .all() as Array<{ name: string }>;
+if (!tradeColumns.some((column) => column.name === "settled_at")) {
+  db.exec("ALTER TABLE market_trades ADD COLUMN settled_at TEXT");
+}
+if (!tradeColumns.some((column) => column.name === "payout_cents")) {
+  db.exec("ALTER TABLE market_trades ADD COLUMN payout_cents INTEGER NOT NULL DEFAULT 0");
+}
+try {
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS market_trades_market_settled_idx ON market_trades(market_id, settled_at)",
   );
 } catch {
   // ignore
