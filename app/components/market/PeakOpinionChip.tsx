@@ -8,19 +8,29 @@ export function PeakOpinionChip({
   question,
   crowdYes,
   enabled,
+  refetchNonce = 0,
 }: {
   question: string;
   crowdYes: number;
   enabled: boolean;
+  /** Bump to call /api/peak again (e.g. user retaps peaksees). */
+  refetchNonce?: number;
 }) {
   const [loading, setLoading] = useState(false);
   const [probYes, setProbYes] = useState<number | null>(null);
   const [disagree, setDisagree] = useState(false);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      setProbYes(null);
+      setDisagree(false);
+      return undefined;
+    }
     let cancelled = false;
     async function run() {
-      if (!enabled) return;
+      setProbYes(null);
+      setDisagree(false);
       setLoading(true);
       try {
         const res = await fetch("/api/peak", {
@@ -45,7 +55,7 @@ export function PeakOpinionChip({
     return () => {
       cancelled = true;
     };
-  }, [enabled, question, crowdYes]);
+  }, [enabled, question, crowdYes, refetchNonce]);
 
   if (!enabled) return null;
 

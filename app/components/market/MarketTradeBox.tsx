@@ -7,9 +7,12 @@ import { safeJson } from "@/lib/http";
 export function MarketTradeBox({
   marketId,
   yesProbability,
+  onTradeSuccess,
 }: {
   marketId: string;
   yesProbability: number;
+  /** Fires after each successful Peakpoints trade (buy yes/no). */
+  onTradeSuccess?: () => void;
 }) {
   const [amountCents, setAmountCents] = useState(500);
   const [busy, setBusy] = useState(false);
@@ -63,6 +66,7 @@ export function MarketTradeBox({
         return;
       }
       setOk("Bought in.");
+      onTradeSuccess?.();
       if (typeof data.trade?.costCents === "number") {
         setBalanceCents((prev) =>
           typeof prev === "number" ? prev - data.trade!.costCents : prev,

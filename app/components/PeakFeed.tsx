@@ -31,9 +31,14 @@ function tickerParts(post: MarketPost) {
 
 function MarketPostCard({ post }: { post: MarketPost }) {
   const [selected, setSelected] = useState<string | null>(null);
+  /** Unlocks tapping the peaksees badge to fetch Peak disagree score */
+  const [hasPlacedBet, setHasPlacedBet] = useState(false);
+  const [peakScoreRevealed, setPeakScoreRevealed] = useState(false);
+  const [peakRefetchNonce, setPeakRefetchNonce] = useState(0);
   const [yes, no] = post.outcomes;
   const yesP = Number(yes?.probability ?? 0.5);
   const cardRef = useRef<HTMLElement | null>(null);
+  const peakBadgeRef = useRef<HTMLButtonElement | null>(null);
   const handleSlug = encodeURIComponent(post.handle.replace(/^@/, ""));
 
   return (
@@ -81,9 +86,53 @@ function MarketPostCard({ post }: { post: MarketPost }) {
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
             <span>{post.postedAt}</span>
             <span className="text-zinc-300 dark:text-zinc-600">·</span>
-            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-700 dark:text-emerald-400">
+            <button
+              ref={peakBadgeRef}
+              type="button"
+              disabled={!hasPlacedBet}
+              data-sparkle-click="true"
+              title={
+                peakScoreRevealed
+                  ? "Tap to refresh Peak’s disagree score"
+                  : hasPlacedBet
+                    ? "Show Peak’s disagree score"
+                    : "Place a Yes or No bet first"
+              }
+              aria-label={
+                peakScoreRevealed
+                  ? "Refresh Peak disagree score"
+                  : hasPlacedBet
+                    ? "Show Peak disagree score"
+                    : "Peak insight — place a Yes or No bet first"
+              }
+              onClick={() => {
+                if (!hasPlacedBet) return;
+                setPeakScoreRevealed(true);
+                setPeakRefetchNonce((n) => n + 1);
+                peakBadgeRef.current?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "nearest",
+                });
+                if (
+                  typeof navigator !== "undefined" &&
+                  navigator.vibrate &&
+                  typeof window !== "undefined" &&
+                  window.matchMedia("(pointer: coarse)").matches
+                ) {
+                  navigator.vibrate(10);
+                }
+              }}
+              className={
+                "rounded-full px-2 py-0.5 font-medium outline-none ring-offset-2 ring-offset-white transition focus-visible:ring-2 focus-visible:ring-emerald-500 dark:ring-offset-zinc-950 " +
+                (peakScoreRevealed
+                  ? "cursor-pointer bg-emerald-600/90 text-white hover:bg-emerald-600 ring-1 ring-emerald-500/50 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                  : hasPlacedBet
+                    ? "cursor-pointer bg-violet-500/15 text-violet-700 ring-2 ring-violet-400/70 motion-safe:animate-pulse dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/50"
+                    : "cursor-not-allowed bg-emerald-500/10 text-emerald-600/65 dark:text-emerald-400/55")
+              }
+            >
               peaksees
-            </span>
+            </button>
             <span className="rounded-full bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">
               {post.category}
             </span>
@@ -165,13 +214,25 @@ function MarketPostCard({ post }: { post: MarketPost }) {
         ) : null}
       </footer>
 
+      <MarketTradeBox
+        marketId={`market:${post.id}`}
+        yesProbability={yesP}
+        onTradeSuccess={() => setHasPlacedBet(true)}
+      />
+
+      {hasPlacedBet && !peakScoreRevealed ? (
+        <p className="mt-3 rounded-xl border border-violet-200/80 bg-violet-500/[0.07] px-3 py-2 text-center text-[12px] font-medium text-violet-800 dark:border-violet-500/35 dark:bg-violet-500/10 dark:text-violet-200">
+          Tap <span className="font-bold">peaksees</span> at the top of this card to see Peak&apos;s
+          disagree score versus the crowd.
+        </p>
+      ) : null}
+
       <PeakOpinionChip
         question={post.question}
         crowdYes={yesP}
-        enabled={selected !== null}
+        enabled={peakScoreRevealed}
+        refetchNonce={peakRefetchNonce}
       />
-
-      <MarketTradeBox marketId={`market:${post.id}`} yesProbability={yesP} />
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <ShareMarketButton
