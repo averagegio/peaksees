@@ -198,7 +198,7 @@ export function PeakFeed({
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ul className="mx-auto flex w-full max-w-xl flex-col gap-3 px-2 pb-28 pt-4 sm:gap-5 sm:px-4 sm:pb-24 md:pt-8">
+      <ul className="mx-auto flex w-full max-w-xl flex-col gap-3 px-2 pb-28 pt-5 sm:gap-5 sm:px-4 sm:pb-24 sm:pt-6 md:pt-9">
         {contextLabel ? (
           <li>
             <div className="rounded-xl border border-zinc-200/90 bg-white/95 px-4 py-2 text-sm text-zinc-600 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-300">
@@ -217,7 +217,7 @@ export function PeakFeed({
                   <li
                     key={p.id}
                     data-sparkle-click="true"
-                    className="sparkle-hover rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                    className="sparkle-hover sparkle-hover--contained rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <ProfileLink

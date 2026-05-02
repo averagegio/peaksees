@@ -59,7 +59,7 @@ export function NavShell({
       <header className="sticky top-0 z-30 shrink-0 border-b border-zinc-200/90 bg-white/95 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/95">
         <Link
           href="/feed"
-          className="flex w-full items-center justify-center bg-white px-4 py-3 sm:py-4 dark:bg-zinc-950"
+          className="flex w-full items-center justify-center bg-white px-3 py-2 sm:py-2.5 dark:bg-zinc-950"
           onClick={() => setOpen(false)}
         >
           <Image
@@ -67,17 +67,17 @@ export function NavShell({
             alt="peaksees — prediction markets"
             width={720}
             height={220}
-            className="h-auto w-full max-h-[92px] max-w-xl object-contain sm:max-h-[112px]"
+            className="h-auto w-full max-h-[80px] max-w-xl object-contain sm:max-h-[96px]"
             sizes="(max-width: 768px) 100vw, 36rem"
             priority
           />
         </Link>
 
-        <p className="border-t border-zinc-100 bg-white px-4 py-2 text-center text-[12px] leading-snug tracking-tight text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+        <p className="border-t border-zinc-100 bg-white px-3 py-1 text-center text-[11px] leading-tight tracking-tight text-zinc-500 sm:py-1.5 sm:text-[12px] dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
           {FEED_TAGLINE}
         </p>
 
-        <div className="flex items-center justify-between gap-3 border-t border-zinc-100 px-3 py-2 dark:border-zinc-800">
+        <div className="flex items-center justify-between gap-3 border-t border-zinc-100 px-3 py-1.5 dark:border-zinc-800">
           <div className="flex items-center gap-2">
             {showBackButton && (
               <BackButton fallbackHref="/feed" label="Back" iconOnly />
@@ -263,8 +263,8 @@ export function NavShell({
         </nav>
       </div>
 
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden">
+        <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden">
           {children}
         </div>
       </div>

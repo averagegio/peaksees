@@ -87,8 +87,13 @@ body {
 @media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
   .sparkle-hover {
     position: relative;
-    overflow: hidden;
     isolation: isolate;
+    /* Full cards shouldn't clip avatar chrome; use sparkle-hover--contained on pills/chips. */
+    overflow: visible;
+  }
+
+  .sparkle-hover--contained {
+    overflow: hidden;
   }
 
   .sparkle-hover::after {

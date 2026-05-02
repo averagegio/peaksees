@@ -30,7 +30,7 @@ function FeedTabButton({
       role="tab"
       aria-selected={active}
       data-sparkle-click="true"
-      className={`poppy-hover sparkle-hover min-h-8 flex-1 rounded-full px-2.5 py-1 text-[12px] font-medium outline-none ring-emerald-500/35 transition focus-visible:ring-2 sm:py-1.5 sm:text-[13px] ${
+      className={`poppy-hover sparkle-hover sparkle-hover--contained min-h-8 flex-1 rounded-full px-2.5 py-1 text-[12px] font-medium outline-none ring-emerald-500/35 transition focus-visible:ring-2 sm:py-1.5 sm:text-[13px] ${
         active
           ? "bg-white text-zinc-900 shadow-sm shadow-zinc-300/40 dark:bg-zinc-800 dark:text-emerald-300 dark:shadow-black/45"
           : "text-zinc-600 hover:bg-zinc-100/90 dark:text-zinc-400 dark:hover:bg-zinc-800/92"
@@ -367,7 +367,7 @@ export function HomeFeedWithTabs({
                   type="button"
                   data-sparkle-click="true"
                   onClick={() => setExplore(item)}
-                  className={`group sparkle-hover nav-chip-motion shrink-0 rounded-none px-0 py-1 text-[13px] font-semibold tracking-tight transition ${
+                  className={`group sparkle-hover sparkle-hover--contained nav-chip-motion shrink-0 rounded-none px-0 py-1 text-[13px] font-semibold tracking-tight transition ${
                     explore === item
                       ? color
                       : inactive
@@ -406,7 +406,7 @@ export function HomeFeedWithTabs({
               <Link
                 href="/peakstats"
                 data-sparkle-click="true"
-                className="group sparkle-hover nav-chip-motion shrink-0 px-0 py-1 text-[13px] font-semibold tracking-tight text-fuchsia-700/65 transition hover:text-fuchsia-800 dark:text-fuchsia-300/70 dark:hover:text-fuchsia-200"
+                className="group sparkle-hover sparkle-hover--contained nav-chip-motion shrink-0 px-0 py-1 text-[13px] font-semibold tracking-tight text-fuchsia-700/65 transition hover:text-fuchsia-800 dark:text-fuchsia-300/70 dark:hover:text-fuchsia-200"
               >
                 <span className="sr-only">Peakstats</span>
                 <span className="slot-roll" data-slot-speed="slow" aria-hidden>
@@ -456,7 +456,7 @@ export function HomeFeedWithTabs({
 
       <div
         ref={scrollRef}
-        className="feed-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
+        className="feed-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-pt-4 sm:scroll-pt-6"
       >
         {tab === "live" ? <LiveStreamPanel /> : null}
         <PeakFeed
