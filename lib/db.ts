@@ -102,6 +102,11 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS peakpoints_ledger_user_idx ON peakpoints_ledger(user_id, created_at DESC);
 
+  CREATE TABLE IF NOT EXISTS stripe_wallet_topup_claims (
+    stripe_checkout_session_id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS markets (
     id TEXT PRIMARY KEY,
     question TEXT NOT NULL,

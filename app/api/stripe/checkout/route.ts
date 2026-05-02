@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth/session";
+import { PLATFORM_FEE_RATE } from "@/lib/peakpoints/fees";
 import { getAppUrl, getStripe } from "@/lib/stripe/server";
 
 export const runtime = "nodejs";
@@ -112,7 +113,9 @@ export async function POST(request: Request) {
           {
             price_data: {
               currency: "usd",
-              product_data: { name: "Peakpoints wallet top-up" },
+              product_data: {
+                name: `Peakpoints top-up (${Math.round((1 - PLATFORM_FEE_RATE) * 100)}% credited — ${Math.round(PLATFORM_FEE_RATE * 100)}% platform fee)`,
+              },
               unit_amount: amountCents,
             },
             quantity: 1,

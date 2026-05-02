@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 
 import { safeJson } from "@/lib/http";
+import {
+  PLATFORM_FEE_RATE,
+  peakpointsCreditAfterDepositFee,
+  payoutCentsAfterWithdrawFee,
+} from "@/lib/peakpoints/fees";
 
 type LedgerEntry = {
   id: string;
@@ -26,6 +31,9 @@ export function PeakpointsClient() {
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [amount, setAmount] = useState(500);
   const [busy, setBusy] = useState<null | "deposit" | "withdraw">(null);
+
+  const depositCreditPreview = peakpointsCreditAfterDepositFee(amount);
+  const withdrawPayoutPreview = payoutCentsAfterWithdrawFee(amount);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,7 +126,11 @@ export function PeakpointsClient() {
             {loading ? "…" : formatUsdCents(balanceCents)}
           </p>
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-            Add money uses Stripe Checkout. Wallet is credited by webhook after payment.
+            Deposits: Stripe charges the amount below; Peakpoints credited are{" "}
+            {Math.round((1 - PLATFORM_FEE_RATE) * 100)}% of payment (
+            {Math.round(PLATFORM_FEE_RATE * 100)}% platform fee). Withdrawals deduct the full
+            Peakpoints amount; estimated outbound cash after the{" "}
+            {Math.round(PLATFORM_FEE_RATE * 100)}% withdrawal fee is shown next to Withdraw.
           </p>
         </div>
 
@@ -135,6 +147,10 @@ export function PeakpointsClient() {
               onChange={(e) => setAmount(Number(e.target.value))}
               className="mt-1 w-32 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
             />
+            <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+              ≈ {formatUsdCents(depositCreditPreview)} credited after deposit fee · withdraw
+              nets ≈ {formatUsdCents(withdrawPayoutPreview)}
+            </p>
           </div>
           <button
             type="button"
@@ -148,6 +164,7 @@ export function PeakpointsClient() {
             type="button"
             disabled={busy !== null}
             onClick={() => act("withdraw")}
+            title={`Removes ${formatUsdCents(amount)} from balance; payout ≈ ${formatUsdCents(withdrawPayoutPreview)} after fee`}
             className="rounded-xl border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-900"
           >
             {busy === "withdraw" ? "Withdrawing…" : "Withdraw"}
