@@ -1,10 +1,15 @@
 import "server-only";
 
-import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 
-function openDbAt(dbPath: string) {
+const requireBetterSqlite3 = createRequire(import.meta.url);
+/** `better-sqlite3` is `export =`; load via require so Turbopack does not wrongly bundle natives. */
+const Database = requireBetterSqlite3("better-sqlite3") as typeof import("better-sqlite3");
+type SqliteDb = InstanceType<typeof Database>;
+
+function openDbAt(dbPath: string): SqliteDb {
   mkdirSync(path.dirname(dbPath), { recursive: true });
   return new Database(dbPath);
 }
@@ -12,7 +17,7 @@ function openDbAt(dbPath: string) {
 const localDbPath = path.join(process.cwd(), "data", "peaksees.db");
 const tmpDbPath = path.join("/tmp", "peaksees.db");
 
-let db: Database.Database;
+let db: SqliteDb;
 try {
   db = openDbAt(localDbPath);
 } catch {
