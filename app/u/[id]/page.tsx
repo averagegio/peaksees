@@ -2,9 +2,14 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { BackButton } from "@/app/components/BackButton";
+import { ProfileFollowSocial } from "@/app/components/profile/ProfileFollowSocial";
 import { getSession } from "@/lib/auth/session";
 import { getUserById } from "@/lib/auth/users-store";
 import { listPeaks } from "@/lib/peaks/store";
+import {
+  getFollowCounts,
+  isFollowing,
+} from "@/lib/social/follows-store";
 
 function formatJoined(iso: string) {
   try {
@@ -30,6 +35,10 @@ export default async function UserProfilePage({
   if (!u) notFound();
 
   const peaks = await listPeaks({ mineUserId: u.id, limit: 20 });
+  const followCounts = await getFollowCounts(u.id);
+  const amFollowing =
+    session.user.id !== u.id &&
+    (await isFollowing(session.user.id, u.id));
 
   return (
     <main className="min-h-dvh bg-gradient-to-b from-zinc-100 to-zinc-200/90 px-4 py-10 dark:from-zinc-950 dark:to-zinc-900">
@@ -85,6 +94,16 @@ export default async function UserProfilePage({
                 {u.displayName}
               </h1>
               <p className="text-sm text-zinc-600 dark:text-zinc-400">{u.email}</p>
+              <div className="mt-4">
+                <ProfileFollowSocial
+                  targetUserId={u.id}
+                  viewerUserId={session.user.id}
+                  showFollowButton={session.user.id !== u.id}
+                  initialFollowers={followCounts.followers}
+                  initialFollowing={followCounts.following}
+                  initialIsFollowing={amFollowing}
+                />
+              </div>
             </div>
 
             <dl className="grid gap-4 border-t border-zinc-100 pt-6 text-sm dark:border-zinc-800">

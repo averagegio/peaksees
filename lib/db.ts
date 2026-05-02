@@ -107,6 +107,16 @@ db.exec(`
     created_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS user_follows (
+    follower_id TEXT NOT NULL,
+    following_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (follower_id, following_id),
+    CHECK (follower_id != following_id)
+  );
+  CREATE INDEX IF NOT EXISTS user_follows_following_idx ON user_follows(following_id);
+  CREATE INDEX IF NOT EXISTS user_follows_follower_idx ON user_follows(follower_id);
+
   CREATE TABLE IF NOT EXISTS markets (
     id TEXT PRIMARY KEY,
     question TEXT NOT NULL,

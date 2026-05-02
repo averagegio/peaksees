@@ -6,8 +6,10 @@ import { BackButton } from "@/app/components/BackButton";
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { ProfileEditor } from "@/app/components/profile/ProfileEditor";
 import { PEAKSEES_HEADER_BANNER } from "@/lib/brand";
+import { ProfileFollowSocial } from "@/app/components/profile/ProfileFollowSocial";
 import { getSession } from "@/lib/auth/session";
 import { getPeakById, listPeaks } from "@/lib/peaks/store";
+import { getFollowCounts } from "@/lib/social/follows-store";
 import { listPins } from "@/lib/social/pins-store";
 import { MARKET_FEED_FOLLOWING, MARKET_FEED_FOR_YOU, MARKET_FEED_LIVE } from "@/app/lib/mock-markets";
 
@@ -27,6 +29,7 @@ export default async function DashboardPage() {
   if (!session) redirect("/login");
 
   const u = session.user;
+  const followCounts = await getFollowCounts(u.id);
   const myPeaks = await listPeaks({ mineUserId: u.id, limit: 10 });
   const pins = await listPins(u.id);
   const marketById = new Map(
@@ -163,6 +166,16 @@ export default async function DashboardPage() {
                 {u.displayName}
               </h2>
               <p className="text-zinc-600 dark:text-zinc-400">{u.email}</p>
+              <div className="mt-4">
+                <ProfileFollowSocial
+                  targetUserId={u.id}
+                  viewerUserId={u.id}
+                  showFollowButton={false}
+                  initialFollowers={followCounts.followers}
+                  initialFollowing={followCounts.following}
+                  initialIsFollowing={false}
+                />
+              </div>
             </div>
             <ProfileEditor
               initialDisplayName={u.displayName}
