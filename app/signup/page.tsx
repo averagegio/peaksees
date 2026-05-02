@@ -9,7 +9,7 @@ export default function SignupPage() {
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Create your account</h1>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Join peaksees to track your profile
+            New here? We open your dashboard so you can set up your profile
           </p>
         </div>
         <SignupForm />
