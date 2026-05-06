@@ -64,7 +64,6 @@ function buildMarketsHref(opts: {
   autogen: boolean;
   count?: number;
   marketCategory: string;
-  activeSubcat: string;
   tz: string;
   cursor?: { createdAt: string; id: string };
 }) {
@@ -75,7 +74,6 @@ function buildMarketsHref(opts: {
     q.set("count", String(opts.count ?? 5));
   }
   if (opts.marketCategory) q.set("category", opts.marketCategory);
-  if (opts.activeSubcat) q.set("subcategory", opts.activeSubcat);
   if (opts.tz) q.set("tz", opts.tz);
   if (opts.cursor) {
     q.set("cursorCreatedAt", opts.cursor.createdAt);
@@ -171,7 +169,6 @@ export function HomeFeedWithTabs({
 } = {}) {
   const [tab, setTab] = useState<"foryou" | "following" | "live">("foryou");
   const [explore, setExplore] = useState("Trending");
-  const [subcat, setSubcat] = useState<string>("");
   const [showLatestPeaks, setShowLatestPeaks] = useState(
     () => Boolean(highlightPeakId?.trim()),
   );
@@ -249,20 +246,11 @@ export function HomeFeedWithTabs({
 
   const marketCategory =
     explore === "Trending" ? "" : explore === "News" ? "News" : explore === "Sports" ? "Sports" : "Culture";
-  const allowedSubcats =
-    explore === "News"
-      ? ["politics", "econ", "global", "eu", "tech", "science", "commodities", "ai"]
-      : explore === "Sports"
-        ? ["nba", "nfl", "wnba", "soccer", "hockey", "golf", "olympics", "niche"]
-        : explore === "Culture"
-          ? ["celebs", "fashion", "music", "events", "local", "tv", "streaming", "netflix", "art"]
-          : [];
-  const activeSubcat = allowedSubcats.includes(subcat) ? subcat : "";
   const tz =
     typeof Intl !== "undefined"
       ? Intl.DateTimeFormat().resolvedOptions().timeZone ?? ""
       : "";
-  const filtersKey = `${tab}:${explore}:${marketCategory}:${activeSubcat}:${tz}`;
+  const filtersKey = `${tab}:${explore}:${marketCategory}:${tz}`;
 
   const runPullRefreshRef = useRef<() => Promise<void>>(async () => {});
 
@@ -279,7 +267,6 @@ export function HomeFeedWithTabs({
         autogen: true,
         count: 5,
         marketCategory,
-        activeSubcat,
         tz,
       });
       const res = await fetch(href, { cache: "no-store" });
@@ -327,7 +314,6 @@ export function HomeFeedWithTabs({
           limit: 14,
           autogen: false,
           marketCategory,
-          activeSubcat,
           tz,
           cursor: { createdAt: last.createdAt, id: last.id },
         });
@@ -362,15 +348,6 @@ export function HomeFeedWithTabs({
       }
     })();
   };
-
-  useEffect(() => {
-    // Reset subcategory when switching nav chips.
-    if (allowedSubcats.length === 0) {
-      setSubcat("");
-      return;
-    }
-    setSubcat((prev) => (allowedSubcats.includes(prev) ? prev : allowedSubcats[0] ?? ""));
-  }, [explore]);
 
   useEffect(() => {
     const hilite = highlightPeakId?.trim();
@@ -424,7 +401,6 @@ export function HomeFeedWithTabs({
           autogen: true,
           count: 5,
           marketCategory,
-          activeSubcat,
           tz,
         });
         const res = await fetch(href, { cache: "no-store" });
@@ -437,7 +413,7 @@ export function HomeFeedWithTabs({
     }
     void boot();
     return undefined;
-  }, [tab, filtersKey, marketCategory, activeSubcat, tz]);
+  }, [tab, filtersKey, marketCategory, tz]);
 
   useEffect(() => {
     function onNewPeak(e: Event) {
@@ -811,25 +787,6 @@ export function HomeFeedWithTabs({
                 <span aria-hidden className="mt-1 block h-[2px] w-full rounded-full bg-transparent group-hover:bg-current/35" />
               </Link>
             </div>
-            {allowedSubcats.length > 0 ? (
-              <div className="-mx-3 mt-2 feed-scroll flex items-center gap-3 overflow-x-auto px-3 pb-1">
-                {allowedSubcats.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    data-sparkle-click="true"
-                    onClick={() => setSubcat(s)}
-                    className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
-                      activeSubcat === s
-                        ? "border-zinc-300 bg-white text-zinc-900 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-                        : "border-transparent bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-900/50 dark:text-zinc-300 dark:hover:bg-zinc-900"
-                    }`}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            ) : null}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <button
                 type="button"
