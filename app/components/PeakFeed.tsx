@@ -3,6 +3,7 @@
 import type { MarketPost } from "@/app/lib/mock-markets";
 import { useRef, useState } from "react";
 import type { Peak } from "@/lib/peaks/store";
+import { usePostPin } from "@/app/hooks/usePostPin";
 import { PostActions } from "@/app/components/post/PostActions";
 import { MarketTradeBox } from "@/app/components/market/MarketTradeBox";
 import { PeakOpinionChip } from "@/app/components/market/PeakOpinionChip";
@@ -15,6 +16,52 @@ function formatUsd(n: number) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(n);
+}
+
+function BookmarkRibbonIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[22px] w-[22px]"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+      />
+    </svg>
+  );
+}
+
+function MarketPostBookmark({ postKey }: { postKey: string }) {
+  const { pinned, toggle, pinning } = usePostPin(postKey);
+  return (
+    <button
+      type="button"
+      data-sparkle-click="true"
+      className={
+        "shrink-0 self-start rounded-full p-2 outline-none transition hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-emerald-500 dark:hover:bg-zinc-800 " +
+        (pinned
+          ? "text-emerald-600 dark:text-emerald-400"
+          : "text-zinc-400 dark:text-zinc-500")
+      }
+      disabled={pinning}
+      aria-pressed={pinned}
+      aria-label={pinned ? "Remove bookmark" : "Bookmark this market"}
+      title={
+        pinned
+          ? "Remove bookmark — same as undo Repeak below"
+          : "Bookmark — same as Repeak below (saved pins)"
+      }
+      onClick={() => void toggle()}
+    >
+      <BookmarkRibbonIcon filled={pinned} />
+    </button>
+  );
 }
 
 function tickerParts(post: MarketPost) {
@@ -59,7 +106,7 @@ function MarketPostCard({
       className="poppy-hover sparkle-hover rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm backdrop-blur-md dark:border-zinc-700 dark:bg-zinc-900/95"
       aria-label={`Prediction market: ${post.question}`}
     >
-      <header className="flex gap-3">
+      <header className="flex items-start gap-3">
         <ProfileLink
           href={`/p/${handleSlug}`}
           className="group shrink-0"
@@ -152,6 +199,7 @@ function MarketPostCard({
             ) : null}
           </div>
         </div>
+        <MarketPostBookmark postKey={`market:${post.id}`} />
       </header>
 
       <h2 className="mt-4 text-[17px] font-semibold leading-snug tracking-tight text-zinc-900 dark:text-zinc-50">

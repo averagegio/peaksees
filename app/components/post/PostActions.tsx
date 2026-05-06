@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CommentsDrawer } from "@/app/components/comments/CommentsDrawer";
-import { safeJson } from "@/lib/http";
+import { usePostPin } from "@/app/hooks/usePostPin";
 
 function CommentIcon() {
   return (
@@ -44,36 +44,7 @@ export function PostActions({
   title: string;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [repeaked, setRepeaked] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadPins() {
-      try {
-        const res = await fetch("/api/pins", { cache: "no-store" });
-        const data = (await safeJson<{ pins?: string[] }>(res)) ?? {};
-        if (!cancelled && Array.isArray(data.pins)) {
-          setRepeaked(data.pins.includes(postKey));
-        }
-      } catch {
-        // ignore
-      }
-    }
-    void loadPins();
-    return () => {
-      cancelled = true;
-    };
-  }, [postKey]);
-
-  async function toggleRepeak() {
-    const res = await fetch("/api/pins", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ postKey }),
-    });
-    const data = (await safeJson<{ pinned?: boolean }>(res)) ?? {};
-    if (typeof data.pinned === "boolean") setRepeaked(data.pinned);
-  }
+  const { pinned: repeaked, toggle: toggleRepeak, pinning } = usePostPin(postKey);
 
   return (
     <>
@@ -98,7 +69,8 @@ export function PostActions({
               ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
               : "border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
           }`}
-          onClick={toggleRepeak}
+          disabled={pinning}
+          onClick={() => void toggleRepeak()}
           title={
             repeaked ? "Undo repeak" : "Repeak — save this post on your feed (yours or others)"
           }
