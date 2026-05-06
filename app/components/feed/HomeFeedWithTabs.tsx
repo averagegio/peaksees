@@ -95,6 +95,45 @@ function scrollRootShowsSentinel(
   return s.top <= r.bottom + marginPastBottomPx && s.bottom >= r.top;
 }
 
+function PullRefreshRail({
+  expandedPx,
+  loading,
+}: {
+  expandedPx: number;
+  loading: boolean;
+}) {
+  const h = loading ? 64 : expandedPx;
+  if (h < 2 && !loading) return null;
+  const progress = loading ? 1 : Math.min(1, expandedPx / 72);
+  return (
+    <div
+      role={loading ? "status" : undefined}
+      aria-live={loading ? "polite" : undefined}
+      aria-busy={loading || undefined}
+      className="flex w-full shrink-0 flex-col items-center justify-center overflow-hidden border-b border-zinc-200/40 pb-1 transition-[height] duration-200 ease-out dark:border-zinc-700/50"
+      style={{ height: h }}
+    >
+      <div
+        className={`flex h-9 w-9 items-center justify-center rounded-full border-2 border-emerald-200 dark:border-zinc-600 ${
+          loading ? "animate-spin border-t-emerald-600 dark:border-t-emerald-400" : "border-t-emerald-600/45 dark:border-t-emerald-400/45"
+        }`}
+        style={
+          loading
+            ? undefined
+            : { transform: `rotate(${expandedPx * 2.8}deg)`, opacity: 0.35 + progress * 0.65 }
+        }
+      />
+      {loading ? (
+        <span className="mt-2 text-[10px] font-medium uppercase tracking-wide text-emerald-800/85 dark:text-emerald-300/90">
+          New markets…
+        </span>
+      ) : expandedPx >= 44 ? (
+        <span className="mt-2 text-[10px] text-zinc-500 dark:text-zinc-400">Release to load</span>
+      ) : null}
+    </div>
+  );
+}
+
 function FeedInfiniteFooter({ loading, end }: { loading: boolean; end: boolean }) {
   return (
     <div className="mx-auto flex w-full max-w-xl flex-none flex-col px-2 pb-28 pt-4 sm:px-4">
@@ -141,6 +180,8 @@ export function HomeFeedWithTabs({
   const [generatedMarkets, setGeneratedMarkets] = useState<Market[]>([]);
   const [loadMoreBusy, setLoadMoreBusy] = useState(false);
   const [marketsAtEnd, setMarketsAtEnd] = useState(false);
+  const [pullOffset, setPullOffset] = useState(0);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -151,6 +192,24 @@ export function HomeFeedWithTabs({
   const feedSessionRef = useRef(0);
   const generatedMarketsRef = useRef<Market[]>([]);
   const marketsAtEndRef = useRef(false);
+  const pullOffsetRef = useRef(0);
+  const pullGestureRef = useRef<{ active: boolean; startY: number }>({
+    active: false,
+    startY: 0,
+  });
+  const tabRef = useRef(tab);
+  const lastPullRefreshAtRef = useRef(0);
+
+  useEffect(() => {
+    tabRef.current = tab;
+  }, [tab]);
+  useEffect(() => {
+    pullOffsetRef.current = pullOffset;
+  }, [pullOffset]);
+  const pullRefreshingRef = useRef(false);
+  useEffect(() => {
+    pullRefreshingRef.current = pullRefreshing;
+  }, [pullRefreshing]);
 
   useEffect(() => {
     generatedMarketsRef.current = generatedMarkets;
@@ -204,6 +263,47 @@ export function HomeFeedWithTabs({
       ? Intl.DateTimeFormat().resolvedOptions().timeZone ?? ""
       : "";
   const filtersKey = `${tab}:${explore}:${marketCategory}:${activeSubcat}:${tz}`;
+
+  const runPullRefreshRef = useRef<() => Promise<void>>(async () => {});
+
+  runPullRefreshRef.current = async () => {
+    if (tabRef.current === "live") return;
+    const nowTick = Date.now();
+    if (nowTick - lastPullRefreshAtRef.current < 2200) return;
+    lastPullRefreshAtRef.current = nowTick;
+
+    setPullRefreshing(true);
+    try {
+      const href = buildMarketsHref({
+        limit: 24,
+        autogen: true,
+        count: 5,
+        marketCategory,
+        activeSubcat,
+        tz,
+      });
+      const res = await fetch(href, { cache: "no-store" });
+      const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
+      const incoming = Array.isArray(data.markets) ? data.markets : [];
+
+      let didPrepend = false;
+      setGeneratedMarkets((prev) => {
+        const seen = new Set(prev.map((m) => m.id));
+        const novel = incoming.filter((m) => !seen.has(m.id));
+        if (novel.length === 0) return prev;
+        didPrepend = true;
+        return [...novel, ...prev];
+      });
+      if (didPrepend) {
+        marketsAtEndRef.current = false;
+        setMarketsAtEnd(false);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setPullRefreshing(false);
+    }
+  };
 
   const appendOlderChunkRef = useRef<() => void>(() => {});
 
@@ -374,6 +474,117 @@ export function HomeFeedWithTabs({
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || tab === "live") return undefined;
+
+    const g = pullGestureRef.current;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (pullRefreshingRef.current) return;
+      if (el.scrollTop > 2) return;
+      g.active = true;
+      g.startY = e.touches[0].clientY;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!g.active || pullRefreshingRef.current) return;
+      if (el.scrollTop > 2) {
+        g.active = false;
+        pullOffsetRef.current = 0;
+        setPullOffset(0);
+        return;
+      }
+      const dy = e.touches[0].clientY - g.startY;
+      if (dy > 0) {
+        e.preventDefault();
+        const v = Math.min(dy * 0.4, 100);
+        pullOffsetRef.current = v;
+        setPullOffset(v);
+      }
+    };
+
+    const onTouchEnd = () => {
+      if (!g.active) return;
+      g.active = false;
+      const armed = pullOffsetRef.current >= 48;
+      pullOffsetRef.current = 0;
+      setPullOffset(0);
+      if (armed && !pullRefreshingRef.current) void runPullRefreshRef.current();
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
+
+    let mouseArmed = false;
+    let mouseStartY = 0;
+    let mousePtrId = -1;
+
+    const ptrDown = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
+      if (pullRefreshingRef.current || el.scrollTop > 2) return;
+      mouseArmed = true;
+      mouseStartY = e.clientY;
+      mousePtrId = e.pointerId;
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {
+        mouseArmed = false;
+      }
+    };
+
+    const ptrMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch" || !mouseArmed || e.pointerId !== mousePtrId) return;
+      if (pullRefreshingRef.current || (e.buttons & 1) === 0) return;
+      if (el.scrollTop > 2) {
+        mouseArmed = false;
+        pullOffsetRef.current = 0;
+        setPullOffset(0);
+        return;
+      }
+      const dy = e.clientY - mouseStartY;
+      if (dy > 0) {
+        e.preventDefault();
+        const v = Math.min(dy * 0.4, 100);
+        pullOffsetRef.current = v;
+        setPullOffset(v);
+      }
+    };
+
+    const ptrUp = (e: PointerEvent) => {
+      if (e.pointerType === "touch" || !mouseArmed || e.pointerId !== mousePtrId) return;
+      mouseArmed = false;
+      mousePtrId = -1;
+      try {
+        el.releasePointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
+      const armed = pullOffsetRef.current >= 48;
+      pullOffsetRef.current = 0;
+      setPullOffset(0);
+      if (armed && !pullRefreshingRef.current) void runPullRefreshRef.current();
+    };
+
+    el.addEventListener("pointerdown", ptrDown);
+    el.addEventListener("pointermove", ptrMove, { passive: false });
+    el.addEventListener("pointerup", ptrUp);
+    el.addEventListener("pointercancel", ptrUp);
+
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+      el.removeEventListener("pointerdown", ptrDown);
+      el.removeEventListener("pointermove", ptrMove);
+      el.removeEventListener("pointerup", ptrUp);
+      el.removeEventListener("pointercancel", ptrUp);
+    };
+  }, [tab]);
 
   useEffect(() => {
     if (tab === "live") return undefined;
@@ -641,6 +852,9 @@ export function HomeFeedWithTabs({
         data-tour="feed-scroll"
         className="feed-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-pt-4 sm:scroll-pt-6"
       >
+        {tab !== "live" ? (
+          <PullRefreshRail expandedPx={pullOffset} loading={pullRefreshing} />
+        ) : null}
         {tab === "live" ? <LiveStreamPanel /> : null}
         <PeakFeed
           key={`${tab}-${explore}`}
