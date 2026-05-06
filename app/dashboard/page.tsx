@@ -3,15 +3,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BackButton } from "@/app/components/BackButton";
+import { PeakpointsWalletCallout } from "@/app/components/dashboard/PeakpointsWalletCallout";
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { ProfileEditor } from "@/app/components/profile/ProfileEditor";
 import { PEAKSEES_HEADER_BANNER } from "@/lib/brand";
 import { ProfileFollowSocial } from "@/app/components/profile/ProfileFollowSocial";
+import type { Peak } from "@/lib/peaks/store";
 import { getSession } from "@/lib/auth/session";
 import { getPeakById, listPeaks } from "@/lib/peaks/store";
 import { getFollowCounts } from "@/lib/social/follows-store";
-import { listPins } from "@/lib/social/pins-store";
-import { MARKET_FEED_FOLLOWING, MARKET_FEED_FOR_YOU, MARKET_FEED_LIVE } from "@/app/lib/mock-markets";
+import { listPinEntries } from "@/lib/social/pins-store";
 
 function formatJoined(iso: string) {
   try {
@@ -24,29 +25,91 @@ function formatJoined(iso: string) {
   }
 }
 
+function parsePeakPinId(postKey: string): string | null {
+  if (!postKey.startsWith("peak:")) return null;
+  const id = postKey.slice("peak:".length).trim();
+  return id.length > 0 ? id : null;
+}
+
+function newerIso(a: string, b: string) {
+  try {
+    return new Date(a) >= new Date(b) ? a : b;
+  } catch {
+    return a;
+  }
+}
+
+type DashboardPeakRow = {
+  peak: Peak;
+  youPosted: boolean;
+  repeakedAt: string | null;
+};
+
+async function buildDashboardPeaksAndRepeaks(viewerUserId: string): Promise<DashboardPeakRow[]> {
+  const [myPeaks, pinEntries] = await Promise.all([
+    listPeaks({ mineUserId: viewerUserId, limit: 80 }),
+    listPinEntries(viewerUserId, 80),
+  ]);
+
+  const mineById = new Map(myPeaks.map((p) => [p.id, p]));
+  const repeakedPeakIdsOrdered: Array<{ id: string; repeakedAt: string }> = [];
+  for (const e of pinEntries) {
+    const id = parsePeakPinId(e.postKey);
+    if (id) repeakedPeakIdsOrdered.push({ id, repeakedAt: e.createdAt });
+  }
+
+  const repeakedAtById = new Map<string, string>();
+  for (const x of repeakedPeakIdsOrdered) {
+    repeakedAtById.set(x.id, x.repeakedAt);
+  }
+
+  const onlyRepeakedIds = [
+    ...new Set(repeakedPeakIdsOrdered.map((x) => x.id)),
+  ].filter((id) => !mineById.has(id));
+
+  const fetched = (
+    await Promise.all(onlyRepeakedIds.map((id) => getPeakById(id)))
+  ).filter(Boolean) as Peak[];
+
+  const byId = new Map<string, DashboardPeakRow>();
+
+  for (const p of myPeaks) {
+    byId.set(p.id, {
+      peak: p,
+      youPosted: true,
+      repeakedAt: repeakedAtById.get(p.id) ?? null,
+    });
+  }
+
+  for (const p of fetched) {
+    if (byId.has(p.id)) continue;
+    byId.set(p.id, {
+      peak: p,
+      youPosted: false,
+      repeakedAt: repeakedAtById.get(p.id) ?? null,
+    });
+  }
+
+  return [...byId.values()].sort((ra, rb) => {
+    const sa = newerIso(
+      ra.peak.createdAt,
+      ra.repeakedAt ?? ra.peak.createdAt,
+    );
+    const sb = newerIso(
+      rb.peak.createdAt,
+      rb.repeakedAt ?? rb.peak.createdAt,
+    );
+    return sb.localeCompare(sa);
+  });
+}
+
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
   const u = session.user;
   const followCounts = await getFollowCounts(u.id);
-  const myPeaks = await listPeaks({ mineUserId: u.id, limit: 10 });
-  const pins = await listPins(u.id);
-  const marketById = new Map(
-    [...MARKET_FEED_FOR_YOU, ...MARKET_FEED_FOLLOWING, ...MARKET_FEED_LIVE].map((p) => [p.id, p]),
-  );
-  const pinnedMarkets = pins
-    .filter((k) => k.startsWith("market:"))
-    .map((k) => k.split(":")[1] ?? "")
-    .map((id) => marketById.get(id))
-    .filter(Boolean);
-  const pinnedPeakIds = pins
-    .filter((k) => k.startsWith("peak:"))
-    .map((k) => k.split(":")[1] ?? "")
-    .filter(Boolean);
-  const pinnedPeaksResolved = (
-    await Promise.all(pinnedPeakIds.map((id) => getPeakById(id)))
-  ).filter(Boolean);
+  const peakRows = await buildDashboardPeaksAndRepeaks(u.id);
 
   return (
     <div className="flex min-h-dvh flex-col bg-gradient-to-b from-zinc-100 to-zinc-200/90 dark:from-zinc-950 dark:to-zinc-900">
@@ -86,47 +149,8 @@ export default async function DashboardPage() {
       </header>
 
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-8">
-        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-6 py-4 dark:border-zinc-800">
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              Pinned
-            </h3>
-            <Link
-              href="/feed"
-              className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
-            >
-              Manage in feed
-            </Link>
-          </div>
-          <div className="px-6 py-5">
-            {pins.length === 0 ? (
-              <p className="text-sm text-zinc-600 dark:text-zinc-300">
-                Pin markets or peaks to keep them at the top.
-              </p>
-            ) : (
-              <ul className="space-y-3">
-                {pinnedMarkets.map((m) => (
-                  <li key={`pm-${m!.id}`} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950">
-                    <p className="font-semibold text-zinc-900 dark:text-zinc-100">
-                      {m!.question}
-                    </p>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      Market · {m!.category}
-                    </p>
-                  </li>
-                ))}
-                {pinnedPeaksResolved.map((p) => (
-                  <li key={`pp-${p!.id}`} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950">
-                    <p className="text-zinc-800 dark:text-zinc-100">{p!.text}</p>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      Peak · {new Date(p!.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </section>
+        <PeakpointsWalletCallout />
+
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="relative z-0 h-28 overflow-hidden bg-gradient-to-r from-emerald-600/90 to-teal-600/80 sm:h-32">
             {u.bannerUrl?.trim() ? (
@@ -200,38 +224,99 @@ export default async function DashboardPage() {
 
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-6 py-4 dark:border-zinc-800">
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              Your peaks
-            </h3>
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                Your peaks &amp; repeaks
+              </h3>
+              <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                Posts you write and peaks you&nbsp;repeak from the feed.
+              </p>
+            </div>
             <Link
               href="/feed"
               className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
             >
-              View feed
+              Open feed
             </Link>
           </div>
           <div className="px-6 py-5">
-            {myPeaks.length === 0 ? (
+            {peakRows.length === 0 ? (
               <p className="text-sm text-zinc-600 dark:text-zinc-300">
-                Peaks you post will appear here.
+                Compose peaks from the floating button on the feed, or&nbsp;repeak someone
+                else&apos;s peak—the list updates here automatically.
               </p>
             ) : (
               <ul className="space-y-3">
-                {myPeaks.map((p) => (
+                {peakRows.map((row) => {
+                  const { peak: p, youPosted, repeakedAt } = row;
+                  return (
                   <li
                     key={p.id}
                     className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   >
-                    <p className="text-zinc-700 dark:text-zinc-200">{p.text}</p>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      {new Date(p.createdAt).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] leading-tight">
+                      {youPosted ? (
+                        <span className="font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                          Your peak
+                        </span>
+                      ) : (
+                        <span className="font-semibold tracking-tight text-sky-700 dark:text-sky-400">
+                          You repeaked
+                          {repeakedAt
+                            ? ` · ${new Date(repeakedAt).toLocaleString(undefined, {
+                                month: "short",
+                                day: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}`
+                            : ""}
+                        </span>
+                      )}
+                      {!youPosted ? (
+                        <span className="font-medium normal-case tracking-normal text-zinc-600 dark:text-zinc-400">
+                          Original · {p.displayName} ({p.handle})
+                        </span>
+                      ) : null}
+                      {youPosted && repeakedAt ? (
+                        <span className="ml-auto normal-case tracking-normal text-zinc-500 dark:text-zinc-400">
+                          Repeak saved ·{" "}
+                          {new Date(repeakedAt).toLocaleString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap break-words text-[15px] leading-snug text-zinc-800 dark:text-zinc-100">
+                      {p.text}
                     </p>
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                        Posted{" "}
+                        {new Date(p.createdAt).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                        {p.expiresAt ? (
+                          <> · expires {new Date(p.expiresAt).toLocaleString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                            })}</>
+                        ) : null}
+                      </p>
+                      <Link
+                        href={`/feed?peak=${encodeURIComponent(p.id)}`}
+                        className="shrink-0 text-[11px] font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
+                      >
+                        View in feed
+                      </Link>
+                    </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </div>

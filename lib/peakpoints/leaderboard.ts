@@ -4,6 +4,22 @@ import { Pool } from "pg";
 
 import { db } from "@/lib/db";
 
+type PeakstatsPgRow = {
+  user_id: string;
+  email: string;
+  display_name: string;
+  avatar_url: string | null;
+  balance_cents: string | null;
+};
+
+type PeakstatsSqliteRow = {
+  user_id: string;
+  email: string;
+  display_name: string;
+  avatar_url: string | null;
+  balance_cents: number;
+};
+
 export type PeakstatsRow = {
   userId: string;
   displayName: string;
@@ -63,13 +79,7 @@ export async function listPeakstatsLeaderboard(input: {
 
   if (postgresPool) {
     await ensureSchema();
-    const result = await postgresPool.query<{
-      user_id: string;
-      email: string;
-      display_name: string;
-      avatar_url: string | null;
-      balance_cents: string | null;
-    }>(
+    const result = await postgresPool.query<PeakstatsPgRow>(
       `
       SELECT
         u.id as user_id,
@@ -110,13 +120,7 @@ export async function listPeakstatsLeaderboard(input: {
       LIMIT ?
       `,
     )
-    .all(limit) as Array<{
-    user_id: string;
-    email: string;
-    display_name: string;
-    avatar_url: string | null;
-    balance_cents: number;
-  }>;
+    .all(limit) as PeakstatsSqliteRow[];
 
   return rows.map((r) => ({
     userId: r.user_id,

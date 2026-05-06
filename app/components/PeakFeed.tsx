@@ -29,7 +29,14 @@ function tickerParts(post: MarketPost) {
   ];
 }
 
-function MarketPostCard({ post }: { post: MarketPost }) {
+function MarketPostCard({
+  post,
+  isTourAnchor = false,
+}: {
+  post: MarketPost;
+  /** Highlights this card for the first-visit interactive tour. */
+  isTourAnchor?: boolean;
+}) {
   const [selected, setSelected] = useState<string | null>(null);
   /** Unlocks tapping the peaksees badge to fetch Peak disagree score */
   const [hasPlacedBet, setHasPlacedBet] = useState(false);
@@ -44,6 +51,7 @@ function MarketPostCard({ post }: { post: MarketPost }) {
   return (
     <article
       data-market-id={post.id}
+      data-tour={isTourAnchor ? "tour-first-card" : undefined}
       ref={(el) => {
         cardRef.current = el;
       }}
@@ -90,6 +98,7 @@ function MarketPostCard({ post }: { post: MarketPost }) {
               ref={peakBadgeRef}
               type="button"
               disabled={!hasPlacedBet}
+              data-tour={isTourAnchor ? "peak-badge" : undefined}
               data-sparkle-click="true"
               title={
                 peakScoreRevealed
@@ -252,11 +261,15 @@ export function PeakFeed({
   posts,
   contextLabel,
   peaks = [],
+  tourMarketPostIndex,
 }: {
   posts: MarketPost[];
   contextLabel?: string;
   peaks?: Peak[];
+  /** Index in `posts` to attach tour spotlight (first market card). */
+  tourMarketPostIndex?: number;
 }) {
+  const tourIx = tourMarketPostIndex ?? -1;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ul className="mx-auto flex w-full max-w-xl flex-col gap-3 px-2 pb-28 pt-5 sm:gap-5 sm:px-4 sm:pb-24 sm:pt-6 md:pt-9">
@@ -274,9 +287,10 @@ export function PeakFeed({
                 Latest peaks
               </p>
               <ul className="mt-3 space-y-2">
-                {peaks.slice(0, 6).map((p) => (
+                {peaks.slice(0, 18).map((p) => (
                   <li
                     key={p.id}
+                    data-peak-id={p.id}
                     data-sparkle-click="true"
                     className="sparkle-hover sparkle-hover--contained rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                   >
@@ -294,7 +308,7 @@ export function PeakFeed({
                         })}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-200">
+                    <p className="mt-1 whitespace-pre-wrap break-words text-sm text-zinc-700 dark:text-zinc-200">
                       {p.text}
                     </p>
                     {p.expiresAt ? (
@@ -309,9 +323,9 @@ export function PeakFeed({
             </div>
           </li>
         ) : null}
-        {posts.map((post) => (
+        {posts.map((post, i) => (
           <li key={post.id}>
-            <MarketPostCard post={post} />
+            <MarketPostCard post={post} isTourAnchor={i === tourIx} />
           </li>
         ))}
       </ul>

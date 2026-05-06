@@ -12,6 +12,15 @@ import { db } from "@/lib/db";
 
 export type TradeSide = "yes" | "no";
 
+type BalanceSumRow = { s: string | null };
+
+type MarketPricesRow = {
+  id: string;
+  question: string;
+  yes_probability: number;
+  no_probability: number;
+};
+
 const postgresUrl = process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? "";
 const postgresPool = postgresUrl
   ? new Pool({
@@ -108,7 +117,7 @@ async function ensureSchema() {
 export async function getPeakpointsBalanceCents(userId: string): Promise<number> {
   if (postgresPool) {
     await ensureSchema();
-    const result = await postgresPool.query<{ s: string | null }>(
+    const result = await postgresPool.query<BalanceSumRow>(
       `SELECT COALESCE(SUM(amount_cents), 0) as s FROM peakpoints_ledger WHERE user_id = $1`,
       [userId],
     );
@@ -149,12 +158,7 @@ export async function buyMarketSide(input: {
     try {
       await client.query("BEGIN");
 
-      const mRes = await client.query<{
-        id: string;
-        question: string;
-        yes_probability: number;
-        no_probability: number;
-      }>(
+      const mRes = await client.query<MarketPricesRow>(
         `SELECT id, question, yes_probability, no_probability
          FROM markets
          WHERE id = $1
@@ -193,7 +197,7 @@ export async function buyMarketSide(input: {
       const sharesX1000 = Math.max(1, Math.floor((amountCents * 1000) / priceCents));
       const costCents = Math.floor((sharesX1000 * priceCents) / 1000);
 
-      const balRes = await client.query<{ s: string | null }>(
+      const balRes = await client.query<BalanceSumRow>(
         `SELECT COALESCE(SUM(amount_cents), 0) as s FROM peakpoints_ledger WHERE user_id = $1`,
         [input.userId],
       );

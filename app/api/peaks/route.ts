@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth/session";
-import { createPeak, listPeaks } from "@/lib/peaks/store";
+import { createPeak, getPeakById, listPeaks } from "@/lib/peaks/store";
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -9,12 +9,22 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const mine = url.searchParams.get("mine") === "1";
-  const limit = Number(url.searchParams.get("limit") ?? "20");
+  const limitRaw = Number(url.searchParams.get("limit") ?? "20");
+  const highlight = url.searchParams.get("highlight")?.trim() ?? "";
+  const capped = Number.isFinite(limitRaw) ? Math.min(50, Math.max(1, limitRaw)) : 20;
 
-  const peaks = await listPeaks({
+  let peaks = await listPeaks({
     mineUserId: mine ? session.user.id : undefined,
-    limit: Number.isFinite(limit) ? limit : 20,
+    limit: capped,
   });
+
+  if (highlight) {
+    const hp = await getPeakById(highlight);
+    if (hp) {
+      peaks = [hp, ...peaks.filter((p) => p.id !== hp.id)].slice(0, capped);
+    }
+  }
+
   return NextResponse.json({ peaks });
 }
 

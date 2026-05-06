@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth/session";
-import { updateUserProfile } from "@/lib/auth/users-store";
+import { toPublicUser, updateUserProfile } from "@/lib/auth/users-store";
 
 export async function PATCH(request: Request) {
   const session = await getSession();
@@ -70,14 +70,6 @@ export async function PATCH(request: Request) {
   }
 
   return NextResponse.json({
-    user: {
-      id: updated.id,
-      email: updated.email,
-      displayName: updated.displayName,
-      createdAt: updated.createdAt,
-      bio: updated.bio,
-      avatarUrl: updated.avatarUrl,
-      bannerUrl: updated.bannerUrl,
-    },
+    user: toPublicUser(updated),
   });
 }

@@ -13,6 +13,18 @@ export type LedgerEntry = {
   note: string | null;
 };
 
+type LedgerRowDb = {
+  id: string;
+  kind: string;
+  amount_cents: number;
+  created_at: string;
+  note: string | null;
+};
+
+type BalanceSumRow = { s: string | null };
+
+type StripeCheckoutClaimRow = { stripe_checkout_session_id: string };
+
 const postgresUrl = process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? "";
 const postgresPool = postgresUrl
   ? new Pool({
@@ -59,7 +71,7 @@ async function ensureSchema() {
 export async function getBalanceCents(userId: string): Promise<number> {
   if (postgresPool) {
     await ensureSchema();
-    const result = await postgresPool.query<{ s: string | null }>(
+    const result = await postgresPool.query<BalanceSumRow>(
       `SELECT COALESCE(SUM(amount_cents), 0) as s FROM peakpoints_ledger WHERE user_id = $1`,
       [userId],
     );
@@ -74,13 +86,7 @@ export async function getBalanceCents(userId: string): Promise<number> {
 export async function listLedger(userId: string): Promise<LedgerEntry[]> {
   if (postgresPool) {
     await ensureSchema();
-    const result = await postgresPool.query<{
-      id: string;
-      kind: string;
-      amount_cents: number;
-      created_at: string;
-      note: string | null;
-    }>(
+    const result = await postgresPool.query<LedgerRowDb>(
       `SELECT id, kind, amount_cents, created_at, note
        FROM peakpoints_ledger
        WHERE user_id = $1
@@ -105,13 +111,7 @@ export async function listLedger(userId: string): Promise<LedgerEntry[]> {
        ORDER BY created_at DESC
        LIMIT 50`,
     )
-    .all(userId) as Array<{
-    id: string;
-    kind: string;
-    amount_cents: number;
-    created_at: string;
-    note: string | null;
-  }>;
+    .all(userId) as LedgerRowDb[];
 
   return rows.map((r) => ({
     id: r.id,
@@ -142,7 +142,7 @@ export async function tryCreditWalletTopupOnce(input: {
     const client = await postgresPool.connect();
     try {
       await client.query("BEGIN");
-      const ins = await client.query<{ stripe_checkout_session_id: string }>(
+      const ins = await client.query<StripeCheckoutClaimRow>(
         `INSERT INTO stripe_wallet_topup_claims (stripe_checkout_session_id, created_at)
          VALUES ($1, $2)
          ON CONFLICT (stripe_checkout_session_id) DO NOTHING

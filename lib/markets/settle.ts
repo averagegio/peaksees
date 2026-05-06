@@ -6,6 +6,15 @@ import { Pool } from "pg";
 import { db } from "@/lib/db";
 import type { MarketSide } from "@/lib/markets/store";
 
+type MarketResolvedSideRow = { resolved_side: string | null };
+
+type UnsettledTradeRow = {
+  id: string;
+  user_id: string;
+  side: string;
+  shares_x1000: number;
+};
+
 const postgresUrl = process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? "";
 const postgresPool = postgresUrl
   ? new Pool({
@@ -78,7 +87,7 @@ export async function resolveAndSettleMarket(input: {
     try {
       await client.query("BEGIN");
 
-      const mRes = await client.query<{ resolved_side: string | null }>(
+      const mRes = await client.query<MarketResolvedSideRow>(
         `SELECT resolved_side FROM markets WHERE id = $1 FOR UPDATE`,
         [marketId],
       );
@@ -90,12 +99,7 @@ export async function resolveAndSettleMarket(input: {
         [marketId, outcome, resolvedAt],
       );
 
-      const tradesRes = await client.query<{
-        id: string;
-        user_id: string;
-        side: string;
-        shares_x1000: number;
-      }>(
+      const tradesRes = await client.query<UnsettledTradeRow>(
         `SELECT id, user_id, side, shares_x1000
          FROM market_trades
          WHERE market_id = $1 AND settled_at IS NULL
@@ -164,12 +168,7 @@ export async function resolveAndSettleMarket(input: {
          FROM market_trades
          WHERE market_id = ? AND settled_at IS NULL`,
       )
-      .all(marketId) as Array<{
-      id: string;
-      user_id: string;
-      side: string;
-      shares_x1000: number;
-    }>;
+      .all(marketId) as UnsettledTradeRow[];
 
     let totalPayoutCents = 0;
     let settledTrades = 0;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth/session";
-import { listMarkets } from "@/lib/markets/store";
+import { listMarkets, type MarketCursor } from "@/lib/markets/store";
 import { maybeGenerateMarketsOnRefresh } from "@/lib/markets/generate";
 
 export const runtime = "nodejs";
@@ -17,8 +17,12 @@ export async function GET(request: Request) {
   const category = (url.searchParams.get("category") ?? "").trim();
   const subcategory = (url.searchParams.get("subcategory") ?? "").trim();
   const tz = (url.searchParams.get("tz") ?? "").trim();
+  const cursorCreatedAt = (url.searchParams.get("cursorCreatedAt") ?? "").trim();
+  const cursorId = (url.searchParams.get("cursorId") ?? "").trim();
+  const cursor: MarketCursor | undefined =
+    cursorCreatedAt && cursorId ? { createdAt: cursorCreatedAt, id: cursorId } : undefined;
 
-  if (autogen) {
+  if (autogen && !cursor) {
     // Generate a small batch per refresh, but rate-limit + cap daily total.
     await maybeGenerateMarketsOnRefresh({
       count,
@@ -33,6 +37,7 @@ export async function GET(request: Request) {
     limit: Number.isFinite(limit) ? limit : 50,
     category: category || undefined,
     subcategory: subcategory || undefined,
+    cursor,
   });
   return NextResponse.json({ markets });
 }

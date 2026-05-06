@@ -181,7 +181,8 @@ export async function getPeakById(id: string): Promise<Peak | null> {
   if (postgresPool) {
     await ensurePeaksSchema();
     const result = await postgresPool.query<PeakRow>(
-      `SELECT p.id, p.user_id, p.text, p.created_at, u.display_name, u.email, u.avatar_url
+      `SELECT p.id, p.user_id, p.text, p.created_at, p.expires_at,
+         u.display_name, u.email, u.avatar_url
        FROM peaks p
        JOIN users u ON u.id = p.user_id
        WHERE p.id = $1
@@ -193,7 +194,7 @@ export async function getPeakById(id: string): Promise<Peak | null> {
 
   const row = db
     .prepare(
-      `SELECT p.id, p.user_id, p.text, p.created_at,
+      `SELECT p.id, p.user_id, p.text, p.created_at, p.expires_at,
         u.display_name as display_name,
         u.email as email,
         u.avatar_url as avatar_url

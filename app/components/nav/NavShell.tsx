@@ -54,11 +54,27 @@ export function NavShell({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, close]);
 
+  useEffect(() => {
+    function tourOpen() {
+      setOpen(true);
+    }
+    function tourClose() {
+      setOpen(false);
+    }
+    window.addEventListener("peaksees:tour-open-nav", tourOpen);
+    window.addEventListener("peaksees:tour-close-nav", tourClose);
+    return () => {
+      window.removeEventListener("peaksees:tour-open-nav", tourOpen);
+      window.removeEventListener("peaksees:tour-close-nav", tourClose);
+    };
+  }, []);
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <header className="sticky top-0 z-30 shrink-0 border-b border-zinc-200/90 bg-white/95 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/95">
         <Link
           href="/feed"
+          data-tour="tour-header-banner"
           className="flex w-full items-center justify-center bg-white px-3 py-2 sm:py-2.5 dark:bg-zinc-950"
           onClick={() => setOpen(false)}
         >
@@ -85,6 +101,7 @@ export function NavShell({
             <button
               type="button"
               ref={firstFocusableRef}
+              data-tour="nav-menu"
               aria-expanded={open}
               aria-controls="peaksees-drawer-menu"
               aria-label={open ? "Close navigation menu" : "Open navigation menu"}

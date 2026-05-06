@@ -9,6 +9,9 @@ const requireBetterSqlite3 = createRequire(import.meta.url);
 const Database = requireBetterSqlite3("better-sqlite3") as typeof import("better-sqlite3");
 type SqliteDb = InstanceType<typeof Database>;
 
+/** PRAGMA table_info row (avoids `}>;` casts that confuse Turbopack JSX-ish parsing). */
+type SqliteColumnInfo = { name: string };
+
 function openDbAt(dbPath: string): SqliteDb {
   mkdirSync(path.dirname(dbPath), { recursive: true });
   return new Database(dbPath);
@@ -40,9 +43,7 @@ db.exec(`
   );
 `);
 
-const userColumns = db
-  .prepare("PRAGMA table_info(users)")
-  .all() as Array<{ name: string }>;
+const userColumns = db.prepare("PRAGMA table_info(users)").all() as SqliteColumnInfo[];
 if (!userColumns.some((column) => column.name === "bio")) {
   db.exec("ALTER TABLE users ADD COLUMN bio TEXT");
 }
@@ -51,6 +52,9 @@ if (!userColumns.some((column) => column.name === "avatar_url")) {
 }
 if (!userColumns.some((column) => column.name === "banner_url")) {
   db.exec("ALTER TABLE users ADD COLUMN banner_url TEXT");
+}
+if (!userColumns.some((column) => column.name === "interactive_feed_tour_v1_at")) {
+  db.exec("ALTER TABLE users ADD COLUMN interactive_feed_tour_v1_at TEXT");
 }
 
 db.exec(`
@@ -65,9 +69,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS peaks_user_created_at_idx ON peaks(user_id, created_at DESC);
 `);
 
-const peakColumns = db
-  .prepare("PRAGMA table_info(peaks)")
-  .all() as Array<{ name: string }>;
+const peakColumns = db.prepare("PRAGMA table_info(peaks)").all() as SqliteColumnInfo[];
 if (!peakColumns.some((column) => column.name === "expires_at")) {
   db.exec("ALTER TABLE peaks ADD COLUMN expires_at TEXT");
 }
@@ -156,9 +158,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS market_trades_market_created_at_idx ON market_trades(market_id, created_at DESC);
 `);
 
-const marketColumns = db
-  .prepare("PRAGMA table_info(markets)")
-  .all() as Array<{ name: string }>;
+const marketColumns = db.prepare("PRAGMA table_info(markets)").all() as SqliteColumnInfo[];
 if (!marketColumns.some((column) => column.name === "subcategory")) {
   db.exec("ALTER TABLE markets ADD COLUMN subcategory TEXT");
 }
@@ -181,7 +181,7 @@ try {
 
 const tradeColumns = db
   .prepare("PRAGMA table_info(market_trades)")
-  .all() as Array<{ name: string }>;
+  .all() as SqliteColumnInfo[];
 if (!tradeColumns.some((column) => column.name === "settled_at")) {
   db.exec("ALTER TABLE market_trades ADD COLUMN settled_at TEXT");
 }

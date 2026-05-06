@@ -194,10 +194,40 @@ function rowToMarket(row: {
   };
 }
 
+/** Oldest-visible row anchor for paging (strictly older results after this tuple). */
+export type MarketCursor = { createdAt: string; id: string };
+
+/** Postgres / SQLite `markets` row shape (see `rowToMarket`). */
+type MarketDbRow = {
+  id: string;
+  question: string;
+  category: string;
+  subcategory: string | null;
+  hashtags_json: string | null;
+  ends_at: string;
+  resolved_side: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  source: string;
+  yes_probability: number;
+  no_probability: number;
+  volume_cents: number;
+};
+
+function cursorPredicateSqlite(cursor: MarketCursor): string {
+  return "(created_at < ? OR (created_at = ? AND id < ?))";
+}
+
+/** Params for SQLite cursor binds: [ ..., ca, ca, id ] appended after WHERE prefix params. */
+function cursorBind(cursor: MarketCursor): [string, string, string] {
+  return [cursor.createdAt, cursor.createdAt, cursor.id];
+}
+
 export async function listMarkets(input: {
   limit: number;
   category?: string;
   subcategory?: string;
+  cursor?: MarketCursor;
 }): Promise<Market[]> {
   const limit = Math.max(1, Math.min(200, Math.floor(input.limit)));
   const category =
@@ -208,125 +238,100 @@ export async function listMarkets(input: {
     typeof input.subcategory === "string" && input.subcategory.trim()
       ? input.subcategory.trim().slice(0, 32)
       : "";
+  const cur = input.cursor;
+  const hasCur = !!(cur?.createdAt && cur?.id);
+  const cursorTailSqlite = hasCur ? ` AND ${cursorPredicateSqlite(cur!)}` : "";
+
   if (postgresPool) {
     await ensureSchema();
     if (category && subcategory) {
-      const result = await postgresPool.query<{
-        id: string;
-        question: string;
-        category: string;
-        subcategory: string | null;
-        hashtags_json: string | null;
-        ends_at: string;
-        resolved_side: string | null;
-        resolved_at: string | null;
-        created_at: string;
-        source: string;
-        yes_probability: number;
-        no_probability: number;
-        volume_cents: number;
-      }>(
-        `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
+      const sql = !hasCur
+        ? `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
          FROM markets
          WHERE category = $2 AND subcategory = $3
-         ORDER BY created_at DESC
-         LIMIT $1`,
-        [limit, category, subcategory],
-      );
+         ORDER BY created_at DESC, id DESC
+         LIMIT $1`
+        : `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
+         FROM markets
+         WHERE category = $2 AND subcategory = $3
+         AND (created_at < $4::text OR (created_at = $4::text AND id < $5::text))
+         ORDER BY created_at DESC, id DESC
+         LIMIT $1`;
+      const params = hasCur ? [limit, category, subcategory, cur!.createdAt, cur!.id] : [limit, category, subcategory];
+      const result = await postgresPool.query<MarketDbRow>(sql, params);
       return result.rows.map(rowToMarket);
     }
     if (category) {
-      const result = await postgresPool.query<{
-        id: string;
-        question: string;
-        category: string;
-        subcategory: string | null;
-        hashtags_json: string | null;
-        ends_at: string;
-        resolved_side: string | null;
-        resolved_at: string | null;
-        created_at: string;
-        source: string;
-        yes_probability: number;
-        no_probability: number;
-        volume_cents: number;
-      }>(
-        `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
+      const sql = !hasCur
+        ? `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
          FROM markets
          WHERE category = $2
-         ORDER BY created_at DESC
-         LIMIT $1`,
-        [limit, category],
-      );
+         ORDER BY created_at DESC, id DESC
+         LIMIT $1`
+        : `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
+         FROM markets
+         WHERE category = $2
+         AND (created_at < $3::text OR (created_at = $3::text AND id < $4::text))
+         ORDER BY created_at DESC, id DESC
+         LIMIT $1`;
+      const params = hasCur ? [limit, category, cur!.createdAt, cur!.id] : [limit, category];
+      const result = await postgresPool.query<MarketDbRow>(sql, params);
       return result.rows.map(rowToMarket);
     }
-    const result = await postgresPool.query<{
-      id: string;
-      question: string;
-      category: string;
-      subcategory: string | null;
-      hashtags_json: string | null;
-      ends_at: string;
-      resolved_side: string | null;
-      resolved_at: string | null;
-      created_at: string;
-      source: string;
-      yes_probability: number;
-      no_probability: number;
-      volume_cents: number;
-    }>(
-      `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
+    const sql = !hasCur
+      ? `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
        FROM markets
-       ORDER BY created_at DESC
-       LIMIT $1`,
-      [limit],
-    );
+       ORDER BY created_at DESC, id DESC
+       LIMIT $1`
+      : `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
+       FROM markets
+       WHERE (created_at < $2::text OR (created_at = $2::text AND id < $3::text))
+       ORDER BY created_at DESC, id DESC
+       LIMIT $1`;
+    const params = hasCur ? [limit, cur!.createdAt, cur!.id] : [limit];
+    const result = await postgresPool.query<MarketDbRow>(sql, params);
     return result.rows.map(rowToMarket);
   }
 
-  const rows = (category && subcategory
-    ? db
-        .prepare(
-          `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
+  /** Split branches so Turbopack never sees tricky `}>;` casts on nested ternaries. */
+  let rowsRaw: MarketDbRow[];
+  if (category && subcategory) {
+    rowsRaw = db
+      .prepare(
+        `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
            FROM markets
-           WHERE category = ? AND subcategory = ?
-           ORDER BY created_at DESC
+           WHERE category = ? AND subcategory = ? ${hasCur ? cursorTailSqlite : ""}
+           ORDER BY created_at DESC, id DESC
            LIMIT ?`,
-        )
-        .all(category, subcategory, limit)
-    : category
-      ? db
-          .prepare(
-            `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
+      )
+      .all(
+        ...(hasCur
+          ? [category, subcategory, ...cursorBind(cur!), limit]
+          : [category, subcategory, limit]),
+      ) as MarketDbRow[];
+  } else if (category) {
+    rowsRaw = db
+      .prepare(
+        `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
              FROM markets
-             WHERE category = ?
-             ORDER BY created_at DESC
+             WHERE category = ? ${hasCur ? cursorTailSqlite : ""}
+             ORDER BY created_at DESC, id DESC
              LIMIT ?`,
-          )
-          .all(category, limit)
-    : db
-        .prepare(
-          `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
+      )
+      .all(...(hasCur ? [category, ...cursorBind(cur!), limit] : [category, limit])) as MarketDbRow[];
+  } else {
+    rowsRaw = db
+      .prepare(
+        `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
            FROM markets
-           ORDER BY created_at DESC
+           ${hasCur ? `WHERE ${cursorPredicateSqlite(cur!)}` : ""}
+           ORDER BY created_at DESC, id DESC
            LIMIT ?`,
-        )
-        .all(limit)) as Array<{
-    id: string;
-    question: string;
-    category: string;
-    subcategory: string | null;
-    hashtags_json: string | null;
-    ends_at: string;
-    resolved_side: string | null;
-    resolved_at: string | null;
-    created_at: string;
-    source: string;
-    yes_probability: number;
-    no_probability: number;
-    volume_cents: number;
-  }>;
-  return rows.map(rowToMarket);
+      )
+      .all(...(hasCur ? [...cursorBind(cur!), limit] : [limit])) as MarketDbRow[];
+  }
+
+  return rowsRaw.map(rowToMarket);
 }
 
 export async function createMarket(input: {

@@ -15,6 +15,23 @@ import type { Market } from "@/lib/markets/store";
 import type { MarketPost } from "@/app/lib/mock-markets";
 import Link from "next/link";
 
+/** Real markets and mock timelines can share the same `MarketPost.id` (e.g. `"4"`); merge must stay key-unique for React. */
+function dedupePostsByMarketId(generated: MarketPost[], filler: MarketPost[]): MarketPost[] {
+  const seen = new Set<string>();
+  const out: MarketPost[] = [];
+  for (const p of generated) {
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
+    out.push(p);
+  }
+  for (const p of filler) {
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
+    out.push(p);
+  }
+  return out;
+}
+
 function FeedTabButton({
   active,
   onClick,
@@ -42,43 +59,105 @@ function FeedTabButton({
   );
 }
 
-function Spinner({ label }: { label: string }) {
+function buildMarketsHref(opts: {
+  limit: number;
+  autogen: boolean;
+  count?: number;
+  marketCategory: string;
+  activeSubcat: string;
+  tz: string;
+  cursor?: { createdAt: string; id: string };
+}) {
+  const q = new URLSearchParams();
+  q.set("limit", String(opts.limit));
+  if (opts.autogen) {
+    q.set("autogen", "1");
+    q.set("count", String(opts.count ?? 5));
+  }
+  if (opts.marketCategory) q.set("category", opts.marketCategory);
+  if (opts.activeSubcat) q.set("subcategory", opts.activeSubcat);
+  if (opts.tz) q.set("tz", opts.tz);
+  if (opts.cursor) {
+    q.set("cursorCreatedAt", opts.cursor.createdAt);
+    q.set("cursorId", opts.cursor.id);
+  }
+  return `/api/markets?${q}`;
+}
+
+/** True when the sentinel overlaps the scroll root viewport (within bottom margin). */
+function scrollRootShowsSentinel(
+  scrollRoot: HTMLElement,
+  sentinel: HTMLElement,
+  marginPastBottomPx: number,
+): boolean {
+  const r = scrollRoot.getBoundingClientRect();
+  const s = sentinel.getBoundingClientRect();
+  return s.top <= r.bottom + marginPastBottomPx && s.bottom >= r.top;
+}
+
+function FeedInfiniteFooter({ loading, end }: { loading: boolean; end: boolean }) {
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="flex flex-col items-center justify-center gap-3 py-8 text-[13px] text-zinc-600 dark:text-zinc-400"
-    >
-      <div
-        className="h-7 w-7 animate-spin rounded-full border-[2.5px] border-emerald-200 border-t-emerald-600 dark:border-zinc-600 dark:border-t-emerald-400"
-        aria-hidden
-      />
-      <span>{label}</span>
+    <div className="mx-auto flex w-full max-w-xl flex-none flex-col px-2 pb-28 pt-4 sm:px-4">
+      <div className="flex min-h-[3.25rem] flex-col items-center justify-center gap-2 pb-8">
+        {end ? (
+          <p className="text-center text-[12px] text-zinc-500 dark:text-zinc-400">
+            You&apos;re up to date for now
+          </p>
+        ) : loading ? (
+          <div
+            role="status"
+            aria-live="polite"
+            aria-label="Loading more"
+            className="flex flex-col items-center gap-2"
+          >
+            <div
+              className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-200 border-t-emerald-600 dark:border-zinc-600 dark:border-t-emerald-400"
+              aria-hidden
+            />
+            <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Loading more</span>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-/** Feed tabs hide on scroll down; sentinel at bottom triggers a refresh pulse. */
+/** Feed tabs hide on scroll down; older market cards load as you scroll (infinite feed). */
 export function HomeFeedWithTabs({
   highlightMarketId,
+  highlightPeakId,
 }: {
   highlightMarketId?: string;
+  highlightPeakId?: string;
 } = {}) {
   const [tab, setTab] = useState<"foryou" | "following" | "live">("foryou");
   const [explore, setExplore] = useState("Trending");
   const [subcat, setSubcat] = useState<string>("");
-  const [showLatestPeaks, setShowLatestPeaks] = useState(false);
+  const [showLatestPeaks, setShowLatestPeaks] = useState(
+    () => Boolean(highlightPeakId?.trim()),
+  );
   const [tabsVisible, setTabsVisible] = useState(true);
-  const [bottomRefreshing, setBottomRefreshing] = useState(false);
   const [peaks, setPeaks] = useState<Peak[]>([]);
   const [generatedMarkets, setGeneratedMarkets] = useState<Market[]>([]);
+  const [loadMoreBusy, setLoadMoreBusy] = useState(false);
+  const [marketsAtEnd, setMarketsAtEnd] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const scrollTopPrev = useRef(0);
-  const pulseLock = useRef(false);
-  const lastPulseAt = useRef(0);
   const sparkleLayerRef = useRef<HTMLDivElement>(null);
+  const loadArmedRef = useRef(true);
+  const loadingMoreRef = useRef(false);
+  const feedSessionRef = useRef(0);
+  const generatedMarketsRef = useRef<Market[]>([]);
+  const marketsAtEndRef = useRef(false);
+
+  useEffect(() => {
+    generatedMarketsRef.current = generatedMarkets;
+  }, [generatedMarkets]);
+  useEffect(() => {
+    marketsAtEndRef.current = marketsAtEnd;
+  }, [marketsAtEnd]);
 
   const posts =
     tab === "foryou"
@@ -124,11 +203,65 @@ export function HomeFeedWithTabs({
     typeof Intl !== "undefined"
       ? Intl.DateTimeFormat().resolvedOptions().timeZone ?? ""
       : "";
-  const marketsUrl = `/api/markets?limit=60&autogen=1&count=5${
-    marketCategory ? `&category=${encodeURIComponent(marketCategory)}` : ""
-  }${activeSubcat ? `&subcategory=${encodeURIComponent(activeSubcat)}` : ""}${
-    tz ? `&tz=${encodeURIComponent(tz)}` : ""
-  }`;
+  const filtersKey = `${tab}:${explore}:${marketCategory}:${activeSubcat}:${tz}`;
+
+  const appendOlderChunkRef = useRef<() => void>(() => {});
+
+  appendOlderChunkRef.current = () => {
+    if (tab === "live") return;
+    if (marketsAtEndRef.current) return;
+    const gen = generatedMarketsRef.current;
+    if (!gen.length || !loadArmedRef.current) return;
+    if (loadingMoreRef.current) return;
+
+    const session = feedSessionRef.current;
+    const last = gen[gen.length - 1];
+
+    loadArmedRef.current = false;
+    loadingMoreRef.current = true;
+    setLoadMoreBusy(true);
+
+    void (async () => {
+      try {
+        const href = buildMarketsHref({
+          limit: 14,
+          autogen: false,
+          marketCategory,
+          activeSubcat,
+          tz,
+          cursor: { createdAt: last.createdAt, id: last.id },
+        });
+        const res = await fetch(href, { cache: "no-store" });
+        const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
+        if (session !== feedSessionRef.current) {
+          loadingMoreRef.current = false;
+          setLoadMoreBusy(false);
+          loadArmedRef.current = true;
+          return;
+        }
+
+        const chunk = Array.isArray(data.markets) ? data.markets : [];
+
+        loadingMoreRef.current = false;
+        setLoadMoreBusy(false);
+
+        let drained = false;
+        setGeneratedMarkets((prev) => {
+          const seen = new Set(prev.map((m) => m.id));
+          const merged = chunk.filter((m) => !seen.has(m.id));
+          drained = merged.length === 0;
+          if (drained) return prev;
+          return [...prev, ...merged];
+        });
+        marketsAtEndRef.current = drained;
+        setMarketsAtEnd(drained);
+      } catch {
+        loadingMoreRef.current = false;
+        setLoadMoreBusy(false);
+        loadArmedRef.current = true;
+      }
+    })();
+  };
 
   useEffect(() => {
     // Reset subcategory when switching nav chips.
@@ -140,11 +273,20 @@ export function HomeFeedWithTabs({
   }, [explore]);
 
   useEffect(() => {
+    const hilite = highlightPeakId?.trim();
+    if (hilite) setShowLatestPeaks(true);
+  }, [highlightPeakId]);
+
+  useEffect(() => {
     if (!showLatestPeaks) return undefined;
     let cancelled = false;
+    const hilite = highlightPeakId?.trim();
+    const params = new URLSearchParams();
+    params.set("limit", hilite ? "30" : "12");
+    if (hilite) params.set("highlight", hilite);
     async function loadPeaks() {
       try {
-        const res = await fetch("/api/peaks?limit=12", { cache: "no-store" });
+        const res = await fetch(`/api/peaks?${params}`, { cache: "no-store" });
         const data = (await safeJson<{ peaks?: Peak[] }>(res)) ?? {};
         if (!cancelled && Array.isArray(data.peaks)) setPeaks(data.peaks);
       } catch {
@@ -155,26 +297,47 @@ export function HomeFeedWithTabs({
     return () => {
       cancelled = true;
     };
-  }, [showLatestPeaks]);
+  }, [showLatestPeaks, highlightPeakId]);
 
   useEffect(() => {
-    let cancelled = false;
-    async function loadMarkets() {
+    if (tab === "live") {
+      setGeneratedMarkets([]);
+      setMarketsAtEnd(false);
+      marketsAtEndRef.current = false;
+      loadingMoreRef.current = false;
+      setLoadMoreBusy(false);
+      return undefined;
+    }
+    feedSessionRef.current += 1;
+    const session = feedSessionRef.current;
+    loadArmedRef.current = true;
+    marketsAtEndRef.current = false;
+    setGeneratedMarkets([]);
+    setMarketsAtEnd(false);
+    setLoadMoreBusy(false);
+    loadingMoreRef.current = false;
+
+    async function boot() {
       try {
-        const res = await fetch(marketsUrl, {
-          cache: "no-store",
+        const href = buildMarketsHref({
+          limit: 20,
+          autogen: true,
+          count: 5,
+          marketCategory,
+          activeSubcat,
+          tz,
         });
+        const res = await fetch(href, { cache: "no-store" });
         const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
-        if (!cancelled && Array.isArray(data.markets)) setGeneratedMarkets(data.markets);
+        if (session !== feedSessionRef.current) return;
+        if (Array.isArray(data.markets)) setGeneratedMarkets(data.markets);
       } catch {
         // ignore
       }
     }
-    void loadMarkets();
-    return () => {
-      cancelled = true;
-    };
-  }, [marketsUrl]);
+    void boot();
+    return undefined;
+  }, [tab, filtersKey, marketCategory, activeSubcat, tz]);
 
   useEffect(() => {
     function onNewPeak(e: Event) {
@@ -213,63 +376,70 @@ export function HomeFeedWithTabs({
   }, []);
 
   useEffect(() => {
+    if (tab === "live") return undefined;
+
     const root = scrollRef.current;
     const sent = sentinelRef.current;
     if (!root || !sent) return undefined;
 
     const io = new IntersectionObserver(
       (entries) => {
-        entries.forEach((en) => {
-          if (!en.isIntersecting) return;
-          const slack = root.scrollHeight - root.clientHeight;
-          if (slack < 56) return;
-          const now = Date.now();
-          if (pulseLock.current || now - lastPulseAt.current < 2000) return;
-          lastPulseAt.current = now;
-          pulseLock.current = true;
+        const en = entries[0];
+        if (!en) return;
 
-          setBottomRefreshing(true);
-          // On refresh pulse, fetch markets with autogen enabled.
-          // Rate-limited server-side to avoid excessive generation.
-          void (async () => {
-            try {
-              const res = await fetch(marketsUrl, {
-                cache: "no-store",
-              });
-              const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
-              if (Array.isArray(data.markets)) setGeneratedMarkets(data.markets);
-            } catch {
-              // ignore
-            }
-          })();
-          window.setTimeout(() => {
-            pulseLock.current = false;
-            setBottomRefreshing(false);
-          }, 900);
-        });
+        if (!en.isIntersecting) {
+          loadArmedRef.current = true;
+          return;
+        }
+
+        appendOlderChunkRef.current();
       },
-      { root, rootMargin: "0px 0px 80px 0px", threshold: 0 },
+      { root, rootMargin: "140px", threshold: 0 },
     );
 
     io.observe(sent);
     return () => io.disconnect();
-  }, [tab]);
+  }, [tab, filtersKey]);
+
+  // After the first batch arrives, IO may never re-fire while the sentinel stays in view.
+  useEffect(() => {
+    if (tab === "live" || generatedMarkets.length === 0) return undefined;
+
+    const root = scrollRef.current;
+    const sent = sentinelRef.current;
+    if (!root || !sent) return undefined;
+
+    const id = window.requestAnimationFrame(() => {
+      if (marketsAtEndRef.current || loadingMoreRef.current) return;
+      if (!scrollRootShowsSentinel(root, sent, 160)) return;
+      loadArmedRef.current = true;
+      appendOlderChunkRef.current();
+    });
+
+    return () => window.cancelAnimationFrame(id);
+  }, [generatedMarkets.length, tab, filtersKey]);
 
   useEffect(() => {
-    const id = highlightMarketId?.trim();
-    if (!id) return undefined;
+    const marketId = highlightMarketId?.trim();
+    const peakId = highlightPeakId?.trim();
+    if (!marketId && !peakId) return undefined;
     const timer = window.setTimeout(() => {
       const root = scrollRef.current;
       if (!root || typeof CSS === "undefined" || typeof CSS.escape !== "function") return;
       try {
-        const el = root.querySelector(`[data-market-id="${CSS.escape(id)}"]`);
-        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (marketId) {
+          const el = root.querySelector(`[data-market-id="${CSS.escape(marketId)}"]`);
+          el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        } else if (peakId) {
+          const el = root.querySelector(`[data-peak-id="${CSS.escape(peakId)}"]`);
+          el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
       } catch {
         // ignore
       }
-    }, 120);
+    }, peakId ? 320 : 120);
     return () => window.clearTimeout(timer);
-  }, [highlightMarketId, tab, explore, peaks, generatedMarkets]);
+  }, [highlightMarketId, highlightPeakId, tab, explore, peaks, generatedMarkets]);
 
   useEffect(() => {
     function spawnSparkles(event: MouseEvent) {
@@ -297,6 +467,14 @@ export function HomeFeedWithTabs({
     return () => window.removeEventListener("click", spawnSparkles);
   }, []);
 
+  useEffect(() => {
+    function showTourChrome() {
+      setTabsVisible(true);
+    }
+    window.addEventListener("peaksees:tour-show-feed-chrome", showTourChrome);
+    return () => window.removeEventListener("peaksees:tour-show-feed-chrome", showTourChrome);
+  }, []);
+
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col">
       <div ref={sparkleLayerRef} className="pointer-events-none fixed inset-0 z-[120]" />
@@ -312,6 +490,7 @@ export function HomeFeedWithTabs({
           <div
             role="tablist"
             aria-label="Feed tabs"
+            data-tour="feed-tabs"
             className="feed-scroll mx-auto flex w-full max-w-[25rem] gap-px overflow-x-auto rounded-full border border-zinc-200/75 bg-white/90 p-[2px] shadow-sm backdrop-blur-sm dark:border-zinc-700/85 dark:bg-zinc-900/80"
           >
             <FeedTabButton
@@ -343,7 +522,10 @@ export function HomeFeedWithTabs({
             </FeedTabButton>
           </div>
           <div className="mx-auto mt-3 max-w-lg border-t border-zinc-200/80 pt-3 dark:border-zinc-800">
-            <div className="-mx-3 feed-scroll flex items-center gap-4 overflow-x-auto px-3 pb-1">
+            <div
+              data-tour="feed-explore"
+              className="-mx-3 feed-scroll flex items-center gap-4 overflow-x-auto px-3 pb-1"
+            >
               {["Trending", "News", "Sports", "Culture"].map((item) => {
                 const color =
                   item === "Trending"
@@ -437,7 +619,7 @@ export function HomeFeedWithTabs({
                 ))}
               </div>
             ) : null}
-            <div className="mt-2 flex items-center justify-between gap-3">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 data-sparkle-click="true"
@@ -456,18 +638,21 @@ export function HomeFeedWithTabs({
 
       <div
         ref={scrollRef}
+        data-tour="feed-scroll"
         className="feed-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-pt-4 sm:scroll-pt-6"
       >
         {tab === "live" ? <LiveStreamPanel /> : null}
         <PeakFeed
           key={`${tab}-${explore}`}
-          posts={[...generatedAsPosts, ...posts]}
+          posts={dedupePostsByMarketId(generatedAsPosts, posts)}
           contextLabel={explore}
           peaks={showLatestPeaks ? peaks : []}
+          tourMarketPostIndex={0}
         />
-        <div ref={sentinelRef} className="h-px w-full shrink-0" aria-hidden />
-        {bottomRefreshing ? (
-          <Spinner label="Refreshing feed…" />
+        {tab !== "live" ? (
+          <div ref={sentinelRef} className="w-full shrink-0" aria-hidden={false}>
+            <FeedInfiniteFooter loading={loadMoreBusy} end={marketsAtEnd} />
+          </div>
         ) : null}
       </div>
     </div>

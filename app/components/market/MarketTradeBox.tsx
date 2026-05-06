@@ -8,11 +8,14 @@ export function MarketTradeBox({
   marketId,
   yesProbability,
   onTradeSuccess,
+  tourAnchor = false,
 }: {
   marketId: string;
   yesProbability: number;
   /** Fires after each successful Peakpoints trade (buy yes/no). */
   onTradeSuccess?: () => void;
+  /** Marks the Peakpoints lane on the onboarding tour’s demo card. */
+  tourAnchor?: boolean;
 }) {
   const [amountCents, setAmountCents] = useState(500);
   const [busy, setBusy] = useState(false);
@@ -80,7 +83,10 @@ export function MarketTradeBox({
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-950">
+    <div
+      data-tour={tourAnchor ? "market-trade-box" : undefined}
+      className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-950"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           Buy in with Peakpoints

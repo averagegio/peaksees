@@ -37,22 +37,42 @@ async function ensureSchema() {
   await schemaReady;
 }
 
-export async function listPins(userId: string): Promise<string[]> {
+export type PinEntry = {
+  postKey: string;
+  createdAt: string;
+};
+
+type PinnedPostRow = { post_key: string; created_at: string };
+
+/** Ordered pins with timestamps (Repeaks etc.). Same row order as legacy `listPins`. */
+export async function listPinEntries(
+  userId: string,
+  limit = 50,
+): Promise<PinEntry[]> {
+  const capped = Math.min(100, Math.max(1, limit));
   if (postgresPool) {
     await ensureSchema();
-    const result = await postgresPool.query<{ post_key: string }>(
-      `SELECT post_key FROM pinned_posts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
-      [userId],
+    const result = await postgresPool.query<PinnedPostRow>(
+      `SELECT post_key, created_at FROM pinned_posts WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
+      [userId, capped],
     );
-    return result.rows.map((r) => r.post_key);
+    return result.rows.map((r) => ({
+      postKey: r.post_key,
+      createdAt: r.created_at,
+    }));
   }
 
   const rows = db
     .prepare(
-      `SELECT post_key FROM pinned_posts WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`,
+      `SELECT post_key, created_at FROM pinned_posts WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`,
     )
-    .all(userId) as Array<{ post_key: string }>;
-  return rows.map((r) => r.post_key);
+    .all(userId, capped) as PinnedPostRow[];
+  return rows.map((r) => ({ postKey: r.post_key, createdAt: r.created_at }));
+}
+
+export async function listPins(userId: string): Promise<string[]> {
+  const rows = await listPinEntries(userId, 50);
+  return rows.map((r) => r.postKey);
 }
 
 export async function togglePin(input: { userId: string; postKey: string }) {

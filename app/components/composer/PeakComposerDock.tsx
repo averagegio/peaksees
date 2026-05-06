@@ -173,6 +173,7 @@ export function PeakComposerDock() {
 
         <button
           type="button"
+          data-tour="compose-fab"
           aria-haspopup="dialog"
           aria-expanded={modalOpen}
           className="peak-fab-trigger peak-fab-special relative isolate box-border h-11 w-11 shrink-0 overflow-hidden rounded-full bg-white p-[3px] shadow-md ring-2 ring-emerald-500/30 ring-offset-1 ring-offset-zinc-100 transition active:scale-[0.93] dark:bg-zinc-950 dark:ring-emerald-500/38 dark:ring-offset-zinc-950"
