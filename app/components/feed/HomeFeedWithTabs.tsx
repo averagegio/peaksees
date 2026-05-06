@@ -93,40 +93,147 @@ function scrollRootShowsSentinel(
   return s.top <= r.bottom + marginPastBottomPx && s.bottom >= r.top;
 }
 
+function PullRefreshChevron({ ready }: { ready: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.25}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5 motion-safe:transition-transform motion-safe:duration-300 motion-safe:ease-out"
+      style={{
+        transform: ready ? "rotate(180deg)" : "rotate(0deg)",
+      }}
+      aria-hidden
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+/** Pull inset: maps finger travel to rail height with light saturation (rubber-band). */
+function pullDisplacement(dy: number) {
+  const dampened = dy * 0.42;
+  return Math.min(96, dampened * (1 + Math.log1p(dampened / 140)));
+}
+
 function PullRefreshRail({
   expandedPx,
   loading,
+  thresholdPx = 48,
 }: {
   expandedPx: number;
   loading: boolean;
+  /** Pull distance needed before release triggers refresh. */
+  thresholdPx?: number;
 }) {
-  const h = loading ? 64 : expandedPx;
+  const maxProgressPx = 80;
+  const h = loading ? 78 : expandedPx;
   if (h < 2 && !loading) return null;
-  const progress = loading ? 1 : Math.min(1, expandedPx / 72);
+  const progress = loading ? 1 : Math.min(1, expandedPx / maxProgressPx);
+  const ready = !loading && expandedPx >= thresholdPx;
+  const railR = 15;
+  const circ = 2 * Math.PI * railR;
+
   return (
     <div
       role={loading ? "status" : undefined}
       aria-live={loading ? "polite" : undefined}
       aria-busy={loading || undefined}
-      className="flex w-full shrink-0 flex-col items-center justify-center overflow-hidden border-b border-zinc-200/40 pb-1 transition-[height] duration-200 ease-out dark:border-zinc-700/50"
+      data-pull-rail=""
+      className="flex w-full shrink-0 flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-emerald-500/[0.06] via-transparent to-transparent pb-2 motion-safe:transition-[height] motion-safe:duration-[240ms] motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)] dark:from-emerald-400/[0.07]"
       style={{ height: h }}
     >
       <div
-        className={`flex h-9 w-9 items-center justify-center rounded-full border-2 border-emerald-200 dark:border-zinc-600 ${
-          loading ? "animate-spin border-t-emerald-600 dark:border-t-emerald-400" : "border-t-emerald-600/45 dark:border-t-emerald-400/45"
+        className={`relative mx-auto flex h-[46px] w-[46px] items-center justify-center motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out ${
+          loading ? "animate-pull-refresh-breathe" : ready ? "scale-[1.06]" : "scale-100"
         }`}
-        style={
-          loading
-            ? undefined
-            : { transform: `rotate(${expandedPx * 2.8}deg)`, opacity: 0.35 + progress * 0.65 }
-        }
-      />
+      >
+        {loading ? (
+          <>
+            <svg
+              viewBox="0 0 40 40"
+              className="absolute inset-0 h-[46px] w-[46px] -rotate-90 motion-safe:animate-spin motion-safe:[animation-duration:780ms] dark:text-emerald-400 text-emerald-600"
+              aria-hidden
+            >
+              <circle
+                cx="20"
+                cy="20"
+                r={railR}
+                fill="none"
+                strokeWidth="2.5"
+                className="text-zinc-200 dark:text-zinc-600"
+                stroke="currentColor"
+              />
+              <circle
+                cx="20"
+                cy="20"
+                r={railR}
+                fill="none"
+                strokeWidth="3"
+                strokeLinecap="round"
+                stroke="currentColor"
+                strokeDasharray="22 999"
+              />
+            </svg>
+            <span className="relative z-[1] h-[30px] w-[30px] rounded-full border border-emerald-200/35 bg-white/95 shadow-inner shadow-emerald-500/12 dark:border-emerald-500/20 dark:bg-zinc-900/96 dark:shadow-black/40" />
+          </>
+        ) : (
+          <>
+            <svg
+              viewBox="0 0 40 40"
+              className="absolute inset-0 h-[46px] w-[46px] -rotate-90 text-emerald-600 motion-reduce:hidden dark:text-emerald-400"
+              aria-hidden
+            >
+              <circle
+                cx="20"
+                cy="20"
+                r={railR}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                className="text-emerald-200/70 dark:text-zinc-600"
+              />
+              <circle
+                cx="20"
+                cy="20"
+                r={railR}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeDasharray={`${circ} ${circ}`}
+                strokeDashoffset={circ * (1 - progress)}
+                className="opacity-95 drop-shadow-sm transition-[stroke-dashoffset] duration-75 ease-out"
+              />
+            </svg>
+            <div
+              className="relative z-[1] flex h-[34px] w-[34px] items-center justify-center rounded-full border border-zinc-200/90 bg-white/95 text-emerald-700 shadow-sm dark:border-zinc-600 dark:bg-zinc-900/95 dark:text-emerald-300"
+              style={{
+                opacity: 0.45 + progress * 0.55,
+              }}
+            >
+              <PullRefreshChevron ready={ready} />
+            </div>
+          </>
+        )}
+      </div>
       {loading ? (
-        <span className="mt-2 text-[10px] font-medium uppercase tracking-wide text-emerald-800/85 dark:text-emerald-300/90">
-          New markets…
+        <span className="mt-1.5 text-[11px] font-semibold tracking-wide text-emerald-800/90 dark:text-emerald-300/95">
+          Refreshing feed…
         </span>
-      ) : expandedPx >= 44 ? (
-        <span className="mt-2 text-[10px] text-zinc-500 dark:text-zinc-400">Release to load</span>
+      ) : expandedPx >= 8 ? (
+        <span
+          className={`mt-1.5 text-[11px] font-medium motion-safe:transition-colors motion-safe:duration-200 ${
+            ready
+              ? "text-emerald-700 dark:text-emerald-300"
+              : "text-zinc-500 dark:text-zinc-400"
+          }`}
+        >
+          {ready ? "Release to refresh" : "Pull to refresh"}
+        </span>
       ) : null}
     </div>
   );
@@ -475,7 +582,7 @@ export function HomeFeedWithTabs({
       const dy = e.touches[0].clientY - g.startY;
       if (dy > 0) {
         e.preventDefault();
-        const v = Math.min(dy * 0.4, 100);
+        const v = pullDisplacement(dy);
         pullOffsetRef.current = v;
         setPullOffset(v);
       }
@@ -524,7 +631,7 @@ export function HomeFeedWithTabs({
       const dy = e.clientY - mouseStartY;
       if (dy > 0) {
         e.preventDefault();
-        const v = Math.min(dy * 0.4, 100);
+        const v = pullDisplacement(dy);
         pullOffsetRef.current = v;
         setPullOffset(v);
       }

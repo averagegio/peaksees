@@ -405,6 +405,23 @@ body {
   }
 }
 
+/* Feed pull-to-refresh (loading capsule gentle pulse) */
+@keyframes pull-refresh-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-pull-refresh-breathe {
+    animation: pull-refresh-breathe 980ms ease-in-out infinite;
+  }
+}
+
 .peak-fab-img {
   transition:
     transform 0.4s cubic-bezier(0.33, 1, 0.32, 1),
