@@ -317,7 +317,7 @@ export function MarketPostCard({
         </p>
       ) : (
         <MarketTradeBox
-          marketId={`market:${post.id}`}
+          marketId={post.id}
           yesProbability={yesP}
           onTradeSuccess={() => setHasPlacedBet(true)}
         />

@@ -9,6 +9,7 @@ import {
   MARKET_FEED_LIVE,
 } from "@/app/lib/mock-markets";
 import { db } from "@/lib/db";
+import { normalizeMarketId } from "@/lib/markets/id";
 
 export type TradeSide = "yes" | "no";
 
@@ -152,6 +153,11 @@ export async function buyMarketSide(input: {
     throw new Error("amountCents must be >= 100");
   }
 
+  const marketId = normalizeMarketId(input.marketId);
+  if (!marketId || marketId.startsWith("pending:")) {
+    throw new Error("Market not found");
+  }
+
   if (postgresPool) {
     await ensureSchema();
     const client = await postgresPool.connect();
@@ -163,11 +169,11 @@ export async function buyMarketSide(input: {
          FROM markets
          WHERE id = $1
          FOR UPDATE`,
-        [input.marketId],
+        [marketId],
       );
       let m = mRes.rows[0];
       if (!m) {
-        const seeded = seedFromMock(input.marketId);
+        const seeded = seedFromMock(marketId);
         if (!seeded) throw new Error("Market not found");
         await client.query(
           `INSERT INTO markets (id, question, category, ends_at, created_at, source, yes_probability, no_probability, volume_cents)
@@ -214,7 +220,7 @@ export async function buyMarketSide(input: {
         [
           tradeId,
           input.userId,
-          input.marketId,
+          marketId,
           input.side,
           priceCents,
           sharesX1000,
@@ -225,7 +231,7 @@ export async function buyMarketSide(input: {
 
       await client.query(
         `UPDATE markets SET volume_cents = volume_cents + $1 WHERE id = $2`,
-        [costCents, input.marketId],
+        [costCents, marketId],
       );
 
       await client.query(
@@ -245,7 +251,7 @@ export async function buyMarketSide(input: {
       return {
         trade: {
           id: tradeId,
-          marketId: input.marketId,
+          marketId,
           side: input.side,
           priceCents,
           sharesX1000,
@@ -268,11 +274,11 @@ export async function buyMarketSide(input: {
        FROM markets
        WHERE id = ?`,
     )
-    .get(input.marketId) as
+    .get(marketId) as
     | { id: string; question: string; yes_probability: number; no_probability: number }
     | undefined;
   if (!market) {
-    const seeded = seedFromMock(input.marketId);
+    const seeded = seedFromMock(marketId);
     if (!seeded) throw new Error("Market not found");
     const createdAt = new Date().toISOString();
     db.prepare(
@@ -318,7 +324,7 @@ export async function buyMarketSide(input: {
     ).run(
       tradeId,
       input.userId,
-      input.marketId,
+      marketId,
       input.side,
       priceCents,
       sharesX1000,
@@ -328,7 +334,7 @@ export async function buyMarketSide(input: {
 
     db.prepare(`UPDATE markets SET volume_cents = volume_cents + ? WHERE id = ?`).run(
       costCents,
-      input.marketId,
+      marketId,
     );
 
     db.prepare(
@@ -349,7 +355,7 @@ export async function buyMarketSide(input: {
   return {
     trade: {
       id: tradeId,
-      marketId: input.marketId,
+      marketId,
       side: input.side,
       priceCents,
       sharesX1000,
@@ -372,15 +378,14 @@ function seedFromMock(marketId: string): null | {
   yesProbability: number;
   noProbability: number;
 } {
-  // Allow callers to pass either the raw mock id ("1") or the namespaced one ("market:1").
-  const raw = marketId.startsWith("market:") ? marketId.slice("market:".length) : marketId;
+  const raw = normalizeMarketId(marketId);
   const all = [...MARKET_FEED_FOR_YOU, ...MARKET_FEED_FOLLOWING, ...MARKET_FEED_LIVE];
   const found = all.find((m) => m.id === raw);
   if (!found) return null;
   const yes = found.outcomes.find((o) => o.id === "y")?.probability ?? found.outcomes[0]?.probability ?? 0.5;
   const yesP = Math.min(0.99, Math.max(0.01, Number(yes)));
   return {
-    id: `market:${found.id}`,
+    id: found.id,
     question: found.question,
     category: found.category,
     endsAt: found.endsAtLabel,
