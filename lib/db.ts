@@ -52,6 +52,16 @@ function ensureSqliteSchema(conn: SqliteDb) {
   if (!userColumns.some((column) => column.name === "interactive_feed_tour_v1_at")) {
     conn.exec("ALTER TABLE users ADD COLUMN interactive_feed_tour_v1_at TEXT");
   }
+  if (!userColumns.some((column) => column.name === "handle")) {
+    conn.exec("ALTER TABLE users ADD COLUMN handle TEXT");
+  }
+  try {
+    conn.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS users_handle_lower_idx ON users (lower(handle)) WHERE handle IS NOT NULL",
+    );
+  } catch {
+    // ignore duplicate index races
+  }
 
   conn.exec(`
     CREATE TABLE IF NOT EXISTS peaks (

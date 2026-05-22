@@ -12,6 +12,7 @@ export async function PATCH(request: Request) {
   let body: {
     displayName?: string;
     bio?: string;
+    handle?: string;
     avatarUrl?: string;
     bannerUrl?: string;
   };
@@ -24,6 +25,7 @@ export async function PATCH(request: Request) {
   const displayName =
     typeof body.displayName === "string" ? body.displayName.trim() : "";
   const bio = typeof body.bio === "string" ? body.bio : "";
+  const handle = typeof body.handle === "string" ? body.handle.trim() : undefined;
   const avatarUrl = typeof body.avatarUrl === "string" ? body.avatarUrl : undefined;
   const bannerUrl = typeof body.bannerUrl === "string" ? body.bannerUrl : undefined;
 
@@ -62,11 +64,21 @@ export async function PATCH(request: Request) {
   const updated = await updateUserProfile(session.user.id, {
     displayName,
     bio,
+    handle,
     avatarUrl,
     bannerUrl,
   });
   if (!updated) {
     return NextResponse.json({ error: "Unable to update profile" }, { status: 500 });
+  }
+  if ("error" in updated) {
+    if (updated.error === "handle_taken") {
+      return NextResponse.json({ error: "That @ handle is already taken" }, { status: 409 });
+    }
+    return NextResponse.json(
+      { error: updated.message ?? "Invalid handle" },
+      { status: 400 },
+    );
   }
 
   return NextResponse.json({

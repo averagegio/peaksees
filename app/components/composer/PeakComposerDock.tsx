@@ -23,12 +23,25 @@ function hueForUserId(id: string) {
   return h;
 }
 
-function toComposeUser(user: { id: string; email: string; displayName: string }): ComposeUser {
-  const local = (user.email.split("@")[0] ?? "trader").slice(0, 32);
+function toComposeUser(user: {
+  id: string;
+  email: string;
+  displayName: string;
+  handle?: string;
+  atHandle?: string;
+}): ComposeUser {
+  const slug =
+    typeof user.handle === "string" && user.handle.trim()
+      ? user.handle.trim().toLowerCase()
+      : (user.email.split("@")[0] ?? "trader").slice(0, 32);
+  const at =
+    typeof user.atHandle === "string" && user.atHandle.trim()
+      ? user.atHandle.trim()
+      : `@${slug}`;
   return {
     id: user.id,
     displayName: user.displayName,
-    handle: `@${local}`,
+    handle: at.startsWith("@") ? at : `@${at}`,
     avatarHue: hueForUserId(user.id),
   };
 }
@@ -95,7 +108,13 @@ export function PeakComposerDock() {
         const res = await fetch("/api/me", { cache: "no-store" });
         const data =
           (await safeJson<{
-            user?: { id: string; email: string; displayName: string } | null;
+            user?: {
+              id: string;
+              email: string;
+              displayName: string;
+              handle?: string;
+              atHandle?: string;
+            } | null;
           }>(res)) ?? {};
         if (cancelled || !data.user) return;
         setComposeUser(toComposeUser(data.user));

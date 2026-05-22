@@ -10,6 +10,7 @@ import { ProfileEditor } from "@/app/components/profile/ProfileEditor";
 import { ProfilePeakFeed } from "@/app/components/profile/ProfilePeakFeed";
 import { PEAKSEES_HEADER_BANNER } from "@/lib/brand";
 import { ProfileFollowSocial } from "@/app/components/profile/ProfileFollowSocial";
+import { formatAtHandle } from "@/lib/auth/handle";
 import { getSession } from "@/lib/auth/session";
 import { listMarketsByPeakIds } from "@/lib/markets/store";
 import { getFollowCounts } from "@/lib/social/follows-store";
@@ -118,7 +119,7 @@ export default async function DashboardPage() {
               <h2 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">
                 {u.displayName}
               </h2>
-              <p className="text-zinc-600 dark:text-zinc-400">{u.email}</p>
+              <p className="text-zinc-600 dark:text-zinc-400">{formatAtHandle(u.handle)}</p>
               <div className="mt-4">
                 <ProfileFollowSocial
                   targetUserId={u.id}
@@ -132,6 +133,7 @@ export default async function DashboardPage() {
             </div>
             <ProfileEditor
               initialDisplayName={u.displayName}
+              initialHandle={u.handle}
               initialBio={u.bio ?? ""}
               initialAvatarUrl={u.avatarUrl ?? ""}
               initialBannerUrl={u.bannerUrl ?? ""}
@@ -154,10 +156,10 @@ export default async function DashboardPage() {
         <section className="mt-2 px-1">
           <div className="mb-4 flex items-center justify-between gap-3">
             <Link
-              href={`/u/${encodeURIComponent(u.id)}`}
+              href={`/p/${encodeURIComponent(u.handle)}`}
               className="text-sm font-semibold text-zinc-900 hover:underline dark:text-zinc-100"
             >
-              View profile
+              View public profile
             </Link>
             <Link
               href="/feed"

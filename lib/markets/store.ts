@@ -340,6 +340,40 @@ export async function listMarkets(input: {
   return rowsRaw.map(rowToMarket);
 }
 
+const PEAK_AI_MARKET_SOURCE_SQL = `source NOT LIKE 'peak_post:%' AND source != 'pending'`;
+
+/** Markets published by Peak AI (cron + feed autogen), not user peak listings. */
+export async function listPeakAiMarkets(input: { limit?: number } = {}): Promise<Market[]> {
+  const limit = Math.max(1, Math.min(200, Math.floor(input.limit ?? 200)));
+  const selectCols =
+    "id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents";
+
+  if (postgresPool) {
+    await ensureSchema();
+    const result = await postgresPool.query<MarketDbRow>(
+      `SELECT ${selectCols}
+       FROM markets
+       WHERE ${PEAK_AI_MARKET_SOURCE_SQL}
+       ORDER BY created_at DESC, id DESC
+       LIMIT $1`,
+      [limit],
+    );
+    return result.rows.map(rowToMarket);
+  }
+
+  const rows = db
+    .prepare(
+      `SELECT ${selectCols}
+       FROM markets
+       WHERE source NOT LIKE 'peak_post:%' AND source != 'pending'
+       ORDER BY created_at DESC, id DESC
+       LIMIT ?`,
+    )
+    .all(limit) as MarketDbRow[];
+
+  return rows.map(rowToMarket);
+}
+
 export async function getMarketById(id: string): Promise<Market | null> {
   const marketId = id.trim();
   if (!marketId) return null;

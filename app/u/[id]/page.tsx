@@ -5,6 +5,7 @@ import { PeakComposerDock } from "@/app/components/composer/PeakComposerDock";
 import { BackButton } from "@/app/components/BackButton";
 import { ProfileFollowSocial } from "@/app/components/profile/ProfileFollowSocial";
 import { ProfilePeakFeed } from "@/app/components/profile/ProfilePeakFeed";
+import { formatAtHandle } from "@/lib/auth/handle";
 import { getSession } from "@/lib/auth/session";
 import { getUserById } from "@/lib/auth/users-store";
 import { listMarketsByPeakIds } from "@/lib/markets/store";
@@ -116,7 +117,7 @@ export default async function UserProfilePage({
               <h1 className="truncate text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">
                 {u.displayName}
               </h1>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">{u.email}</p>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">{formatAtHandle(u.handle)}</p>
               <div className="mt-4">
                 <ProfileFollowSocial
                   targetUserId={u.id}

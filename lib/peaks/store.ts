@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 
+import { formatAtHandle } from "@/lib/auth/handle";
 import { db } from "@/lib/db";
 
 export type Peak = {
@@ -26,6 +27,7 @@ type PeakRow = {
   display_name: string;
   email: string;
   avatar_url: string | null;
+  handle: string | null;
 };
 
 const postgresUrl = process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? "";
@@ -67,12 +69,15 @@ function hueForUserId(id: string) {
 }
 
 function toPeak(row: PeakRow): Peak {
-  const local = (row.email.split("@")[0] ?? "trader").slice(0, 32);
+  const slug =
+    typeof row.handle === "string" && row.handle.trim().length >= 3
+      ? row.handle.trim().toLowerCase()
+      : (row.email.split("@")[0] ?? "trader").slice(0, 32);
   return {
     id: row.id,
     userId: row.user_id,
     displayName: row.display_name,
-    handle: `@${local}`,
+    handle: formatAtHandle(slug),
     avatarHue: hueForUserId(row.user_id),
     avatarUrl: row.avatar_url ?? "",
     text: row.text,
@@ -102,7 +107,8 @@ export async function createPeak(input: {
        RETURNING id, user_id, text, created_at, expires_at,
          (SELECT display_name FROM users WHERE id = $2) AS display_name,
          (SELECT email FROM users WHERE id = $2) AS email,
-         (SELECT avatar_url FROM users WHERE id = $2) AS avatar_url`,
+         (SELECT avatar_url FROM users WHERE id = $2) AS avatar_url,
+         (SELECT handle FROM users WHERE id = $2) AS handle`,
       [id, input.userId, text, createdAt, expiresAt],
     );
     return toPeak(result.rows[0]);
@@ -117,7 +123,8 @@ export async function createPeak(input: {
         p.expires_at as expires_at,
         u.display_name as display_name,
         u.email as email,
-        u.avatar_url as avatar_url
+        u.avatar_url as avatar_url,
+        u.handle as handle
        FROM peaks p
        JOIN users u ON u.id = p.user_id
        WHERE p.id = ?
@@ -146,7 +153,7 @@ export async function listPeaks(input: {
     params.push(limit);
     const limitParam = params.length;
     const result = await postgresPool.query<PeakRow>(
-      `SELECT p.id, p.user_id, p.text, p.created_at, p.expires_at, u.display_name, u.email, u.avatar_url
+      `SELECT p.id, p.user_id, p.text, p.created_at, p.expires_at, u.display_name, u.email, u.avatar_url, u.handle
        FROM peaks p
        JOIN users u ON u.id = p.user_id
        ${where}
@@ -162,7 +169,8 @@ export async function listPeaks(input: {
       `SELECT p.id, p.user_id, p.text, p.created_at, p.expires_at,
         u.display_name as display_name,
         u.email as email,
-        u.avatar_url as avatar_url
+        u.avatar_url as avatar_url,
+        u.handle as handle
        FROM peaks p
        JOIN users u ON u.id = p.user_id
        WHERE (p.expires_at IS NULL OR p.expires_at > ?)
@@ -182,7 +190,7 @@ export async function getPeakById(id: string): Promise<Peak | null> {
     await ensurePeaksSchema();
     const result = await postgresPool.query<PeakRow>(
       `SELECT p.id, p.user_id, p.text, p.created_at, p.expires_at,
-         u.display_name, u.email, u.avatar_url
+         u.display_name, u.email, u.avatar_url, u.handle
        FROM peaks p
        JOIN users u ON u.id = p.user_id
        WHERE p.id = $1
@@ -197,7 +205,8 @@ export async function getPeakById(id: string): Promise<Peak | null> {
       `SELECT p.id, p.user_id, p.text, p.created_at, p.expires_at,
         u.display_name as display_name,
         u.email as email,
-        u.avatar_url as avatar_url
+        u.avatar_url as avatar_url,
+        u.handle as handle
        FROM peaks p
        JOIN users u ON u.id = p.user_id
        WHERE p.id = ?

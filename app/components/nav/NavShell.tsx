@@ -234,7 +234,7 @@ export function NavShell({
                       {session.user.displayName}
                     </p>
                     <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">
-                      @{session.user.email.split("@")[0]}
+                      {session.user.atHandle ?? `@${session.user.handle}`}
                     </p>
                     <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
                       View profile →

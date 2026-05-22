@@ -7,6 +7,7 @@ import { safeJson } from "@/lib/http";
 
 type ProfileEditorProps = {
   initialDisplayName: string;
+  initialHandle: string;
   initialBio: string;
   initialAvatarUrl?: string;
   initialBannerUrl?: string;
@@ -14,6 +15,7 @@ type ProfileEditorProps = {
 
 export function ProfileEditor({
   initialDisplayName,
+  initialHandle,
   initialBio,
   initialAvatarUrl = "",
   initialBannerUrl = "",
@@ -21,6 +23,7 @@ export function ProfileEditor({
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState(initialDisplayName);
+  const [handle, setHandle] = useState(initialHandle);
   const [bio, setBio] = useState(initialBio);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [bannerUrl, setBannerUrl] = useState(initialBannerUrl);
@@ -36,13 +39,14 @@ export function ProfileEditor({
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName, bio, avatarUrl, bannerUrl }),
+        body: JSON.stringify({ displayName, handle, bio, avatarUrl, bannerUrl }),
       });
       const data =
         (await safeJson<{
           error?: string;
           user?: {
             displayName: string;
+            handle?: string;
             bio?: string | null;
             avatarUrl?: string | null;
             bannerUrl?: string | null;
@@ -54,6 +58,7 @@ export function ProfileEditor({
       }
       if (data.user) {
         setDisplayName(data.user.displayName);
+        setHandle(data.user.handle ?? handle);
         setBio(data.user.bio ?? "");
         setAvatarUrl(data.user.avatarUrl ?? "");
         setBannerUrl(data.user.bannerUrl ?? "");
@@ -85,6 +90,7 @@ export function ProfileEditor({
             type="button"
             onClick={() => {
               setDisplayName(initialDisplayName);
+              setHandle(initialHandle);
               setBio(initialBio);
               setAvatarUrl(initialAvatarUrl);
               setBannerUrl(initialBannerUrl);
@@ -207,6 +213,37 @@ export function ProfileEditor({
           </div>
           <div>
             <label
+              htmlFor="dashboard-handle"
+              className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+            >
+              @ Handle
+            </label>
+            <div className="mt-1 flex overflow-hidden rounded-lg border border-zinc-300 bg-white ring-emerald-500/30 focus-within:border-emerald-500 focus-within:ring-2 dark:border-zinc-600 dark:bg-zinc-900">
+              <span className="flex items-center bg-zinc-50 px-3 text-sm font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                @
+              </span>
+              <input
+                id="dashboard-handle"
+                value={handle}
+                onChange={(event) =>
+                  setHandle(
+                    event.target.value.toLowerCase().replace(/^@+/, "").replace(/[^a-z0-9_]/g, ""),
+                  )
+                }
+                maxLength={32}
+                autoComplete="off"
+                spellCheck={false}
+                className="min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm text-zinc-900 outline-none dark:text-zinc-100"
+                placeholder="your_handle"
+              />
+            </div>
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              3–32 characters: letters, numbers, underscores. Your profile link is /p/
+              {handle || "handle"}.
+            </p>
+          </div>
+          <div>
+            <label
               htmlFor="dashboard-bio"
               className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
             >
@@ -235,6 +272,7 @@ export function ProfileEditor({
               type="button"
               onClick={() => {
                 setDisplayName(initialDisplayName);
+                setHandle(initialHandle);
                 setBio(initialBio);
                 setAvatarUrl(initialAvatarUrl);
                 setBannerUrl(initialBannerUrl);
