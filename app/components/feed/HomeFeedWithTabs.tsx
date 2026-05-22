@@ -97,6 +97,7 @@ type PeakMarketMeta = {
   handle: string;
   avatarHue: number;
   postedAt: string;
+  profileUserId?: string;
 };
 
 function mergeNovelMarkets(prev: Market[], incoming: Market[]): Market[] {
@@ -308,9 +309,11 @@ function FeedInfiniteFooter({ loading, end }: { loading: boolean; end: boolean }
 export function HomeFeedWithTabs({
   highlightMarketId,
   highlightPeakId,
+  viewerUserId,
 }: {
   highlightMarketId?: string;
   highlightPeakId?: string;
+  viewerUserId?: string;
 } = {}) {
   const [tab, setTab] = useState<"foryou" | "following" | "live">("foryou");
   const [explore, setExplore] = useState("Trending");
@@ -395,6 +398,7 @@ export function HomeFeedWithTabs({
       volumeUsd: Math.round((m.volumeCents ?? 0) / 100),
       endsAtLabel: m.endsAt,
       pending: isPending,
+      profileUserId: meta?.profileUserId,
       outcomes: [
         { id: "y", label: "Yes", probability: yesP },
         { id: "n", label: "No", probability: noP },
@@ -665,6 +669,7 @@ export function HomeFeedWithTabs({
             handle: user.handle,
             avatarHue: user.avatarHue,
             postedAt: "Just now",
+            profileUserId: user.id,
           },
         }));
         setGeneratedMarkets((prev) => mergeNovelMarkets(prev, [market]));
@@ -710,6 +715,7 @@ export function HomeFeedWithTabs({
             handle: peak.handle,
             avatarHue: peak.avatarHue,
             postedAt: "Just now",
+            profileUserId: peak.userId,
           };
           return next;
         });
@@ -1144,6 +1150,7 @@ export function HomeFeedWithTabs({
           contextLabel={explore}
           peaks={showLatestPeaks ? peaks : []}
           tourMarketPostIndex={0}
+          viewerUserId={viewerUserId}
         />
         {tab !== "live" ? (
           <div ref={sentinelRef} className="w-full shrink-0" aria-hidden={false}>

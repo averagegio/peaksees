@@ -149,6 +149,7 @@ export default async function UserProfilePage({
             profileUserId={u.id}
             initialItems={feedItems}
             isOwnProfile={isOwnProfile}
+            viewerUserId={session.user.id}
             emptyMessage={
               isOwnProfile
                 ? "No posts yet — use the compose button to share an update or list a market."

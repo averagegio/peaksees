@@ -216,6 +216,37 @@ export async function getUserByEmail(
   return row ? toStoredUser(row) : null;
 }
 
+/** Resolve `@local` handle slug to a registered user (email local-part). */
+export async function getUserByHandleSlug(slug: string): Promise<StoredUser | null> {
+  const s = slug.trim().toLowerCase().replace(/^@/, "");
+  if (!s) return null;
+
+  if (postgresPool) {
+    await ensureUsersSchema();
+    const result = await postgresPool.query<SqliteUserRow>(
+      `SELECT id, email, display_name, password_hash, created_at, bio, avatar_url, banner_url, interactive_feed_tour_v1_at
+       FROM users
+       WHERE lower(split_part(email, '@', 1)) = $1
+       LIMIT 1`,
+      [s],
+    );
+
+    return result.rows[0] ? toStoredUser(result.rows[0]) : null;
+  }
+
+  const row = db
+    .prepare(
+      `SELECT id, email, display_name, password_hash, created_at, bio, avatar_url, banner_url,
+              interactive_feed_tour_v1_at
+       FROM users
+       WHERE lower(substr(email, 1, instr(email, '@') - 1)) = ?
+       LIMIT 1`,
+    )
+    .get(s) as SqliteUserRow | undefined;
+
+  return row ? toStoredUser(row) : null;
+}
+
 export async function getUserById(id: string): Promise<StoredUser | null> {
   if (postgresPool) {
     await ensureUsersSchema();

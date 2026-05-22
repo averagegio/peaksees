@@ -8,6 +8,7 @@ import {
   MARKET_FEED_LIVE,
 } from "@/app/lib/mock-markets";
 import { getSession } from "@/lib/auth/session";
+import { getUserByHandleSlug } from "@/lib/auth/users-store";
 
 function normalizeHandleParam(handle: string) {
   const h = decodeURIComponent(handle).trim();
@@ -25,6 +26,9 @@ export default async function CreatorProfilePage({
   const { handle } = await params;
   const slug = normalizeHandleParam(handle);
   if (!slug) notFound();
+
+  const realUser = await getUserByHandleSlug(slug);
+  if (realUser) redirect(`/u/${encodeURIComponent(realUser.id)}`);
 
   const fullHandle = `@${slug}`;
   const all = [...MARKET_FEED_FOR_YOU, ...MARKET_FEED_FOLLOWING, ...MARKET_FEED_LIVE];

@@ -21,11 +21,13 @@ export function ProfilePeakFeed({
   initialItems,
   isOwnProfile = false,
   emptyMessage = "Nothing here yet.",
+  viewerUserId,
 }: {
   profileUserId: string;
   initialItems: ProfilePeakFeedItem[];
   isOwnProfile?: boolean;
   emptyMessage?: string;
+  viewerUserId?: string;
 }) {
   const [items, setItems] = useState(initialItems);
 
@@ -105,7 +107,10 @@ export function ProfilePeakFeed({
       {items.map(({ peak, market, repeakedAt, isRepeak }) => (
         <li key={peak.id}>
           {market ? (
-            <MarketPostCard post={marketAndPeakToPost(market, peak)} />
+            <MarketPostCard
+              post={marketAndPeakToPost(market, peak)}
+              viewerUserId={viewerUserId}
+            />
           ) : (
             <SocialPostCard peak={peak} repeakedAt={repeakedAt} isRepeak={isRepeak} />
           )}

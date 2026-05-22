@@ -170,6 +170,7 @@ export default async function DashboardPage() {
             profileUserId={u.id}
             initialItems={feedItems}
             isOwnProfile
+            viewerUserId={session.user.id}
             emptyMessage="No posts yet — use the compose button to share or list a market."
           />
         </section>

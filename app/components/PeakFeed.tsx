@@ -8,6 +8,7 @@ import { PostActions } from "@/app/components/post/PostActions";
 import { MarketTradeBox } from "@/app/components/market/MarketTradeBox";
 import { PeakOpinionChip } from "@/app/components/market/PeakOpinionChip";
 import { ShareMarketButton } from "@/app/components/market/ShareMarketButton";
+import { FollowUserButton } from "@/app/components/profile/FollowUserButton";
 import { ProfileLink } from "@/app/components/profile/ProfileLink";
 
 function formatUsd(n: number) {
@@ -80,12 +81,15 @@ export function MarketPostCard({
   post,
   isTourAnchor = false,
   readOnly = false,
+  viewerUserId,
 }: {
   post: MarketPost;
   /** Highlights this card for the first-visit interactive tour. */
   isTourAnchor?: boolean;
   /** Guest preview: show the card without trading or social actions. */
   readOnly?: boolean;
+  /** Logged-in viewer — enables follow on real user cards. */
+  viewerUserId?: string;
 }) {
   const pending = Boolean(post.pending);
   const interactive = !readOnly && !pending;
@@ -137,19 +141,28 @@ export function MarketPostCard({
           </div>
         </ProfileLink>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <ProfileLink
-              href={profileHref}
-              className="truncate font-semibold text-zinc-900 hover:underline dark:text-zinc-100"
-            >
-              {post.creator}
-            </ProfileLink>
-            <ProfileLink
-              href={profileHref}
-              className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
-            >
-              {post.handle}
-            </ProfileLink>
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <ProfileLink
+                href={profileHref}
+                className="truncate font-semibold text-zinc-900 hover:underline dark:text-zinc-100"
+              >
+                {post.creator}
+              </ProfileLink>
+              <ProfileLink
+                href={profileHref}
+                className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
+              >
+                {post.handle}
+              </ProfileLink>
+            </div>
+            {viewerUserId && post.profileUserId ? (
+              <FollowUserButton
+                targetUserId={post.profileUserId}
+                viewerUserId={viewerUserId}
+                size="compact"
+              />
+            ) : null}
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
             <span>{post.postedAt}</span>
@@ -362,12 +375,14 @@ export function PeakFeed({
   contextLabel,
   peaks = [],
   tourMarketPostIndex,
+  viewerUserId,
 }: {
   posts: MarketPost[];
   contextLabel?: string;
   peaks?: Peak[];
   /** Index in `posts` to attach tour spotlight (first market card). */
   tourMarketPostIndex?: number;
+  viewerUserId?: string;
 }) {
   const tourIx = tourMarketPostIndex ?? -1;
   return (
@@ -425,7 +440,11 @@ export function PeakFeed({
         ) : null}
         {posts.map((post, i) => (
           <li key={post.id}>
-            <MarketPostCard post={post} isTourAnchor={i === tourIx} />
+            <MarketPostCard
+              post={post}
+              isTourAnchor={i === tourIx}
+              viewerUserId={viewerUserId}
+            />
           </li>
         ))}
       </ul>
