@@ -334,6 +334,28 @@ export async function listMarkets(input: {
   return rowsRaw.map(rowToMarket);
 }
 
+export async function getMarketById(id: string): Promise<Market | null> {
+  const marketId = id.trim();
+  if (!marketId) return null;
+  const selectCols =
+    "id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents";
+
+  if (postgresPool) {
+    await ensureSchema();
+    const result = await postgresPool.query<MarketDbRow>(
+      `SELECT ${selectCols} FROM markets WHERE id = $1 LIMIT 1`,
+      [marketId],
+    );
+    const row = result.rows[0];
+    return row ? rowToMarket(row) : null;
+  }
+
+  const row = db
+    .prepare(`SELECT ${selectCols} FROM markets WHERE id = ? LIMIT 1`)
+    .get(marketId) as MarketDbRow | undefined;
+  return row ? rowToMarket(row) : null;
+}
+
 export async function createMarket(input: {
   question: string;
   category: string;

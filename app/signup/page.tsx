@@ -1,7 +1,13 @@
 import { AuthPageHeader } from "@/app/components/AuthPageHeader";
 import { SignupForm } from "@/app/components/AuthForm";
 
-export default function SignupPage() {
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const sp = await searchParams;
+
   return (
     <div className="flex min-h-dvh flex-col bg-gradient-to-b from-zinc-100 to-zinc-200 dark:from-zinc-950 dark:to-zinc-900">
       <AuthPageHeader crumb="Sign up" />
@@ -12,7 +18,7 @@ export default function SignupPage() {
             New here? We open your dashboard so you can set up your profile
           </p>
         </div>
-        <SignupForm />
+        <SignupForm nextPath={typeof sp?.next === "string" ? sp.next : undefined} />
       </div>
     </div>
   );

@@ -104,7 +104,7 @@ export function LoginForm({
   );
 }
 
-export function SignupForm() {
+export function SignupForm({ nextPath }: { nextPath?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -132,7 +132,9 @@ export function SignupForm() {
         return;
       }
       router.refresh();
-      router.push("/dashboard");
+      router.push(
+        nextPath && nextPath.startsWith("/") ? nextPath : "/dashboard",
+      );
     } catch {
       setError("Server error. Please try again.");
     } finally {

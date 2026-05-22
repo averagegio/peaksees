@@ -19,6 +19,8 @@ export type MarketPost = {
   outcomes: [Outcome, Outcome];
   /** True while the server is still creating the real market. */
   pending?: boolean;
+  /** Real user profile link target (when set, links to /u/ instead of /p/). */
+  profileUserId?: string;
 };
 
 export const MARKET_FEED_FOR_YOU: MarketPost[] = [

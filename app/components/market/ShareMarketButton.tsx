@@ -95,8 +95,26 @@ export function ShareMarketButton({
     };
   }, [menuOpen]);
 
-  const shareUrl = `${appOrigin()}/feed?m=${encodeURIComponent(marketId)}`;
+  const shareUrl = `${appOrigin()}/m/${encodeURIComponent(marketId)}`;
   const tweetText = `${question.trim().slice(0, 220)}${question.trim().length > 220 ? "…" : ""}`;
+
+  const uploadShareImage = useCallback(
+    async (blob: Blob) => {
+      const res = await fetch(
+        `/api/markets/${encodeURIComponent(marketId)}/share-image`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "image/png" },
+          body: blob,
+        },
+      );
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? "Could not upload share image");
+      }
+    },
+    [marketId],
+  );
 
   const ensureCapture = useCallback(async () => {
     const cached = captureRef.current;
@@ -128,11 +146,15 @@ export function ShareMarketButton({
 
       switch (dest) {
         case "x": {
-          await triggerDownload(blob, file.name);
+          try {
+            await uploadShareImage(blob);
+          } catch {
+            // Server still serves a generated card image if upload fails.
+          }
           openWindowSafe(
-            `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareUrl)}`,
+            `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareUrl)}`,
           );
-          setHint("Image downloaded — attach it in X if you want the card in the tweet.");
+          setHint("Opening X — your market card should appear as the link preview.");
           setMenuOpen(false);
           break;
         }

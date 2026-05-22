@@ -79,12 +79,16 @@ function tickerParts(post: MarketPost) {
 export function MarketPostCard({
   post,
   isTourAnchor = false,
+  readOnly = false,
 }: {
   post: MarketPost;
   /** Highlights this card for the first-visit interactive tour. */
   isTourAnchor?: boolean;
+  /** Guest preview: show the card without trading or social actions. */
+  readOnly?: boolean;
 }) {
   const pending = Boolean(post.pending);
+  const interactive = !readOnly && !pending;
   const [selected, setSelected] = useState<string | null>(null);
   /** Unlocks tapping the peaksees badge to fetch Peak disagree score */
   const [hasPlacedBet, setHasPlacedBet] = useState(false);
@@ -95,6 +99,9 @@ export function MarketPostCard({
   const cardRef = useRef<HTMLElement | null>(null);
   const peakBadgeRef = useRef<HTMLButtonElement | null>(null);
   const handleSlug = encodeURIComponent(post.handle.replace(/^@/, ""));
+  const profileHref = post.profileUserId
+    ? `/u/${encodeURIComponent(post.profileUserId)}`
+    : `/p/${handleSlug}`;
 
   return (
     <article
@@ -103,16 +110,18 @@ export function MarketPostCard({
       ref={(el) => {
         cardRef.current = el;
       }}
-      data-sparkle-click="true"
+      data-sparkle-click={interactive ? "true" : undefined}
       className={
-        "poppy-hover sparkle-hover rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm backdrop-blur-md dark:border-zinc-700 dark:bg-zinc-900/95 " +
-        (pending ? "opacity-90 ring-1 ring-emerald-400/40 motion-safe:animate-pulse" : "")
+        "rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm backdrop-blur-md dark:border-zinc-700 dark:bg-zinc-900/95 " +
+        (interactive ? "poppy-hover sparkle-hover " : "") +
+        (pending ? "opacity-90 ring-1 ring-emerald-400/40 motion-safe:animate-pulse" : "") +
+        (readOnly ? " ring-1 ring-zinc-200/80 dark:ring-zinc-700" : "")
       }
       aria-label={`Prediction market: ${post.question}`}
     >
       <header className="flex items-start gap-3">
         <ProfileLink
-          href={`/p/${handleSlug}`}
+          href={profileHref}
           className="group shrink-0"
           ariaLabel={`Open ${post.creator} profile`}
         >
@@ -130,13 +139,13 @@ export function MarketPostCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <ProfileLink
-              href={`/p/${handleSlug}`}
+              href={profileHref}
               className="truncate font-semibold text-zinc-900 hover:underline dark:text-zinc-100"
             >
               {post.creator}
             </ProfileLink>
             <ProfileLink
-              href={`/p/${handleSlug}`}
+              href={profileHref}
               className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
             >
               {post.handle}
@@ -156,25 +165,29 @@ export function MarketPostCard({
             <button
               ref={peakBadgeRef}
               type="button"
-              disabled={!hasPlacedBet}
+              disabled={!interactive || !hasPlacedBet}
               data-tour={isTourAnchor ? "peak-badge" : undefined}
-              data-sparkle-click="true"
+              data-sparkle-click={interactive ? "true" : undefined}
               title={
-                peakScoreRevealed
-                  ? "Tap to refresh Peak’s disagree score"
-                  : hasPlacedBet
-                    ? "Show Peak’s disagree score"
-                    : "Place a Yes or No bet first"
+                readOnly
+                  ? "Sign up to trade and unlock Peak insights"
+                  : peakScoreRevealed
+                    ? "Tap to refresh Peak’s disagree score"
+                    : hasPlacedBet
+                      ? "Show Peak’s disagree score"
+                      : "Place a Yes or No bet first"
               }
               aria-label={
-                peakScoreRevealed
-                  ? "Refresh Peak disagree score"
-                  : hasPlacedBet
-                    ? "Show Peak disagree score"
-                    : "Peak insight — place a Yes or No bet first"
+                readOnly
+                  ? "Peak insight — sign up to trade first"
+                  : peakScoreRevealed
+                    ? "Refresh Peak disagree score"
+                    : hasPlacedBet
+                      ? "Show Peak disagree score"
+                      : "Peak insight — place a Yes or No bet first"
               }
               onClick={() => {
-                if (!hasPlacedBet) return;
+                if (!interactive || !hasPlacedBet) return;
                 setPeakScoreRevealed(true);
                 setPeakRefetchNonce((n) => n + 1);
                 peakBadgeRef.current?.scrollIntoView({
@@ -211,7 +224,7 @@ export function MarketPostCard({
             ) : null}
           </div>
         </div>
-        <MarketPostBookmark postKey={`market:${post.id}`} />
+        {interactive ? <MarketPostBookmark postKey={`market:${post.id}`} /> : null}
       </header>
 
       <h2 className="mt-4 text-[17px] font-semibold leading-snug tracking-tight text-zinc-900 dark:text-zinc-50">
@@ -233,20 +246,16 @@ export function MarketPostCard({
       <div className="mt-4 space-y-2">
         {[yes, no].map((outcome) => {
           const pct = Math.round(outcome.probability * 100);
-          const isPicked = selected === outcome.id;
-          return (
-            <button
-              key={outcome.id}
-              type="button"
-              data-sparkle-click="true"
-              onClick={() => setSelected(outcome.id)}
-              className={
-                "relative w-full overflow-hidden rounded-xl border px-3 py-2.5 text-left transition-colors " +
-                (isPicked
-                  ? "border-emerald-500/70 bg-emerald-500/[0.08] ring-2 ring-emerald-500/25 dark:border-emerald-400/50 dark:bg-emerald-500/10"
-                  : "border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:border-zinc-600 dark:hover:bg-zinc-800/80")
-              }
-            >
+          const isPicked = interactive && selected === outcome.id;
+          const rowClass =
+            "relative w-full overflow-hidden rounded-xl border px-3 py-2.5 text-left " +
+            (isPicked
+              ? "border-emerald-500/70 bg-emerald-500/[0.08] ring-2 ring-emerald-500/25 dark:border-emerald-400/50 dark:bg-emerald-500/10"
+              : readOnly
+                ? "border-zinc-200 bg-zinc-50/80 dark:border-zinc-700 dark:bg-zinc-800/40"
+                : "border-zinc-200 transition-colors hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:border-zinc-600 dark:hover:bg-zinc-800/80");
+          const inner = (
+            <>
               <span
                 className="absolute inset-y-0 left-0 bg-emerald-400/25 dark:bg-emerald-500/20"
                 style={{ width: `${pct}%` }}
@@ -260,7 +269,22 @@ export function MarketPostCard({
                   {pct}%
                 </span>
               </span>
+            </>
+          );
+          return interactive ? (
+            <button
+              key={outcome.id}
+              type="button"
+              data-sparkle-click="true"
+              onClick={() => setSelected(outcome.id)}
+              className={rowClass}
+            >
+              {inner}
             </button>
+          ) : (
+            <div key={outcome.id} className={rowClass} aria-hidden={readOnly}>
+              {inner}
+            </div>
           );
         })}
       </div>
@@ -276,14 +300,18 @@ export function MarketPostCard({
             ))}
           </div>
         </div>
-        {selected ? (
+        {interactive && selected ? (
           <div className="mt-2 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
             You leaned {yes.id === selected ? yes.label : no.label}
           </div>
         ) : null}
       </footer>
 
-      {pending ? (
+      {readOnly ? (
+        <p className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-center text-[12px] font-medium text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+          Preview only — sign up below to trade Yes or No on this market.
+        </p>
+      ) : pending ? (
         <p className="mt-3 rounded-xl border border-emerald-200/80 bg-emerald-500/[0.07] px-3 py-2 text-center text-[12px] font-medium text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/10 dark:text-emerald-200">
           Turning your peak into a market…
         </p>
@@ -295,30 +323,36 @@ export function MarketPostCard({
         />
       )}
 
-      {hasPlacedBet && !peakScoreRevealed && !pending ? (
+      {hasPlacedBet && !peakScoreRevealed && interactive ? (
         <p className="mt-3 rounded-xl border border-violet-200/80 bg-violet-500/[0.07] px-3 py-2 text-center text-[12px] font-medium text-violet-800 dark:border-violet-500/35 dark:bg-violet-500/10 dark:text-violet-200">
           Tap <span className="font-bold">peaksees</span> at the top of this card to see Peak&apos;s
           disagree score versus the crowd.
         </p>
       ) : null}
 
-      <PeakOpinionChip
-        question={post.question}
-        crowdYes={yesP}
-        enabled={peakScoreRevealed && !pending}
-        refetchNonce={peakRefetchNonce}
-      />
-
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <ShareMarketButton
-          getNode={() => cardRef.current}
-          filenameBase={post.question}
-          marketId={post.id}
+      {interactive ? (
+        <PeakOpinionChip
           question={post.question}
+          crowdYes={yesP}
+          enabled={peakScoreRevealed && !pending}
+          refetchNonce={peakRefetchNonce}
         />
-      </div>
+      ) : null}
 
-      <PostActions postKey={`market:${post.id}`} title={post.question} />
+      {interactive ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <ShareMarketButton
+            getNode={() => cardRef.current}
+            filenameBase={post.question}
+            marketId={post.id}
+            question={post.question}
+          />
+        </div>
+      ) : null}
+
+      {interactive ? (
+        <PostActions postKey={`market:${post.id}`} title={post.question} />
+      ) : null}
     </article>
   );
 }

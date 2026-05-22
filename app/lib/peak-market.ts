@@ -33,6 +33,30 @@ export function marketAndPeakToPost(
     volumeUsd: Math.round((market.volumeCents ?? 0) / 100),
     endsAtLabel: market.endsAt,
     pending: isPending,
+    profileUserId: peak.userId,
+    outcomes: [
+      { id: "y", label: "Yes", probability: yesP },
+      { id: "n", label: "No", probability: noP },
+    ],
+  };
+}
+
+export function marketToPost(market: Market, peak?: Peak | null): MarketPost {
+  if (peak) return marketAndPeakToPost(market, peak);
+  const yesP = Number(market.yesProbability) || 0.5;
+  const noP = Number(market.noProbability) || 1 - yesP;
+  return {
+    id: market.id.startsWith("market:") ? market.id.slice("market:".length) : market.id,
+    creator: "Peak AI",
+    handle: "@peak",
+    avatarHue: 160,
+    postedAt: formatMarketPostedAt(market.createdAt),
+    question: market.question,
+    category: market.category,
+    subcategory: market.subcategory || undefined,
+    hashtags: Array.isArray(market.hashtags) && market.hashtags.length ? market.hashtags : undefined,
+    volumeUsd: Math.round((market.volumeCents ?? 0) / 100),
+    endsAtLabel: market.endsAt,
     outcomes: [
       { id: "y", label: "Yes", probability: yesP },
       { id: "n", label: "No", probability: noP },
