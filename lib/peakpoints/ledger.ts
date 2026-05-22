@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 
 export type LedgerEntry = {
   id: string;
-  kind: "deposit" | "withdraw" | "reward" | "spend";
+  kind: "deposit" | "withdraw" | "reward" | "spend" | "escrow_hold" | "escrow_forfeit";
   amountCents: number;
   createdAt: string;
   note: string | null;

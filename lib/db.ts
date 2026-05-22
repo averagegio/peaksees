@@ -196,4 +196,41 @@ try {
   // ignore
 }
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS market_escrow (
+    id TEXT PRIMARY KEY,
+    trade_id TEXT NOT NULL UNIQUE,
+    user_id TEXT NOT NULL,
+    market_id TEXT NOT NULL,
+    amount_cents INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'held',
+    created_at TEXT NOT NULL,
+    released_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS market_escrow_user_status_idx ON market_escrow(user_id, status);
+  CREATE INDEX IF NOT EXISTS market_escrow_market_status_idx ON market_escrow(market_id, status);
+
+  CREATE TABLE IF NOT EXISTS withdrawals (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    amount_cents INTEGER NOT NULL,
+    payout_cents INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    provider TEXT NOT NULL DEFAULT 'stub',
+    provider_payout_id TEXT,
+    created_at TEXT NOT NULL,
+    processed_at TEXT,
+    note TEXT
+  );
+  CREATE INDEX IF NOT EXISTS withdrawals_user_created_at_idx ON withdrawals(user_id, created_at DESC);
+`);
+
+try {
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS markets_unresolved_ends_at_idx ON markets(ends_at) WHERE resolved_side IS NULL",
+  );
+} catch {
+  // ignore
+}
+
 export { db };

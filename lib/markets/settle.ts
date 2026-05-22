@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 
 import { db } from "@/lib/db";
+import { releaseEscrowForSettledTrade } from "@/lib/markets/escrow";
 import type { MarketSide } from "@/lib/markets/store";
 
 type MarketResolvedSideRow = { resolved_side: string | null };
@@ -13,6 +14,7 @@ type UnsettledTradeRow = {
   user_id: string;
   side: string;
   shares_x1000: number;
+  cost_cents: number;
 };
 
 const postgresUrl = process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? "";
@@ -100,7 +102,7 @@ export async function resolveAndSettleMarket(input: {
       );
 
       const tradesRes = await client.query<UnsettledTradeRow>(
-        `SELECT id, user_id, side, shares_x1000
+        `SELECT id, user_id, side, shares_x1000, cost_cents
          FROM market_trades
          WHERE market_id = $1 AND settled_at IS NULL
          FOR UPDATE`,
@@ -112,8 +114,8 @@ export async function resolveAndSettleMarket(input: {
       for (const tr of tradesRes.rows) {
         const tradeSide = tr.side === "yes" || tr.side === "no" ? tr.side : null;
         if (!tradeSide) continue;
-        const payoutCents =
-          tradeSide === outcome ? payoutCentsFromSharesX1000(Number(tr.shares_x1000)) : 0;
+        const won = tradeSide === outcome;
+        const payoutCents = won ? payoutCentsFromSharesX1000(Number(tr.shares_x1000)) : 0;
         if (payoutCents > 0) {
           await client.query(
             `INSERT INTO peakpoints_ledger (id, user_id, kind, amount_cents, created_at, note)
@@ -129,6 +131,15 @@ export async function resolveAndSettleMarket(input: {
           );
           totalPayoutCents += payoutCents;
         }
+        await releaseEscrowForSettledTrade({
+          tradeId: tr.id,
+          userId: tr.user_id,
+          marketId,
+          won,
+          amountCents: Number(tr.cost_cents),
+          resolvedAt,
+          pgClient: client,
+        });
         await client.query(
           `UPDATE market_trades
            SET settled_at = $2, payout_cents = $3
@@ -164,7 +175,7 @@ export async function resolveAndSettleMarket(input: {
 
     const trades = db
       .prepare(
-        `SELECT id, user_id, side, shares_x1000
+        `SELECT id, user_id, side, shares_x1000, cost_cents
          FROM market_trades
          WHERE market_id = ? AND settled_at IS NULL`,
       )
@@ -175,8 +186,8 @@ export async function resolveAndSettleMarket(input: {
     for (const tr of trades) {
       const tradeSide = tr.side === "yes" || tr.side === "no" ? tr.side : null;
       if (!tradeSide) continue;
-      const payoutCents =
-        tradeSide === outcome ? payoutCentsFromSharesX1000(Number(tr.shares_x1000)) : 0;
+      const won = tradeSide === outcome;
+      const payoutCents = won ? payoutCentsFromSharesX1000(Number(tr.shares_x1000)) : 0;
       if (payoutCents > 0) {
         db.prepare(
           `INSERT INTO peakpoints_ledger (id, user_id, kind, amount_cents, created_at, note)
@@ -190,6 +201,23 @@ export async function resolveAndSettleMarket(input: {
           `Settlement payout for market ${marketId} (${outcome.toUpperCase()})`,
         );
         totalPayoutCents += payoutCents;
+      }
+      const escrowStatus = won ? "released_win" : "released_loss";
+      db.prepare(
+        `UPDATE market_escrow
+         SET status = ?, released_at = ?
+         WHERE trade_id = ? AND status = 'held'`,
+      ).run(escrowStatus, resolvedAt, tr.id);
+      if (!won && Number(tr.cost_cents) > 0) {
+        db.prepare(
+          `INSERT INTO peakpoints_ledger (id, user_id, kind, amount_cents, created_at, note)
+           VALUES (?, ?, 'escrow_forfeit', 0, ?, ?)`,
+        ).run(
+          randomUUID(),
+          tr.user_id,
+          resolvedAt,
+          `Escrow forfeited on market ${marketId} (losing trade ${tr.id})`,
+        );
       }
       db.prepare(
         `UPDATE market_trades SET settled_at = ?, payout_cents = ? WHERE id = ?`,

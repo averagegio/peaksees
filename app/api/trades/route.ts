@@ -40,7 +40,12 @@ export async function POST(request: Request) {
     if (msg.toLowerCase().includes("not found")) {
       return NextResponse.json({ error: msg }, { status: 404 });
     }
-    if (msg.toLowerCase().includes("insufficient") || msg.toLowerCase().includes("amountcents")) {
+    if (
+      msg.toLowerCase().includes("insufficient") ||
+      msg.toLowerCase().includes("amountcents") ||
+      msg.toLowerCase().includes("ended") ||
+      msg.toLowerCase().includes("resolved")
+    ) {
       return NextResponse.json({ error: msg }, { status: 400 });
     }
     return NextResponse.json({ error: msg }, { status: 500 });

@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 
 import { db } from "@/lib/db";
+import { isMarketExpired, parseMarketEndsAtMs } from "@/lib/markets/market-status";
 
 export type Market = {
   id: string;
@@ -140,6 +141,11 @@ async function ensureSchema() {
       .then(() =>
         postgresPool.query(
           "CREATE INDEX IF NOT EXISTS market_trades_market_settled_idx ON market_trades(market_id, settled_at)",
+        ),
+      )
+      .then(() =>
+        postgresPool.query(
+          "CREATE INDEX IF NOT EXISTS markets_unresolved_ends_at_idx ON markets(ends_at) WHERE resolved_side IS NULL",
         ),
       )
       .then(() => undefined);
@@ -461,6 +467,46 @@ export function peakIdFromMarketSource(source: string): string | null {
   if (!source.startsWith(PEAK_POST_SOURCE_PREFIX)) return null;
   const id = source.slice(PEAK_POST_SOURCE_PREFIX.length).trim();
   return id || null;
+}
+
+/** Unresolved markets whose ISO `ends_at` is in the past (for auto-resolve cron). */
+export async function listMarketsDueForResolution(input: {
+  limit: number;
+  nowMs?: number;
+}): Promise<Market[]> {
+  const limit = Math.max(1, Math.min(50, Math.floor(input.limit)));
+  const nowIso = new Date(input.nowMs ?? Date.now()).toISOString();
+  const selectCols =
+    "id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents";
+
+  let rows: MarketDbRow[] = [];
+  if (postgresPool) {
+    await ensureSchema();
+    const result = await postgresPool.query<MarketDbRow>(
+      `SELECT ${selectCols}
+       FROM markets
+       WHERE resolved_side IS NULL AND ends_at <= $1
+       ORDER BY ends_at ASC
+       LIMIT $2`,
+      [nowIso, limit * 3],
+    );
+    rows = result.rows;
+  } else {
+    rows = db
+      .prepare(
+        `SELECT ${selectCols}
+         FROM markets
+         WHERE resolved_side IS NULL AND ends_at <= ?
+         ORDER BY ends_at ASC
+         LIMIT ?`,
+      )
+      .all(nowIso, limit * 3) as MarketDbRow[];
+  }
+
+  return rows
+    .map(rowToMarket)
+    .filter((m) => parseMarketEndsAtMs(m.endsAt) !== null && isMarketExpired(m.endsAt, input.nowMs))
+    .slice(0, limit);
 }
 
 export async function listMarketsByPeakIds(peakIds: string[]): Promise<Map<string, Market>> {

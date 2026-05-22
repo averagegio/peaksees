@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth/session";
+import { getEscrowHeldCents } from "@/lib/markets/escrow";
 import {
   PLATFORM_FEE_RATE,
   peakpointsCreditAfterDepositFee,
-  payoutCentsAfterWithdrawFee,
 } from "@/lib/peakpoints/fees";
 import { addLedgerEntry, getBalanceCents, listLedger } from "@/lib/peakpoints/ledger";
+import { createWithdrawal, listWithdrawals } from "@/lib/peakpoints/withdrawals";
 
 export const runtime = "nodejs";
 
@@ -15,8 +16,16 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const balanceCents = await getBalanceCents(session.user.id);
+  const escrowHeldCents = await getEscrowHeldCents(session.user.id);
   const ledger = await listLedger(session.user.id);
-  return NextResponse.json({ balanceCents, ledger });
+  const withdrawals = await listWithdrawals(session.user.id);
+  return NextResponse.json({
+    balanceCents,
+    escrowHeldCents,
+    availableCents: balanceCents,
+    ledger,
+    withdrawals,
+  });
 }
 
 export async function POST(request: Request) {
@@ -57,26 +66,45 @@ export async function POST(request: Request) {
       note: `Stub deposit (${Math.round(PLATFORM_FEE_RATE * 100)}% deposit fee applied to gross ${amountCents}c).`,
     });
   } else if (action === "withdraw") {
-    const bal = await getBalanceCents(session.user.id);
-    if (bal < amountCents) {
-      return NextResponse.json({ error: "Insufficient balance" }, { status: 400 });
+    try {
+      const withdrawal = await createWithdrawal({
+        userId: session.user.id,
+        amountCents,
+      });
+      const balanceCents = await getBalanceCents(session.user.id);
+      const escrowHeldCents = await getEscrowHeldCents(session.user.id);
+      const ledger = await listLedger(session.user.id);
+      const withdrawals = await listWithdrawals(session.user.id);
+      return NextResponse.json({
+        balanceCents,
+        escrowHeldCents,
+        availableCents: balanceCents,
+        ledger,
+        withdrawals,
+        withdrawal,
+        payoutCents: withdrawal.payoutCents,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Withdrawal failed";
+      if (msg.toLowerCase().includes("insufficient")) {
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
+      return NextResponse.json({ error: msg }, { status: 500 });
     }
-    const payoutCents = payoutCentsAfterWithdrawFee(amountCents);
-    await addLedgerEntry({
-      userId: session.user.id,
-      kind: "withdraw",
-      amountCents: -amountCents,
-      note: `Withdrawal (${Math.round(PLATFORM_FEE_RATE * 100)}% fee); estimated payout ${payoutCents}c (stub — connect payout provider).`,
-    });
-    const balanceCents = await getBalanceCents(session.user.id);
-    const ledger = await listLedger(session.user.id);
-    return NextResponse.json({ balanceCents, ledger, payoutCents });
   } else {
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   }
 
   const balanceCents = await getBalanceCents(session.user.id);
+  const escrowHeldCents = await getEscrowHeldCents(session.user.id);
   const ledger = await listLedger(session.user.id);
-  return NextResponse.json({ balanceCents, ledger });
+  const withdrawals = await listWithdrawals(session.user.id);
+  return NextResponse.json({
+    balanceCents,
+    escrowHeldCents,
+    availableCents: balanceCents,
+    ledger,
+    withdrawals,
+  });
 }
 

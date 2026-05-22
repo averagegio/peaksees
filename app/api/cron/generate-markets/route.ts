@@ -2,45 +2,24 @@ import { NextResponse } from "next/server";
 
 import OpenAI from "openai";
 
-import { getSession } from "@/lib/auth/session";
+import { isAdminRequest } from "@/lib/auth/admin";
 import { createMarket, listMarkets } from "@/lib/markets/store";
 
 export const runtime = "nodejs";
 
-export async function POST(request: Request) {
-  const secret = (process.env.CRON_SECRET ?? "").trim();
-  const auth = request.headers.get("authorization") ?? "";
-  const authedBySecret = secret ? auth === `Bearer ${secret}` : false;
-  if (!authedBySecret) {
-    const adminEmails = (process.env.ADMIN_EMAILS ?? "")
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
-    const session = await getSession();
-    const okAdmin =
-      Boolean(session) &&
-      adminEmails.length > 0 &&
-      adminEmails.includes(session!.user.email.toLowerCase());
-    if (!okAdmin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+function clampCount(raw: number) {
+  const count = Math.floor(raw);
+  if (!Number.isFinite(count)) return 80;
+  return Math.max(50, Math.min(100, count));
+}
 
+async function runGenerateMarkets(count: number) {
   const openaiKey = (process.env.OPENAI_API_KEY ?? "").trim();
   if (!openaiKey) {
     return NextResponse.json({ error: "Missing OPENAI_API_KEY" }, { status: 500 });
   }
   const model = (process.env.OPENAI_MODEL ?? "gpt-4o-mini").trim();
   const tavilyKey = (process.env.TAVILY_API_KEY ?? "").trim();
-
-  let count = 80;
-  try {
-    const body = (await request.json().catch(() => ({}))) as { count?: number };
-    if (typeof body.count === "number") count = Math.floor(body.count);
-  } catch {
-    // ignore
-  }
-  count = Math.max(50, Math.min(100, count));
 
   const signals = await fetchTrendSignals(tavilyKey);
 
@@ -116,6 +95,31 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true, createdCount: created.length, created });
+}
+
+/** Vercel Cron invokes GET with `Authorization: Bearer $CRON_SECRET`. */
+export async function GET(request: Request) {
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const url = new URL(request.url);
+  const count = clampCount(Number(url.searchParams.get("count") ?? 80));
+  return runGenerateMarkets(count);
+}
+
+export async function POST(request: Request) {
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let count = 80;
+  try {
+    const body = (await request.json().catch(() => ({}))) as { count?: number };
+    if (typeof body.count === "number") count = body.count;
+  } catch {
+    // ignore
+  }
+  return runGenerateMarkets(clampCount(count));
 }
 
 async function fetchTrendSignals(tavilyKey: string) {

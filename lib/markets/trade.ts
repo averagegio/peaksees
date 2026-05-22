@@ -9,7 +9,9 @@ import {
   MARKET_FEED_LIVE,
 } from "@/app/lib/mock-markets";
 import { db } from "@/lib/db";
+import { holdTradeEscrow } from "@/lib/markets/escrow";
 import { normalizeMarketId } from "@/lib/markets/id";
+import { marketClosedReason } from "@/lib/markets/market-status";
 
 export type TradeSide = "yes" | "no";
 
@@ -20,6 +22,8 @@ type MarketPricesRow = {
   question: string;
   yes_probability: number;
   no_probability: number;
+  ends_at: string;
+  resolved_side: string | null;
 };
 
 const postgresUrl = process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? "";
@@ -165,7 +169,7 @@ export async function buyMarketSide(input: {
       await client.query("BEGIN");
 
       const mRes = await client.query<MarketPricesRow>(
-        `SELECT id, question, yes_probability, no_probability
+        `SELECT id, question, yes_probability, no_probability, ends_at, resolved_side
          FROM markets
          WHERE id = $1
          FOR UPDATE`,
@@ -194,8 +198,17 @@ export async function buyMarketSide(input: {
           question: seeded.question,
           yes_probability: seeded.yesProbability,
           no_probability: seeded.noProbability,
+          ends_at: seeded.endsAt,
+          resolved_side: null,
         };
       }
+
+      const closed = marketClosedReason({
+        endsAt: m.ends_at,
+        resolvedSide:
+          m.resolved_side === "yes" || m.resolved_side === "no" ? m.resolved_side : null,
+      });
+      if (closed) throw new Error(closed);
 
       const p =
         input.side === "yes" ? Number(m.yes_probability) : Number(m.no_probability);
@@ -211,7 +224,6 @@ export async function buyMarketSide(input: {
       if (bal < costCents) throw new Error("Insufficient Peakpoints balance");
 
       const tradeId = randomUUID();
-      const ledgerId = randomUUID();
       const createdAt = new Date().toISOString();
 
       await client.query(
@@ -234,18 +246,15 @@ export async function buyMarketSide(input: {
         [costCents, marketId],
       );
 
-      await client.query(
-        `INSERT INTO peakpoints_ledger (id, user_id, kind, amount_cents, created_at, note)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [
-          ledgerId,
-          input.userId,
-          "spend",
-          -costCents,
-          createdAt,
-          `Trade ${input.side.toUpperCase()} on market: ${m.question.slice(0, 80)}`,
-        ],
-      );
+      await holdTradeEscrow({
+        tradeId,
+        userId: input.userId,
+        marketId,
+        amountCents: costCents,
+        ledgerNote: `Escrow ${input.side.toUpperCase()} on market: ${m.question.slice(0, 80)}`,
+        createdAt,
+        pgClient: client,
+      });
 
       await client.query("COMMIT");
       return {
@@ -270,17 +279,24 @@ export async function buyMarketSide(input: {
   // SQLite
   let market = db
     .prepare(
-      `SELECT id, question, yes_probability, no_probability
+      `SELECT id, question, yes_probability, no_probability, ends_at, resolved_side
        FROM markets
        WHERE id = ?`,
     )
     .get(marketId) as
-    | { id: string; question: string; yes_probability: number; no_probability: number }
+    | {
+        id: string;
+        question: string;
+        yes_probability: number;
+        no_probability: number;
+        ends_at: string;
+        resolved_side: string | null;
+      }
     | undefined;
   if (!market) {
     const seeded = seedFromMock(marketId);
     if (!seeded) throw new Error("Market not found");
-    const createdAt = new Date().toISOString();
+    const createdAtSeed = new Date().toISOString();
     db.prepare(
       `INSERT INTO markets (id, question, category, ends_at, created_at, source, yes_probability, no_probability, volume_cents)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
@@ -289,7 +305,7 @@ export async function buyMarketSide(input: {
       seeded.question,
       seeded.category,
       seeded.endsAt,
-      createdAt,
+      createdAtSeed,
       "seed_mock",
       seeded.yesProbability,
       seeded.noProbability,
@@ -299,8 +315,19 @@ export async function buyMarketSide(input: {
       question: seeded.question,
       yes_probability: seeded.yesProbability,
       no_probability: seeded.noProbability,
+      ends_at: seeded.endsAt,
+      resolved_side: null,
     };
   }
+
+  const closed = marketClosedReason({
+    endsAt: market.ends_at,
+    resolvedSide:
+      market.resolved_side === "yes" || market.resolved_side === "no"
+        ? market.resolved_side
+        : null,
+  });
+  if (closed) throw new Error(closed);
 
   const p =
     input.side === "yes"
@@ -314,8 +341,9 @@ export async function buyMarketSide(input: {
   if (bal < costCents) throw new Error("Insufficient Peakpoints balance");
 
   const tradeId = randomUUID();
-  const ledgerId = randomUUID();
   const createdAt = new Date().toISOString();
+  const escrowId = randomUUID();
+  const ledgerId = randomUUID();
 
   const tx = db.transaction(() => {
     db.prepare(
@@ -338,15 +366,19 @@ export async function buyMarketSide(input: {
     );
 
     db.prepare(
+      `INSERT INTO market_escrow (id, trade_id, user_id, market_id, amount_cents, status, created_at)
+       VALUES (?, ?, ?, ?, ?, 'held', ?)`,
+    ).run(escrowId, tradeId, input.userId, marketId, costCents, createdAt);
+
+    db.prepare(
       `INSERT INTO peakpoints_ledger (id, user_id, kind, amount_cents, created_at, note)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, 'escrow_hold', ?, ?, ?)`,
     ).run(
       ledgerId,
       input.userId,
-      "spend",
       -costCents,
       createdAt,
-      `Trade ${input.side.toUpperCase()} on market: ${market.question.slice(0, 80)}`,
+      `Escrow ${input.side.toUpperCase()} on market: ${market.question.slice(0, 80)}`,
     );
   });
 
@@ -388,7 +420,7 @@ function seedFromMock(marketId: string): null | {
     id: found.id,
     question: found.question,
     category: found.category,
-    endsAt: found.endsAtLabel,
+    endsAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
     yesProbability: yesP,
     noProbability: 1 - yesP,
   };

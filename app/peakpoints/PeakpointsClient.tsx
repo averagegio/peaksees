@@ -22,6 +22,15 @@ type LedgerEntry = {
   note: string | null;
 };
 
+type WithdrawalEntry = {
+  id: string;
+  amountCents: number;
+  payoutCents: number;
+  status: string;
+  createdAt: string;
+  note: string | null;
+};
+
 function formatUsdCents(cents: number) {
   return formatPeakpointsUsd(cents);
 }
@@ -32,7 +41,9 @@ export function PeakpointsClient() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [balanceCents, setBalanceCents] = useState(0);
+  const [escrowHeldCents, setEscrowHeldCents] = useState(0);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalEntry[]>([]);
   const [amount, setAmount] = useState(500);
   const [busy, setBusy] = useState<null | "deposit" | "withdraw">(null);
 
@@ -48,7 +59,9 @@ export function PeakpointsClient() {
         const res = await fetch("/api/peakpoints", { cache: "no-store" });
         const data = (await safeJson<{
           balanceCents?: number;
+          escrowHeldCents?: number;
           ledger?: LedgerEntry[];
+          withdrawals?: WithdrawalEntry[];
           error?: string;
         }>(res)) ?? {};
         if (!res.ok) {
@@ -59,7 +72,9 @@ export function PeakpointsClient() {
         }
         if (cancelled) return;
         setBalanceCents(Number(data.balanceCents ?? 0));
+        setEscrowHeldCents(Number(data.escrowHeldCents ?? 0));
         setLedger(Array.isArray(data.ledger) ? data.ledger : []);
+        setWithdrawals(Array.isArray(data.withdrawals) ? data.withdrawals : []);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load Peakpoints");
@@ -91,7 +106,9 @@ export function PeakpointsClient() {
         });
         const data = (await safeJson<{
           balanceCents?: number;
+          escrowHeldCents?: number;
           ledger?: LedgerEntry[];
+          withdrawals?: WithdrawalEntry[];
           creditedCents?: number;
           credited?: boolean;
           error?: string;
@@ -101,7 +118,9 @@ export function PeakpointsClient() {
         }
         if (cancelled) return;
         setBalanceCents(Number(data.balanceCents ?? 0));
+        setEscrowHeldCents(Number(data.escrowHeldCents ?? 0));
         setLedger(Array.isArray(data.ledger) ? data.ledger : []);
+        setWithdrawals(Array.isArray(data.withdrawals) ? data.withdrawals : []);
         const credited = Number(data.creditedCents ?? 0);
         if (credited > 0) {
           setSuccess(`Added ${formatUsdCents(credited)} to your wallet.`);
@@ -152,7 +171,9 @@ export function PeakpointsClient() {
       });
       const data = (await safeJson<{
         balanceCents?: number;
+        escrowHeldCents?: number;
         ledger?: LedgerEntry[];
+        withdrawals?: WithdrawalEntry[];
         error?: string;
       }>(res)) ?? {};
       if (!res.ok) {
@@ -161,7 +182,9 @@ export function PeakpointsClient() {
         );
       }
       setBalanceCents(Number(data.balanceCents ?? 0));
+      setEscrowHeldCents(Number(data.escrowHeldCents ?? 0));
       setLedger(Array.isArray(data.ledger) ? data.ledger : []);
+      setWithdrawals(Array.isArray(data.withdrawals) ? data.withdrawals : []);
       notifyPeakpointsUpdated();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed");
@@ -180,6 +203,11 @@ export function PeakpointsClient() {
           <p className="mt-1 text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
             {loading ? "…" : formatUsdCents(balanceCents)}
           </p>
+          {escrowHeldCents > 0 ? (
+            <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+              {formatUsdCents(escrowHeldCents)} locked in open markets (escrow)
+            </p>
+          ) : null}
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
             Deposits: Stripe charges the amount below; Peakpoints credited are{" "}
             {Math.round((1 - PLATFORM_FEE_RATE) * 100)}% of payment (
@@ -237,6 +265,33 @@ export function PeakpointsClient() {
         <p className="mt-3 text-sm font-medium text-red-600 dark:text-red-400">
           {error}
         </p>
+      ) : null}
+
+      {withdrawals.length > 0 ? (
+        <div className="mt-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Withdrawals
+          </p>
+          <div className="mt-2 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
+            <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              {withdrawals.map((w) => (
+                <li key={w.id} className="p-4 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-semibold capitalize text-zinc-900 dark:text-zinc-100">
+                      {w.status}
+                    </span>
+                    <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                      {formatUsdCents(w.amountCents)} → {formatUsdCents(w.payoutCents)}
+                    </span>
+                  </div>
+                  {w.note ? (
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">{w.note}</p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       ) : null}
 
       <div className="mt-6">
