@@ -433,3 +433,46 @@ function clampProbability(p: number) {
   return Math.min(0.99, Math.max(0.01, p));
 }
 
+const PEAK_POST_SOURCE_PREFIX = "peak_post:";
+
+export function peakIdFromMarketSource(source: string): string | null {
+  if (!source.startsWith(PEAK_POST_SOURCE_PREFIX)) return null;
+  const id = source.slice(PEAK_POST_SOURCE_PREFIX.length).trim();
+  return id || null;
+}
+
+export async function listMarketsByPeakIds(peakIds: string[]): Promise<Map<string, Market>> {
+  const unique = [...new Set(peakIds.map((id) => id.trim()).filter(Boolean))];
+  const out = new Map<string, Market>();
+  if (unique.length === 0) return out;
+
+  const sources = unique.map((id) => `${PEAK_POST_SOURCE_PREFIX}${id}`);
+  const selectCols =
+    "id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents";
+
+  if (postgresPool) {
+    await ensureSchema();
+    const placeholders = sources.map((_, i) => `$${i + 1}`).join(", ");
+    const result = await postgresPool.query<MarketDbRow>(
+      `SELECT ${selectCols} FROM markets WHERE source IN (${placeholders})`,
+      sources,
+    );
+    for (const row of result.rows) {
+      const peakId = peakIdFromMarketSource(row.source);
+      if (peakId) out.set(peakId, rowToMarket(row));
+    }
+    return out;
+  }
+
+  const placeholders = sources.map(() => "?").join(", ");
+  const rows = db
+    .prepare(`SELECT ${selectCols} FROM markets WHERE source IN (${placeholders})`)
+    .all(...sources) as MarketDbRow[];
+
+  for (const row of rows) {
+    const peakId = peakIdFromMarketSource(row.source);
+    if (peakId) out.set(peakId, rowToMarket(row));
+  }
+  return out;
+}
+

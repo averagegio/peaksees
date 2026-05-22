@@ -13,6 +13,11 @@ import { safeJson } from "@/lib/http";
 import type { Peak } from "@/lib/peaks/store";
 import type { Market } from "@/lib/markets/store";
 import type { MarketPost } from "@/app/lib/mock-markets";
+import {
+  buildOptimisticMarket,
+  buildOptimisticPeak,
+  formatMarketPostedAt,
+} from "@/app/lib/peak-market";
 import Link from "next/link";
 
 function dedupePostsByMarketId(generated: MarketPost[], filler: MarketPost[]): MarketPost[] {
@@ -95,53 +100,6 @@ function mergeNovelMarkets(prev: Market[], incoming: Market[]): Market[] {
   return [...novel, ...prev];
 }
 
-function buildOptimisticMarket(clientId: string, text: string): Market {
-  const trimmed = text.trim().slice(0, 280);
-  const question = /[?]$/.test(trimmed)
-    ? trimmed
-    : `Will this happen: ${trimmed.slice(0, 200)}?`;
-  const createdAt = new Date().toISOString();
-  return {
-    id: `pending:${clientId}`,
-    question: question.slice(0, 240),
-    category: "Culture",
-    subcategory: "",
-    hashtags: ["#peak"],
-    endsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    resolvedSide: null,
-    resolvedAt: null,
-    createdAt,
-    source: "pending",
-    yesProbability: 0.5,
-    noProbability: 0.5,
-    volumeCents: 0,
-  };
-}
-
-function buildOptimisticPeak(
-  clientId: string,
-  input: {
-    text: string;
-    expiresAt?: string | null;
-    userId: string;
-    displayName: string;
-    handle: string;
-    avatarHue: number;
-  },
-): Peak {
-  return {
-    id: `pending:${clientId}`,
-    userId: input.userId,
-    displayName: input.displayName,
-    handle: input.handle,
-    avatarHue: input.avatarHue,
-    avatarUrl: "",
-    text: input.text.trim().slice(0, 280),
-    createdAt: new Date().toISOString(),
-    expiresAt: input.expiresAt ?? null,
-  };
-}
-
 function replacePendingMarket(prev: Market[], clientId: string, market: Market): Market[] {
   const filtered = prev.filter((m) => m.id !== `pending:${clientId}`);
   return mergeNovelMarkets(filtered, [market]);
@@ -154,15 +112,6 @@ function dropPendingMarket(prev: Market[], clientId: string): Market[] {
 function replacePendingPeak(prev: Peak[], clientId: string, peak: Peak): Peak[] {
   const filtered = prev.filter((p) => p.id !== `pending:${clientId}`);
   return [peak, ...filtered.filter((p) => p.id !== peak.id)].slice(0, 30);
-}
-
-function formatMarketPostedAt(iso: string) {
-  const ms = Date.now() - new Date(iso).getTime();
-  if (!Number.isFinite(ms) || ms < 0) return "Just now";
-  if (ms < 60_000) return "Just now";
-  if (ms < 3_600_000) return `${Math.max(1, Math.floor(ms / 60_000))}m ago`;
-  if (ms < 86_400_000) return `${Math.max(1, Math.floor(ms / 3_600_000))}h ago`;
-  return "Today";
 }
 
 /** True when the sentinel overlaps the scroll root viewport (within bottom margin). */

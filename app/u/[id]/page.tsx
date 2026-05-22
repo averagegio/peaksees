@@ -3,8 +3,10 @@ import { notFound, redirect } from "next/navigation";
 
 import { BackButton } from "@/app/components/BackButton";
 import { ProfileFollowSocial } from "@/app/components/profile/ProfileFollowSocial";
+import { ProfilePeakFeed } from "@/app/components/profile/ProfilePeakFeed";
 import { getSession } from "@/lib/auth/session";
 import { getUserById } from "@/lib/auth/users-store";
+import { listMarketsByPeakIds } from "@/lib/markets/store";
 import { listPeaks } from "@/lib/peaks/store";
 import {
   getFollowCounts,
@@ -34,7 +36,12 @@ export default async function UserProfilePage({
   const u = await getUserById(id);
   if (!u) notFound();
 
-  const peaks = await listPeaks({ mineUserId: u.id, limit: 20 });
+  const peaks = await listPeaks({ mineUserId: u.id, limit: 30 });
+  const marketByPeakId = await listMarketsByPeakIds(peaks.map((p) => p.id));
+  const feedItems = peaks.map((peak) => ({
+    peak,
+    market: marketByPeakId.get(peak.id) ?? null,
+  }));
   const followCounts = await getFollowCounts(u.id);
   const amFollowing =
     session.user.id !== u.id &&
@@ -126,24 +133,11 @@ export default async function UserProfilePage({
             <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Peaks</h2>
           </div>
           <div className="px-6 py-5">
-            {peaks.length === 0 ? (
-              <p className="text-sm text-zinc-600 dark:text-zinc-300">No peaks yet.</p>
-            ) : (
-              <ul className="space-y-3">
-                {peaks.map((p) => (
-                  <li
-                    key={p.id}
-                    className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900"
-                  >
-                    <p className="text-zinc-800 dark:text-zinc-100">{p.text}</p>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      {new Date(p.createdAt).toLocaleString()}
-                      {p.expiresAt ? ` · Expires ${new Date(p.expiresAt).toLocaleString()}` : ""}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <ProfilePeakFeed
+              profileUserId={u.id}
+              initialItems={feedItems}
+              isOwnProfile={session.user.id === u.id}
+            />
           </div>
         </section>
       </div>

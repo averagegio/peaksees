@@ -76,7 +76,7 @@ function tickerParts(post: MarketPost) {
   ];
 }
 
-function MarketPostCard({
+export function MarketPostCard({
   post,
   isTourAnchor = false,
 }: {
