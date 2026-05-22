@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth/session";
 import { listMarkets, type MarketCursor } from "@/lib/markets/store";
-import { maybeGenerateMarketsOnRefresh } from "@/lib/markets/generate";
+import { feedAutogenMinIntervalMs, maybeGenerateMarketsOnRefresh } from "@/lib/markets/generate";
 
 export const runtime = "nodejs";
 
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const limit = Math.floor(Number(url.searchParams.get("limit") ?? "50"));
   const autogen = url.searchParams.get("autogen") === "1";
-  const count = Math.floor(Number(url.searchParams.get("count") ?? "5"));
+  const count = Math.floor(Number(url.searchParams.get("count") ?? "4"));
   const category = (url.searchParams.get("category") ?? "").trim();
   const subcategory = (url.searchParams.get("subcategory") ?? "").trim();
   const tz = (url.searchParams.get("tz") ?? "").trim();
@@ -26,8 +26,8 @@ export async function GET(request: Request) {
     // Run generation in the background so the feed returns immediately.
     void maybeGenerateMarketsOnRefresh({
       count,
-      minIntervalMs: 60_000,
-      dailyCap: 100,
+      minIntervalMs: feedAutogenMinIntervalMs(),
+      dailyCap: 120,
       category: category || undefined,
       subcategory: subcategory || undefined,
       tz: tz || undefined,

@@ -4,6 +4,14 @@ import { Pool } from "pg";
 import OpenAI from "openai";
 
 import { db } from "@/lib/db";
+import {
+  forwardLookingMarketRules,
+  isRetroactiveMarketQuestion,
+  isVagueMarketQuestion,
+  marketGenerationDateContext,
+  scoreMarketQuestionFocus,
+  sharpMarketQuestionGuide,
+} from "@/lib/markets/generation-guard";
 import { createMarket, listMarkets, type Market } from "@/lib/markets/store";
 
 const postgresUrl = process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? "";
@@ -64,7 +72,8 @@ export async function maybeGenerateMarketsOnRefresh(input: {
       ? input.tz.trim().slice(0, 64)
       : "";
 
-  const count = Math.max(1, Math.min(10, Math.floor(input.count)));
+  const count = Math.max(1, Math.min(6, Math.floor(input.count)));
+  const askCount = Math.min(8, count + 2);
   const since = new Date(Date.now() - input.minIntervalMs).toISOString();
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
@@ -92,15 +101,20 @@ export async function maybeGenerateMarketsOnRefresh(input: {
       ? requestedSubcategory
       : "";
 
+  const dateCtx = marketGenerationDateContext();
   const system =
     "You are Peak, an expert prediction-market market maker. " +
     "Generate crisp YES/NO markets that are culturally relevant and time-bounded. " +
     "No slurs, explicit sexual content, or private personal data. " +
     "Questions must be specific and resolve within 90 days. " +
-    "Every market must be anchored to a concrete, timely signal.";
+    "Every market must be anchored to a concrete, timely signal.\n\n" +
+    forwardLookingMarketRules() +
+    "\n\n" +
+    sharpMarketQuestionGuide();
 
   const user =
-    `Generate ${count} markets.\n\n` +
+    `Generate ${askCount} candidate markets; only return your ${count} sharpest ideas in JSON (we rank by specificity).\n` +
+    `Reference date: ${dateCtx.todayIso} (UTC).\n\n` +
     (category
       ? `Category: ${category}. Every item MUST use exactly this category value.\n\n`
       : "") +
@@ -112,15 +126,17 @@ export async function maybeGenerateMarketsOnRefresh(input: {
     `Signals:\n${signals}\n\n` +
     "Rules:\n" +
     "- Each market MUST reference a named event/person/team/product mentioned in the signals.\n" +
+    "- SKIP any signal about an event that already finished; only trade on what is still undecided.\n" +
     "- Provide subcategory and hashtags that match the nav category.\n" +
     "- Hashtags: 3..6 tags, each starts with #, no spaces.\n\n" +
-    "Return ONLY valid JSON: an array of objects with keys:\n" +
+    'Return ONLY valid JSON: {"markets":[...]} where each item has keys:\n' +
     `- question: string\n- category: string\n- subcategory: string\n- hashtags: string[]\n- daysToResolve: number (1..90)\n- yesProbability: number (0.05..0.95)\n` +
     "No markdown, no extra text.";
 
   const resp = await client.chat.completions.create({
     model,
-    temperature: 0.7,
+    temperature: 0.35,
+    response_format: { type: "json_object" },
     messages: [
       { role: "system", content: system },
       { role: "user", content: user },
@@ -128,59 +144,21 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   });
 
   const raw = resp.choices[0]?.message?.content ?? "";
-  const parsed = safeParse(raw);
+  const parsed = safeParseMarketsPayload(raw);
   if (!parsed) return { generated: 0 };
 
   const existing = await listMarkets({ limit: 200, category: category || undefined });
   const existingSet = new Set(existing.map((m) => normalizeQuestion(m.question)));
 
-  let createdCount = 0;
-  for (const item of parsed) {
-    const question = typeof item.question === "string" ? item.question.trim() : "";
-    const rawCategory = typeof item.category === "string" ? item.category.trim() : "Culture";
-    const finalCategory = category || rawCategory || "Culture";
-    const rawSubcategory =
-      typeof (item as any).subcategory === "string"
-        ? String((item as any).subcategory).trim()
-        : "";
-    const subcategory =
-      forcedSubcategory ||
-      (allowed.length
-        ? allowed.includes(rawSubcategory)
-          ? rawSubcategory
-          : ""
-        : rawSubcategory);
-    const hashtags = Array.isArray((item as any).hashtags)
-      ? ((item as any).hashtags as unknown[])
-          .filter((t) => typeof t === "string")
-          .map((t) => String(t).trim())
-          .filter((t) => /^#[^\s#]{2,32}$/.test(t))
-          .slice(0, 6)
-      : [];
-    const daysToResolve = Math.floor(Number(item.daysToResolve ?? 30));
-    const yesProbability = Number(item.yesProbability ?? 0.5);
-    if (question.length < 8) continue;
-    if (daysToResolve < 1 || daysToResolve > 90) continue;
-    if (!Number.isFinite(yesProbability) || yesProbability < 0.05 || yesProbability > 0.95)
-      continue;
-    if (allowed.length && !forcedSubcategory && !subcategory) continue;
-
-    const norm = normalizeQuestion(question);
-    if (existingSet.has(norm)) continue;
-
-    const endsAt = new Date(Date.now() + daysToResolve * 24 * 60 * 60 * 1000).toISOString();
-    await createMarket({
-      question,
-      category: finalCategory.slice(0, 24),
-      subcategory,
-      hashtags,
-      endsAt,
-      source: category ? `peak_${category.toLowerCase()}_refresh` : "peak_refresh",
-      yesProbability,
-    });
-    existingSet.add(norm);
-    createdCount += 1;
-  }
+  const createdCount = await persistRankedFeedMarkets({
+    items: parsed,
+    maxCreate: count,
+    category,
+    forcedSubcategory,
+    allowedSubcategories: allowed,
+    existingSet,
+    source: category ? `peak_${category.toLowerCase()}_refresh` : "peak_refresh",
+  });
 
   return { generated: createdCount };
 }
@@ -220,20 +198,29 @@ export async function generateMarketFromPeak(input: {
           content:
             "Convert social posts into YES/NO prediction market questions. " +
             "Be specific, time-bounded (1-90 days), no slurs or private data. " +
-            'Return JSON: {"question":string,"category":string,"daysToResolve":number,"yesProbability":number,"hashtags":string[]}',
+            forwardLookingMarketRules() +
+            "\n" +
+            sharpMarketQuestionGuide() +
+            ' Return JSON: {"question":string,"category":string,"daysToResolve":number,"yesProbability":number,"hashtags":string[]}',
         },
         {
           role: "user",
-          content: `Post:\n${text}\n\nReturn one market as JSON.`,
+          content:
+            `Today: ${marketGenerationDateContext().todayIso} (UTC).\n` +
+            `Post:\n${text}\n\n` +
+            "Return one forward-looking market as JSON (not about an event that already happened).",
         },
       ],
     });
     const raw = resp.choices[0]?.message?.content ?? "";
     const parsed = safeParseObject(raw);
-    const question =
+    let question =
       typeof parsed?.question === "string" && parsed.question.trim().length >= 8
         ? parsed.question.trim().slice(0, 240)
         : fallback.question;
+    if (isRetroactiveMarketQuestion(question) || isVagueMarketQuestion(question)) {
+      question = fallback.question;
+    }
     const rawCategory =
       typeof parsed?.category === "string" ? parsed.category.trim() : fallback.category;
     const category = rawCategory.slice(0, 24) || "Culture";
@@ -313,7 +300,7 @@ async function countMarkets(input: { sinceIso: string; sourcePrefix: string }) {
   return Number(row?.c ?? 0);
 }
 
-async function fetchTrendSignals(input: { tavilyKey: string; category?: string; tz?: string }) {
+export async function fetchTrendSignals(input: { tavilyKey: string; category?: string; tz?: string }) {
   const key = (input.tavilyKey ?? "").trim();
   if (!key) return "- Tavily not configured. Set TAVILY_API_KEY for current events.";
 
@@ -329,6 +316,7 @@ async function fetchTrendSignals(input: { tavilyKey: string; category?: string; 
   const baseQueries = [
     `top breaking headlines today ${now}`,
     `viral trending topics today ${now}${tz ? ` ${tz}` : ""}`,
+    `upcoming events and deadlines next 60 days ${now}`,
   ];
   const categoryQueries =
     category === "News"
@@ -409,14 +397,115 @@ type GenItem = {
   yesProbability?: unknown;
 };
 
-function safeParse(raw: string): GenItem[] | null {
+function safeParseMarketsPayload(raw: string): GenItem[] | null {
   try {
-    const val = JSON.parse(raw);
-    if (!Array.isArray(val)) return null;
-    return val as GenItem[];
+    const val = JSON.parse(raw) as unknown;
+    if (Array.isArray(val)) return val as GenItem[];
+    if (val && typeof val === "object" && Array.isArray((val as { markets?: unknown }).markets)) {
+      return (val as { markets: GenItem[] }).markets;
+    }
+    return null;
   } catch {
     return null;
   }
+}
+
+type RankedMarketDraft = {
+  question: string;
+  finalCategory: string;
+  subcategory: string;
+  hashtags: string[];
+  daysToResolve: number;
+  yesProbability: number;
+  focusScore: number;
+};
+
+async function persistRankedFeedMarkets(input: {
+  items: GenItem[];
+  maxCreate: number;
+  category: string;
+  forcedSubcategory: string;
+  allowedSubcategories: string[];
+  existingSet: Set<string>;
+  source: string;
+}): Promise<number> {
+  const drafts: RankedMarketDraft[] = [];
+
+  for (const item of input.items) {
+    const question = typeof item.question === "string" ? item.question.trim() : "";
+    const rawCategory = typeof item.category === "string" ? item.category.trim() : "Culture";
+    const finalCategory = input.category || rawCategory || "Culture";
+    const rawSubcategory =
+      typeof item.subcategory === "string" ? item.subcategory.trim() : "";
+    const subcategory =
+      input.forcedSubcategory ||
+      (input.allowedSubcategories.length
+        ? input.allowedSubcategories.includes(rawSubcategory)
+          ? rawSubcategory
+          : ""
+        : rawSubcategory);
+    const hashtags = Array.isArray(item.hashtags)
+      ? item.hashtags
+          .filter((t) => typeof t === "string")
+          .map((t) => String(t).trim())
+          .filter((t) => /^#[^\s#]{2,32}$/.test(t))
+          .slice(0, 6)
+      : [];
+    const daysToResolve = Math.floor(Number(item.daysToResolve ?? 30));
+    const yesProbability = Number(item.yesProbability ?? 0.5);
+
+    if (question.length < 8) continue;
+    if (isRetroactiveMarketQuestion(question)) continue;
+    if (isVagueMarketQuestion(question)) continue;
+    if (daysToResolve < 1 || daysToResolve > 90) continue;
+    if (!Number.isFinite(yesProbability) || yesProbability < 0.05 || yesProbability > 0.95) {
+      continue;
+    }
+    if (input.allowedSubcategories.length && !input.forcedSubcategory && !subcategory) {
+      continue;
+    }
+
+    const norm = normalizeQuestion(question);
+    if (input.existingSet.has(norm)) continue;
+
+    drafts.push({
+      question,
+      finalCategory,
+      subcategory,
+      hashtags,
+      daysToResolve,
+      yesProbability,
+      focusScore: scoreMarketQuestionFocus(question),
+    });
+  }
+
+  drafts.sort((a, b) => b.focusScore - a.focusScore);
+
+  let createdCount = 0;
+  for (const d of drafts) {
+    if (createdCount >= input.maxCreate) break;
+    const endsAt = new Date(Date.now() + d.daysToResolve * 24 * 60 * 60 * 1000).toISOString();
+    await createMarket({
+      question: d.question,
+      category: d.finalCategory.slice(0, 24),
+      subcategory: d.subcategory,
+      hashtags: d.hashtags,
+      endsAt,
+      source: input.source,
+      yesProbability: d.yesProbability,
+    });
+    input.existingSet.add(normalizeQuestion(d.question));
+    createdCount += 1;
+  }
+
+  return createdCount;
+}
+
+/** Min ms between feed-triggered autogen batches (env override for faster refresh). */
+export function feedAutogenMinIntervalMs(): number {
+  const raw = Number(process.env.FEED_AUTOGEN_MIN_INTERVAL_MS ?? 30_000);
+  if (!Number.isFinite(raw)) return 30_000;
+  return Math.max(15_000, Math.min(120_000, Math.floor(raw)));
 }
 
 function safeParseObject(raw: string): GenItem | null {

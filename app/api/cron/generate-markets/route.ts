@@ -3,14 +3,25 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
 import { isAdminRequest } from "@/lib/auth/admin";
+import { fetchTrendSignals } from "@/lib/markets/generate";
+import {
+  forwardLookingMarketRules,
+  isRetroactiveMarketQuestion,
+  isVagueMarketQuestion,
+  marketGenerationDateContext,
+  scoreMarketQuestionFocus,
+  sharpMarketQuestionGuide,
+} from "@/lib/markets/generation-guard";
 import { createMarket, listMarkets } from "@/lib/markets/store";
 
 export const runtime = "nodejs";
 
 function clampCount(raw: number) {
+  const envDefault = Math.floor(Number(process.env.CRON_MARKET_COUNT ?? "24"));
   const count = Math.floor(raw);
-  if (!Number.isFinite(count)) return 80;
-  return Math.max(50, Math.min(100, count));
+  const fallback = Number.isFinite(envDefault) ? envDefault : 24;
+  if (!Number.isFinite(count)) return fallback;
+  return Math.max(12, Math.min(40, count));
 }
 
 async function runGenerateMarkets(count: number) {
@@ -21,26 +32,36 @@ async function runGenerateMarkets(count: number) {
   const model = (process.env.OPENAI_MODEL ?? "gpt-4o-mini").trim();
   const tavilyKey = (process.env.TAVILY_API_KEY ?? "").trim();
 
-  const signals = await fetchTrendSignals(tavilyKey);
+  const signals = await fetchTrendSignals({ tavilyKey });
+  const dateCtx = marketGenerationDateContext();
 
   const client = new OpenAI({ apiKey: openaiKey });
   const system =
     "You are Peak, an expert prediction-market market maker. " +
     "Generate crisp YES/NO markets that are culturally relevant and time-bounded. " +
     "Do not include slurs, explicit sexual content, or private personal data. " +
-    "Questions must be specific and resolve by a date within 90 days.";
+    "Questions must be specific and resolve by a date within 90 days.\n\n" +
+    forwardLookingMarketRules() +
+    "\n\n" +
+    sharpMarketQuestionGuide();
 
+  const askCount = Math.min(count + 8, 36);
   const user =
-    `Generate ${count} markets.\n\n` +
+    `Generate ${askCount} candidate markets; return all in JSON (we keep the sharpest ${count}).\n` +
+    `Reference date: ${dateCtx.todayIso} (UTC).\n\n` +
     `Signals (culture + news):\n${signals}\n\n` +
-    "Return ONLY valid JSON: an array of objects with keys:\n" +
+    "Rules:\n" +
+    "- SKIP signals about events that already finished; only forward-looking uncertain outcomes.\n" +
+    "- Each question must still be open as of the reference date.\n\n" +
+    'Return ONLY valid JSON: {"markets":[...]} where each item has keys:\n' +
     `- question: string\n- category: string (e.g. Culture, Tech, Sports, News, Politics, Entertainment)\n` +
     `- daysToResolve: number (1..90)\n- yesProbability: number (0.05..0.95)\n` +
     "No markdown, no extra text.";
 
   const resp = await client.chat.completions.create({
     model,
-    temperature: 0.7,
+    temperature: 0.35,
+    response_format: { type: "json_object" },
     messages: [
       { role: "system", content: system },
       { role: "user", content: user },
@@ -48,7 +69,7 @@ async function runGenerateMarkets(count: number) {
   });
 
   const raw = resp.choices[0]?.message?.content ?? "";
-  const parsed = safeParseJsonArray(raw);
+  const parsed = safeParseMarketsPayload(raw);
   if (!parsed) {
     return NextResponse.json(
       { error: "Model did not return JSON", sample: raw.slice(0, 500) },
@@ -59,13 +80,25 @@ async function runGenerateMarkets(count: number) {
   const existing = await listMarkets({ limit: 200 });
   const existingSet = new Set(existing.map((m) => normalizeQuestion(m.question)));
 
-  const created: Array<{ id: string; question: string }> = [];
+  type Draft = {
+    question: string;
+    category: string;
+    subcategory: string;
+    hashtags: string[];
+    daysToResolve: number;
+    yesProbability: number;
+    focusScore: number;
+  };
+  const drafts: Draft[] = [];
+
   for (const item of parsed) {
     const question = typeof item.question === "string" ? item.question.trim() : "";
     const category = typeof item.category === "string" ? item.category.trim() : "Culture";
     const daysToResolve = Math.floor(Number(item.daysToResolve ?? 30));
     const yesProbability = Number(item.yesProbability ?? 0.5);
     if (question.length < 8) continue;
+    if (isRetroactiveMarketQuestion(question)) continue;
+    if (isVagueMarketQuestion(question)) continue;
     if (daysToResolve < 1 || daysToResolve > 90) continue;
     if (!Number.isFinite(yesProbability) || yesProbability < 0.05 || yesProbability > 0.95)
       continue;
@@ -73,10 +106,9 @@ async function runGenerateMarkets(count: number) {
     const norm = normalizeQuestion(question);
     if (existingSet.has(norm)) continue;
 
-    const endsAt = new Date(Date.now() + daysToResolve * 24 * 60 * 60 * 1000).toISOString();
-    const m = await createMarket({
+    drafts.push({
       question,
-      category: category.slice(0, 24),
+      category,
       subcategory:
         typeof item.subcategory === "string" ? item.subcategory.trim().slice(0, 32) : "",
       hashtags: Array.isArray(item.hashtags)
@@ -86,11 +118,28 @@ async function runGenerateMarkets(count: number) {
             .filter((t) => /^#[^\s#]{2,32}$/.test(t))
             .slice(0, 6)
         : [],
+      daysToResolve,
+      yesProbability,
+      focusScore: scoreMarketQuestionFocus(question),
+    });
+  }
+
+  drafts.sort((a, b) => b.focusScore - a.focusScore);
+
+  const created: Array<{ id: string; question: string }> = [];
+  for (const d of drafts) {
+    if (created.length >= count) break;
+    const endsAt = new Date(Date.now() + d.daysToResolve * 24 * 60 * 60 * 1000).toISOString();
+    const m = await createMarket({
+      question: d.question,
+      category: d.category.slice(0, 24),
+      subcategory: d.subcategory,
+      hashtags: d.hashtags,
       endsAt,
       source: "peak_daily",
-      yesProbability,
+      yesProbability: d.yesProbability,
     });
-    existingSet.add(norm);
+    existingSet.add(normalizeQuestion(d.question));
     created.push({ id: m.id, question: m.question });
   }
 
@@ -122,49 +171,6 @@ export async function POST(request: Request) {
   return runGenerateMarkets(clampCount(count));
 }
 
-async function fetchTrendSignals(tavilyKey: string) {
-  const queries = [
-    "what is trending on X today",
-    "tiktok trending topics today",
-    "top news headlines today",
-    "pop culture trending stories today",
-  ];
-
-  const chunks: string[] = [];
-  for (const q of queries) {
-    const out = await tavilySummary(tavilyKey, q);
-    if (out) chunks.push(`- ${q}:\n${out}`);
-  }
-  if (chunks.length > 0) return chunks.join("\n\n").slice(0, 3500);
-
-  // Fallback if Tavily not configured.
-  return [
-    "- Use broad cultural topics (music, film, tech launches, sports, elections).",
-    "- Prefer near-term resolution (7-60 days).",
-  ].join("\n");
-}
-
-async function tavilySummary(tavilyKey: string, query: string) {
-  if (!tavilyKey) return "";
-  try {
-    const r = await fetch("https://api.tavily.com/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        api_key: tavilyKey,
-        query,
-        search_depth: "basic",
-        max_results: 6,
-        include_answer: true,
-      }),
-    });
-    const j = (await r.json()) as { answer?: string };
-    return typeof j.answer === "string" ? j.answer.slice(0, 900) : "";
-  } catch {
-    return "";
-  }
-}
-
 type GeneratedMarket = {
   question?: unknown;
   category?: unknown;
@@ -174,11 +180,14 @@ type GeneratedMarket = {
   yesProbability?: unknown;
 };
 
-function safeParseJsonArray(raw: string): GeneratedMarket[] | null {
+function safeParseMarketsPayload(raw: string): GeneratedMarket[] | null {
   try {
-    const val = JSON.parse(raw);
-    if (!Array.isArray(val)) return null;
-    return val as GeneratedMarket[];
+    const val = JSON.parse(raw) as unknown;
+    if (Array.isArray(val)) return val as GeneratedMarket[];
+    if (val && typeof val === "object" && Array.isArray((val as { markets?: unknown }).markets)) {
+      return (val as { markets: GeneratedMarket[] }).markets;
+    }
+    return null;
   } catch {
     return null;
   }

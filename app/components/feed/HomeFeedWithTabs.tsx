@@ -36,6 +36,12 @@ function dedupePostsByMarketId(generated: MarketPost[], filler: MarketPost[]): M
   return out;
 }
 
+/** Prefer real generated markets; mock filler only when the feed is still sparse. */
+function buildFeedPosts(generated: MarketPost[], filler: MarketPost[]): MarketPost[] {
+  if (generated.length >= 2) return generated;
+  return dedupePostsByMarketId(generated, filler);
+}
+
 function FeedTabButton({
   active,
   onClick,
@@ -412,8 +418,11 @@ export function HomeFeedWithTabs({
     if (autogenPollRef.current != null) {
       window.clearTimeout(autogenPollRef.current);
     }
-    autogenPollRef.current = window.setTimeout(() => {
-      autogenPollRef.current = null;
+
+    const pollMs = [1200, 2800];
+    let step = 0;
+
+    const pollOnce = () => {
       void (async () => {
         try {
           const href = buildMarketsHref({
@@ -439,8 +448,16 @@ export function HomeFeedWithTabs({
         } catch {
           // ignore
         }
+        step += 1;
+        if (step < pollMs.length && session === feedSessionRef.current) {
+          autogenPollRef.current = window.setTimeout(pollOnce, pollMs[step]! - pollMs[step - 1]!);
+        } else {
+          autogenPollRef.current = null;
+        }
       })();
-    }, 3500);
+    };
+
+    autogenPollRef.current = window.setTimeout(pollOnce, pollMs[0]!);
   };
 
   runPullRefreshRef.current = async () => {
@@ -454,7 +471,7 @@ export function HomeFeedWithTabs({
       const href = buildMarketsHref({
         limit: 24,
         autogen: true,
-        count: 5,
+        count: 4,
         marketCategory,
         tz,
       });
@@ -587,7 +604,7 @@ export function HomeFeedWithTabs({
         const href = buildMarketsHref({
           limit: 20,
           autogen: true,
-          count: 5,
+          count: 4,
           marketCategory,
           tz,
         });
@@ -1117,7 +1134,7 @@ export function HomeFeedWithTabs({
         {tab === "live" ? <LiveStreamPanel /> : null}
         <PeakFeed
           key={`${tab}-${explore}`}
-          posts={dedupePostsByMarketId(generatedAsPosts, posts)}
+          posts={buildFeedPosts(generatedAsPosts, posts)}
           contextLabel={explore}
           peaks={showLatestPeaks ? peaks : []}
           tourMarketPostIndex={0}
