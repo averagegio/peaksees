@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { BackButton } from "@/app/components/BackButton";
 import { LogoutButton } from "@/app/components/LogoutButton";
+import { PeakpointsWalletBadge } from "@/app/components/peakpoints/PeakpointsWalletBadge";
 import { SidebarNav } from "@/app/components/sidebar/SidebarNav";
 import { FEED_TAGLINE, PEAKSEES_HEADER_BANNER } from "@/lib/brand";
 import type { PublicUser } from "@/lib/auth/users-store";
@@ -133,23 +134,26 @@ export function NavShell({
 
           <div className="flex shrink-0 items-center gap-2">
             {session ? (
-              <Link
-                href="/dashboard"
-                className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white ring-2 ring-emerald-500/30"
-                style={{ backgroundColor: "hsl(160 45% 38%)" }}
-                aria-label={`${session.user.displayName} profile`}
-              >
-                {session.user.avatarUrl?.trim() ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- data URL avatar
-                  <img
-                    src={session.user.avatarUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  initials(session.user.displayName)
-                )}
-              </Link>
+              <>
+                <PeakpointsWalletBadge compact />
+                <Link
+                  href="/dashboard"
+                  className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white ring-2 ring-emerald-500/30"
+                  style={{ backgroundColor: "hsl(160 45% 38%)" }}
+                  aria-label={`${session.user.displayName} profile`}
+                >
+                  {session.user.avatarUrl?.trim() ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- data URL avatar
+                    <img
+                      src={session.user.avatarUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    initials(session.user.displayName)
+                  )}
+                </Link>
+              </>
             ) : (
               <>
                 <Link

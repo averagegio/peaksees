@@ -121,7 +121,7 @@ export async function POST(request: Request) {
             quantity: 1,
           },
         ],
-        success_url: `${appUrl}/peakpoints?topup=success`,
+        success_url: `${appUrl}/peakpoints?topup=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${appUrl}/peakpoints?topup=canceled`,
         metadata: {
           kind: "wallet_topup",

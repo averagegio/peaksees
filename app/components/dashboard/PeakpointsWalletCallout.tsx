@@ -1,4 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+
+import { formatPeakpointsUsd } from "@/app/components/peakpoints/PeakpointsWalletBadge";
+import { safeJson } from "@/lib/http";
 
 function PeakpointsCoinGlyph({ className }: { className?: string }) {
   return (
@@ -17,8 +23,30 @@ function PeakpointsCoinGlyph({ className }: { className?: string }) {
   );
 }
 
-/** Prominent link to /peakpoints for new users funding their wallet from the dashboard. */
+/** Prominent link to /peakpoints with live wallet balance on the dashboard. */
 export function PeakpointsWalletCallout() {
+  const [balanceCents, setBalanceCents] = useState<number | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/peakpoints", { cache: "no-store" });
+      const data = (await safeJson<{ balanceCents?: number }>(res)) ?? {};
+      if (res.ok) setBalanceCents(Number(data.balanceCents ?? 0));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+    const onUpdate = () => void refresh();
+    window.addEventListener("peaksees:peakpoints-updated", onUpdate);
+    return () => window.removeEventListener("peaksees:peakpoints-updated", onUpdate);
+  }, [refresh]);
+
+  const balanceLabel =
+    balanceCents === null ? "…" : formatPeakpointsUsd(balanceCents);
+
   return (
     <section className="overflow-hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-500/[0.08] to-teal-600/[0.06] shadow-sm dark:border-emerald-800/50 dark:from-emerald-500/[0.07] dark:to-teal-900/20">
       <Link
@@ -36,7 +64,11 @@ export function PeakpointsWalletCallout() {
             Peakpoints wallet
           </p>
           <p className="mt-0.5 text-sm leading-snug text-zinc-600 dark:text-zinc-400">
-            Add money to trade on markets in your feed—open your wallet to deposit with Stripe.
+            <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+              {balanceLabel}
+            </span>
+            {" in wallet · "}
+            add money with Stripe to trade on markets in your feed.
           </p>
         </div>
         <span className="hidden shrink-0 text-sm font-semibold text-emerald-700 group-hover:underline sm:inline dark:text-emerald-400">

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { BackButton } from "@/app/components/BackButton";
 import { PeakpointsWalletCallout } from "@/app/components/dashboard/PeakpointsWalletCallout";
 import { LogoutButton } from "@/app/components/LogoutButton";
+import { PeakpointsWalletBadge } from "@/app/components/peakpoints/PeakpointsWalletBadge";
 import { ProfileEditor } from "@/app/components/profile/ProfileEditor";
 import { PEAKSEES_HEADER_BANNER } from "@/lib/brand";
 import { ProfileFollowSocial } from "@/app/components/profile/ProfileFollowSocial";
@@ -130,6 +131,7 @@ export default async function DashboardPage() {
             </h1>
             <div className="flex items-center gap-3">
               <BackButton fallbackHref="/feed" iconOnly />
+              <PeakpointsWalletBadge compact />
               <Link
                 href="/feed"
                 className="text-sm font-medium text-zinc-600 underline-offset-4 hover:text-zinc-900 hover:underline dark:text-zinc-400 dark:hover:text-zinc-100"

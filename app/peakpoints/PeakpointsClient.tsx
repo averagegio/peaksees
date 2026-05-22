@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
+import {
+  notifyPeakpointsUpdated,
+  formatPeakpointsUsd,
+} from "@/app/components/peakpoints/PeakpointsWalletBadge";
 import { safeJson } from "@/lib/http";
 import {
   PLATFORM_FEE_RATE,
@@ -18,15 +23,14 @@ type LedgerEntry = {
 };
 
 function formatUsdCents(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
+  return formatPeakpointsUsd(cents);
 }
 
 export function PeakpointsClient() {
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [balanceCents, setBalanceCents] = useState(0);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [amount, setAmount] = useState(500);
@@ -70,6 +74,56 @@ export function PeakpointsClient() {
     };
   }, []);
 
+  useEffect(() => {
+    const topup = searchParams.get("topup");
+    const sessionId = searchParams.get("session_id")?.trim();
+    if (topup !== "success" || !sessionId) return undefined;
+
+    let cancelled = false;
+    void (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/stripe/checkout/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+        const data = (await safeJson<{
+          balanceCents?: number;
+          ledger?: LedgerEntry[];
+          creditedCents?: number;
+          credited?: boolean;
+          error?: string;
+        }>(res)) ?? {};
+        if (!res.ok) {
+          throw new Error(data.error ?? "Could not confirm your deposit");
+        }
+        if (cancelled) return;
+        setBalanceCents(Number(data.balanceCents ?? 0));
+        setLedger(Array.isArray(data.ledger) ? data.ledger : []);
+        const credited = Number(data.creditedCents ?? 0);
+        if (credited > 0) {
+          setSuccess(`Added ${formatUsdCents(credited)} to your wallet.`);
+        } else {
+          setSuccess("Deposit confirmed — your wallet is up to date.");
+        }
+        notifyPeakpointsUpdated();
+        window.history.replaceState({}, "", "/peakpoints");
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Could not confirm your deposit");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
+
   async function act(action: "deposit" | "withdraw") {
     setBusy(action);
     setError(null);
@@ -108,6 +162,7 @@ export function PeakpointsClient() {
       }
       setBalanceCents(Number(data.balanceCents ?? 0));
       setLedger(Array.isArray(data.ledger) ? data.ledger : []);
+      notifyPeakpointsUpdated();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed");
     } finally {
@@ -171,6 +226,12 @@ export function PeakpointsClient() {
           </button>
         </div>
       </div>
+
+      {success ? (
+        <p className="mt-3 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+          {success}
+        </p>
+      ) : null}
 
       {error ? (
         <p className="mt-3 text-sm font-medium text-red-600 dark:text-red-400">

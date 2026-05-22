@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
-import {
-  PLATFORM_FEE_RATE,
-  peakpointsCreditAfterDepositFee,
-} from "@/lib/peakpoints/fees";
-import { tryCreditWalletTopupOnce } from "@/lib/peakpoints/ledger";
 import { getStripe } from "@/lib/stripe/server";
+import { fulfillWalletTopupCheckout } from "@/lib/stripe/wallet-topup";
 
 export const runtime = "nodejs";
 
@@ -33,29 +29,8 @@ export async function POST(request: Request) {
   }
 
   if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session;
-    const kind = String(session.metadata?.kind ?? "");
-    const userId = String(session.metadata?.userId ?? "").trim();
-
-    if (kind === "wallet_topup" && userId && session.mode === "payment") {
-      if (session.payment_status !== "paid") {
-        return NextResponse.json({ received: true });
-      }
-      const checkoutId = String(session.id ?? "").trim();
-      if (!checkoutId) {
-        return NextResponse.json({ received: true });
-      }
-      const grossPaid = session.amount_total ?? 0;
-      const credited = peakpointsCreditAfterDepositFee(grossPaid);
-      if (credited > 0) {
-        await tryCreditWalletTopupOnce({
-          checkoutSessionId: checkoutId,
-          userId,
-          creditedCents: credited,
-          note: `Stripe wallet top-up (credit after ${Math.round(PLATFORM_FEE_RATE * 100)}% deposit fee on $${(grossPaid / 100).toFixed(2)} paid)`,
-        });
-      }
-    }
+    const checkout = event.data.object as Stripe.Checkout.Session;
+    await fulfillWalletTopupCheckout(checkout);
   }
 
   return NextResponse.json({ received: true });

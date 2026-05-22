@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { safeJson } from "@/lib/http";
+import { notifyPeakpointsUpdated } from "@/app/components/peakpoints/PeakpointsWalletBadge";
 
 export function MarketTradeBox({
   marketId,
@@ -46,8 +47,11 @@ export function MarketTradeBox({
       }
     }
     void loadBalance();
+    const onUpdate = () => void loadBalance();
+    window.addEventListener("peaksees:peakpoints-updated", onUpdate);
     return () => {
       cancelled = true;
+      window.removeEventListener("peaksees:peakpoints-updated", onUpdate);
     };
   }, []);
 
@@ -70,6 +74,7 @@ export function MarketTradeBox({
       }
       setOk("Bought in.");
       onTradeSuccess?.();
+      notifyPeakpointsUpdated();
       if (typeof data.trade?.costCents === "number") {
         setBalanceCents((prev) =>
           typeof prev === "number" ? prev - data.trade!.costCents : prev,
