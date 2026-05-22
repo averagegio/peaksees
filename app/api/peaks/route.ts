@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: { text?: string; expiresAt?: string | null };
+  let body: { text?: string; expiresAt?: string | null; createMarket?: boolean };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -49,7 +49,10 @@ export async function POST(request: Request) {
     typeof body.expiresAt === "string" && body.expiresAt.trim()
       ? body.expiresAt
       : null;
+  const createMarket = body.createMarket === true;
   const peak = await createPeak({ userId: session.user.id, text, expiresAt });
-  const market = await generateMarketFromPeak({ peakId: peak.id, text: peak.text });
+  const market = createMarket
+    ? await generateMarketFromPeak({ peakId: peak.id, text: peak.text })
+    : null;
   return NextResponse.json({ peak, market });
 }

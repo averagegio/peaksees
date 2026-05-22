@@ -111,7 +111,14 @@ export function buildOptimisticPeak(
   };
 }
 
-export type ProfilePeakFeedItem = { peak: Peak; market: Market | null };
+export type ProfilePeakFeedItem = {
+  peak: Peak;
+  market: Market | null;
+  /** When you repeaked this peak (pin saved). */
+  repeakedAt?: string | null;
+  /** True when this row is someone else's peak you repeaked. */
+  isRepeak?: boolean;
+};
 
 export function prependProfileFeedItem(
   prev: ProfilePeakFeedItem[],

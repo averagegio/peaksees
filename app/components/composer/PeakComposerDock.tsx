@@ -53,6 +53,7 @@ export function PeakComposerDock() {
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
   const [posting, setPosting] = useState(false);
+  const [turnIntoMarket, setTurnIntoMarket] = useState(false);
   const [composeUser, setComposeUser] = useState<ComposeUser | null>(null);
 
   const imageRef = useRef<HTMLInputElement>(null);
@@ -127,6 +128,7 @@ export function PeakComposerDock() {
 
   function resetComposer() {
     setText("");
+    setTurnIntoMarket(false);
     setPollMode(false);
     setPollOptions(["", ""]);
     setAttachments((prev) => {
@@ -152,7 +154,13 @@ export function PeakComposerDock() {
 
       window.dispatchEvent(
         new CustomEvent("peaksees:peak-pending", {
-          detail: { clientId, text: postText, expiresAt, user: composeUser },
+          detail: {
+            clientId,
+            text: postText,
+            expiresAt,
+            createMarket: turnIntoMarket,
+            user: composeUser,
+          },
         }),
       );
       resetComposer();
@@ -162,7 +170,7 @@ export function PeakComposerDock() {
         const res = await fetch("/api/peaks", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: postText, expiresAt }),
+          body: JSON.stringify({ text: postText, expiresAt, createMarket: turnIntoMarket }),
         });
         const data = (await safeJson<{ peak?: Peak; market?: Market; error?: string }>(res)) ?? {};
         if (!res.ok) {
@@ -279,7 +287,7 @@ export function PeakComposerDock() {
           >
             <header className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
               <h2 id="peak-compose-title" className="text-lg font-semibold text-zinc-900 dark:text-white">
-                Write a peak
+                New post
               </h2>
               <button
                 type="button"
@@ -295,7 +303,9 @@ export function PeakComposerDock() {
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="What are you predicting?"
+                placeholder={
+                  turnIntoMarket ? "What are you predicting?" : "What's on your mind?"
+                }
                 rows={5}
                 className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50/80 px-3 py-2.5 text-[15px] leading-relaxed text-zinc-900 outline-none ring-emerald-500/20 placeholder:text-zinc-400 focus:border-emerald-500 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               />
@@ -528,13 +538,32 @@ export function PeakComposerDock() {
                 )}
               </div>
 
+              <label className="mt-4 flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50/80 px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-950">
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                    List as market
+                  </span>
+                  <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">
+                    Off = social post only · On = Yes/No market card in the feed
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  aria-checked={turnIntoMarket}
+                  checked={turnIntoMarket}
+                  onChange={(e) => setTurnIntoMarket(e.target.checked)}
+                  className="h-5 w-9 shrink-0 cursor-pointer accent-emerald-600"
+                />
+              </label>
+
               <button
                 type="button"
                 disabled={!canPost}
-                className="mt-4 w-full rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-zinc-300 dark:disabled:bg-zinc-700"
+                className="mt-3 w-full rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-zinc-300 dark:disabled:bg-zinc-700"
                 onClick={handlePost}
               >
-                Post peak
+                {turnIntoMarket ? "Post market" : "Post"}
               </button>
             </footer>
           </div>

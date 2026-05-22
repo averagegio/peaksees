@@ -629,6 +629,7 @@ export function HomeFeedWithTabs({
             clientId?: string;
             text?: string;
             expiresAt?: string | null;
+            createMarket?: boolean;
             user?: {
               id: string;
               displayName: string;
@@ -640,9 +641,9 @@ export function HomeFeedWithTabs({
       const clientId = detail?.clientId?.trim();
       const text = typeof detail?.text === "string" ? detail.text.trim() : "";
       const user = detail?.user;
+      const createMarket = Boolean(detail?.createMarket);
       if (!clientId || !text || !user) return;
 
-      const market = buildOptimisticMarket(clientId, text);
       const peak = buildOptimisticPeak(clientId, {
         text,
         expiresAt: detail?.expiresAt,
@@ -653,19 +654,24 @@ export function HomeFeedWithTabs({
       });
 
       setShowLatestPeaks(true);
-      setPeakMarketMeta((prev) => ({
-        ...prev,
-        [market.id]: {
-          creator: user.displayName,
-          handle: user.handle,
-          avatarHue: user.avatarHue,
-          postedAt: "Just now",
-        },
-      }));
       setPeaks((prev) => [peak, ...prev.filter((p) => p.id !== peak.id)].slice(0, 30));
-      setGeneratedMarkets((prev) => mergeNovelMarkets(prev, [market]));
-      marketsAtEndRef.current = false;
-      setMarketsAtEnd(false);
+
+      if (createMarket) {
+        const market = buildOptimisticMarket(clientId, text);
+        setPeakMarketMeta((prev) => ({
+          ...prev,
+          [market.id]: {
+            creator: user.displayName,
+            handle: user.handle,
+            avatarHue: user.avatarHue,
+            postedAt: "Just now",
+          },
+        }));
+        setGeneratedMarkets((prev) => mergeNovelMarkets(prev, [market]));
+        marketsAtEndRef.current = false;
+        setMarketsAtEnd(false);
+      }
+
       const root = scrollRef.current;
       if (root) root.scrollTop = 0;
     }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { PeakComposerDock } from "@/app/components/composer/PeakComposerDock";
 import { BackButton } from "@/app/components/BackButton";
 import { ProfileFollowSocial } from "@/app/components/profile/ProfileFollowSocial";
 import { ProfilePeakFeed } from "@/app/components/profile/ProfilePeakFeed";
@@ -8,6 +9,7 @@ import { getSession } from "@/lib/auth/session";
 import { getUserById } from "@/lib/auth/users-store";
 import { listMarketsByPeakIds } from "@/lib/markets/store";
 import { listPeaks } from "@/lib/peaks/store";
+import { buildProfileFeedItems } from "@/lib/profile-feed";
 import {
   getFollowCounts,
   isFollowing,
@@ -24,6 +26,16 @@ function formatJoined(iso: string) {
   }
 }
 
+async function attachMarketsToFeedItems(
+  items: Awaited<ReturnType<typeof buildProfileFeedItems>>,
+) {
+  const marketByPeakId = await listMarketsByPeakIds(items.map((row) => row.peak.id));
+  return items.map((row) => ({
+    ...row,
+    market: marketByPeakId.get(row.peak.id) ?? null,
+  }));
+}
+
 export default async function UserProfilePage({
   params,
 }: {
@@ -36,12 +48,16 @@ export default async function UserProfilePage({
   const u = await getUserById(id);
   if (!u) notFound();
 
-  const peaks = await listPeaks({ mineUserId: u.id, limit: 30 });
-  const marketByPeakId = await listMarketsByPeakIds(peaks.map((p) => p.id));
-  const feedItems = peaks.map((peak) => ({
-    peak,
-    market: marketByPeakId.get(peak.id) ?? null,
-  }));
+  const isOwnProfile = session.user.id === u.id;
+  const baseItems = isOwnProfile
+    ? await buildProfileFeedItems(u.id)
+    : (await listPeaks({ mineUserId: u.id, limit: 30 })).map((peak) => ({
+        peak,
+        market: null,
+        isRepeak: false,
+      }));
+  const feedItems = await attachMarketsToFeedItems(baseItems);
+
   const followCounts = await getFollowCounts(u.id);
   const amFollowing =
     session.user.id !== u.id &&
@@ -128,20 +144,20 @@ export default async function UserProfilePage({
           </div>
         </section>
 
-        <section className="mt-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="border-b border-zinc-100 px-6 py-4 dark:border-zinc-800">
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Peaks</h2>
-          </div>
-          <div className="px-6 py-5">
-            <ProfilePeakFeed
-              profileUserId={u.id}
-              initialItems={feedItems}
-              isOwnProfile={session.user.id === u.id}
-            />
-          </div>
-        </section>
+        <div className="mt-6">
+          <ProfilePeakFeed
+            profileUserId={u.id}
+            initialItems={feedItems}
+            isOwnProfile={isOwnProfile}
+            emptyMessage={
+              isOwnProfile
+                ? "No posts yet — use the compose button to share an update or list a market."
+                : "No posts yet."
+            }
+          />
+        </div>
       </div>
+      {isOwnProfile ? <PeakComposerDock /> : null}
     </main>
   );
 }
-

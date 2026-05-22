@@ -7,13 +7,13 @@ import { PeakpointsWalletCallout } from "@/app/components/dashboard/PeakpointsWa
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { PeakpointsWalletBadge } from "@/app/components/peakpoints/PeakpointsWalletBadge";
 import { ProfileEditor } from "@/app/components/profile/ProfileEditor";
+import { ProfilePeakFeed } from "@/app/components/profile/ProfilePeakFeed";
 import { PEAKSEES_HEADER_BANNER } from "@/lib/brand";
 import { ProfileFollowSocial } from "@/app/components/profile/ProfileFollowSocial";
-import type { Peak } from "@/lib/peaks/store";
 import { getSession } from "@/lib/auth/session";
-import { getPeakById, listPeaks } from "@/lib/peaks/store";
+import { listMarketsByPeakIds } from "@/lib/markets/store";
 import { getFollowCounts } from "@/lib/social/follows-store";
-import { listPinEntries } from "@/lib/social/pins-store";
+import { buildProfileFeedItems } from "@/lib/profile-feed";
 
 function formatJoined(iso: string) {
   try {
@@ -26,91 +26,18 @@ function formatJoined(iso: string) {
   }
 }
 
-function parsePeakPinId(postKey: string): string | null {
-  if (!postKey.startsWith("peak:")) return null;
-  const id = postKey.slice("peak:".length).trim();
-  return id.length > 0 ? id : null;
-}
-
-function newerIso(a: string, b: string) {
-  try {
-    return new Date(a) >= new Date(b) ? a : b;
-  } catch {
-    return a;
-  }
-}
-
-type DashboardPeakRow = {
-  peak: Peak;
-  youPosted: boolean;
-  repeakedAt: string | null;
-};
-
-async function buildDashboardPeaksAndRepeaks(viewerUserId: string): Promise<DashboardPeakRow[]> {
-  const [myPeaks, pinEntries] = await Promise.all([
-    listPeaks({ mineUserId: viewerUserId, limit: 80 }),
-    listPinEntries(viewerUserId, 80),
-  ]);
-
-  const mineById = new Map(myPeaks.map((p) => [p.id, p]));
-  const repeakedPeakIdsOrdered: Array<{ id: string; repeakedAt: string }> = [];
-  for (const e of pinEntries) {
-    const id = parsePeakPinId(e.postKey);
-    if (id) repeakedPeakIdsOrdered.push({ id, repeakedAt: e.createdAt });
-  }
-
-  const repeakedAtById = new Map<string, string>();
-  for (const x of repeakedPeakIdsOrdered) {
-    repeakedAtById.set(x.id, x.repeakedAt);
-  }
-
-  const onlyRepeakedIds = [
-    ...new Set(repeakedPeakIdsOrdered.map((x) => x.id)),
-  ].filter((id) => !mineById.has(id));
-
-  const fetched = (
-    await Promise.all(onlyRepeakedIds.map((id) => getPeakById(id)))
-  ).filter(Boolean) as Peak[];
-
-  const byId = new Map<string, DashboardPeakRow>();
-
-  for (const p of myPeaks) {
-    byId.set(p.id, {
-      peak: p,
-      youPosted: true,
-      repeakedAt: repeakedAtById.get(p.id) ?? null,
-    });
-  }
-
-  for (const p of fetched) {
-    if (byId.has(p.id)) continue;
-    byId.set(p.id, {
-      peak: p,
-      youPosted: false,
-      repeakedAt: repeakedAtById.get(p.id) ?? null,
-    });
-  }
-
-  return [...byId.values()].sort((ra, rb) => {
-    const sa = newerIso(
-      ra.peak.createdAt,
-      ra.repeakedAt ?? ra.peak.createdAt,
-    );
-    const sb = newerIso(
-      rb.peak.createdAt,
-      rb.repeakedAt ?? rb.peak.createdAt,
-    );
-    return sb.localeCompare(sa);
-  });
-}
-
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
   const u = session.user;
   const followCounts = await getFollowCounts(u.id);
-  const peakRows = await buildDashboardPeaksAndRepeaks(u.id);
+  const baseFeed = await buildProfileFeedItems(u.id);
+  const marketByPeakId = await listMarketsByPeakIds(baseFeed.map((row) => row.peak.id));
+  const feedItems = baseFeed.map((row) => ({
+    ...row,
+    market: marketByPeakId.get(row.peak.id) ?? null,
+  }));
 
   return (
     <div className="flex min-h-dvh flex-col bg-gradient-to-b from-zinc-100 to-zinc-200/90 dark:from-zinc-950 dark:to-zinc-900">
@@ -224,16 +151,14 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-6 py-4 dark:border-zinc-800">
-            <div>
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                Your peaks &amp; repeaks
-              </h3>
-              <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
-                Posts you write and peaks you&nbsp;repeak from the feed.
-              </p>
-            </div>
+        <section className="mt-2 px-1">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <Link
+              href={`/u/${encodeURIComponent(u.id)}`}
+              className="text-sm font-semibold text-zinc-900 hover:underline dark:text-zinc-100"
+            >
+              View profile
+            </Link>
             <Link
               href="/feed"
               className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
@@ -241,87 +166,12 @@ export default async function DashboardPage() {
               Open feed
             </Link>
           </div>
-          <div className="px-6 py-5">
-            {peakRows.length === 0 ? (
-              <p className="text-sm text-zinc-600 dark:text-zinc-300">
-                Compose peaks from the floating button on the feed, or&nbsp;repeak someone
-                else&apos;s peak—the list updates here automatically.
-              </p>
-            ) : (
-              <ul className="space-y-3">
-                {peakRows.map((row) => {
-                  const { peak: p, youPosted, repeakedAt } = row;
-                  return (
-                  <li
-                    key={p.id}
-                    className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-                  >
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] leading-tight">
-                      {youPosted ? (
-                        <span className="font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-                          Your peak
-                        </span>
-                      ) : (
-                        <span className="font-semibold tracking-tight text-sky-700 dark:text-sky-400">
-                          You repeaked
-                          {repeakedAt
-                            ? ` · ${new Date(repeakedAt).toLocaleString(undefined, {
-                                month: "short",
-                                day: "numeric",
-                                hour: "numeric",
-                                minute: "2-digit",
-                              })}`
-                            : ""}
-                        </span>
-                      )}
-                      {!youPosted ? (
-                        <span className="font-medium normal-case tracking-normal text-zinc-600 dark:text-zinc-400">
-                          Original · {p.displayName} ({p.handle})
-                        </span>
-                      ) : null}
-                      {youPosted && repeakedAt ? (
-                        <span className="ml-auto normal-case tracking-normal text-zinc-500 dark:text-zinc-400">
-                          Repeak saved ·{" "}
-                          {new Date(repeakedAt).toLocaleString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-2 whitespace-pre-wrap break-words text-[15px] leading-snug text-zinc-800 dark:text-zinc-100">
-                      {p.text}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                        Posted{" "}
-                        {new Date(p.createdAt).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                        {p.expiresAt ? (
-                          <> · expires {new Date(p.expiresAt).toLocaleString(undefined, {
-                              month: "short",
-                              day: "numeric",
-                            })}</>
-                        ) : null}
-                      </p>
-                      <Link
-                        href={`/feed?peak=${encodeURIComponent(p.id)}`}
-                        className="shrink-0 text-[11px] font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
-                      >
-                        View in feed
-                      </Link>
-                    </div>
-                  </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+          <ProfilePeakFeed
+            profileUserId={u.id}
+            initialItems={feedItems}
+            isOwnProfile
+            emptyMessage="No posts yet — use the compose button to share or list a market."
+          />
         </section>
       </main>
     </div>

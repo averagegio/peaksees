@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { MarketPostCard } from "@/app/components/PeakFeed";
-import { PostActions } from "@/app/components/post/PostActions";
-import { ProfileLink } from "@/app/components/profile/ProfileLink";
+import { SocialPostCard } from "@/app/components/profile/SocialPostCard";
 import {
   buildOptimisticMarket,
   buildOptimisticPeak,
@@ -17,47 +16,16 @@ import {
 import type { Market } from "@/lib/markets/store";
 import type { Peak } from "@/lib/peaks/store";
 
-function PlainPeakCard({ peak }: { peak: Peak }) {
-  return (
-    <article
-      data-peak-id={peak.id}
-      className="rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/95"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <ProfileLink
-          href={`/u/${encodeURIComponent(peak.userId)}`}
-          className="font-semibold hover:underline"
-        >
-          {peak.displayName}
-        </ProfileLink>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          {new Date(peak.createdAt).toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-          })}
-        </span>
-      </div>
-      <p className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-snug text-zinc-800 dark:text-zinc-100">
-        {peak.text}
-      </p>
-      {peak.expiresAt ? (
-        <p className="mt-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-          Expires {new Date(peak.expiresAt).toLocaleString()}
-        </p>
-      ) : null}
-      <PostActions postKey={`peak:${peak.id}`} title={peak.text} />
-    </article>
-  );
-}
-
 export function ProfilePeakFeed({
   profileUserId,
   initialItems,
   isOwnProfile = false,
+  emptyMessage = "Nothing here yet.",
 }: {
   profileUserId: string;
   initialItems: ProfilePeakFeedItem[];
   isOwnProfile?: boolean;
+  emptyMessage?: string;
 }) {
   const [items, setItems] = useState(initialItems);
 
@@ -74,12 +42,14 @@ export function ProfilePeakFeed({
             clientId?: string;
             text?: string;
             expiresAt?: string | null;
+            createMarket?: boolean;
             user?: { id: string; displayName: string; handle: string; avatarHue: number };
           }
         | undefined;
       const clientId = detail?.clientId?.trim();
       const text = typeof detail?.text === "string" ? detail.text.trim() : "";
       const user = detail?.user;
+      const createMarket = Boolean(detail?.createMarket);
       if (!clientId || !text || !user || user.id !== profileUserId) return;
 
       const peak = buildOptimisticPeak(clientId, {
@@ -90,21 +60,21 @@ export function ProfilePeakFeed({
         handle: user.handle,
         avatarHue: user.avatarHue,
       });
-      const market = buildOptimisticMarket(clientId, text);
-      setItems((prev) => prependProfileFeedItem(prev, { peak, market }));
+      const market = createMarket ? buildOptimisticMarket(clientId, text) : null;
+      setItems((prev) => prependProfileFeedItem(prev, { peak, market, isRepeak: false }));
     }
 
     function onNewPeak(e: Event) {
       const detail = (e as CustomEvent).detail as
-        | { clientId?: string; peak?: Peak; market?: Market }
+        | { clientId?: string; peak?: Peak; market?: Market | null }
         | undefined;
       const clientId = detail?.clientId?.trim();
       const peak = detail?.peak;
-      const market = detail?.market;
+      const market = detail?.market ?? null;
       if (!peak || peak.userId !== profileUserId) return;
 
       setItems((prev) => {
-        const nextItem: ProfilePeakFeedItem = { peak, market: market ?? null };
+        const nextItem: ProfilePeakFeedItem = { peak, market, isRepeak: false };
         if (clientId) return replacePendingProfileFeedItem(prev, clientId, nextItem);
         return prependProfileFeedItem(prev, nextItem);
       });
@@ -127,17 +97,17 @@ export function ProfilePeakFeed({
   }, [isOwnProfile, profileUserId]);
 
   if (items.length === 0) {
-    return <p className="text-sm text-zinc-600 dark:text-zinc-300">No peaks yet.</p>;
+    return <p className="text-sm text-zinc-600 dark:text-zinc-300">{emptyMessage}</p>;
   }
 
   return (
     <ul className="space-y-5">
-      {items.map(({ peak, market }) => (
+      {items.map(({ peak, market, repeakedAt, isRepeak }) => (
         <li key={peak.id}>
           {market ? (
             <MarketPostCard post={marketAndPeakToPost(market, peak)} />
           ) : (
-            <PlainPeakCard peak={peak} />
+            <SocialPostCard peak={peak} repeakedAt={repeakedAt} isRepeak={isRepeak} />
           )}
         </li>
       ))}
