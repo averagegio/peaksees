@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth/session";
 import { createPeak, getPeakById, listPeaks } from "@/lib/peaks/store";
+import { generateMarketFromPeak } from "@/lib/markets/generate";
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -49,5 +50,6 @@ export async function POST(request: Request) {
       ? body.expiresAt
       : null;
   const peak = await createPeak({ userId: session.user.id, text, expiresAt });
-  return NextResponse.json({ peak });
+  const market = await generateMarketFromPeak({ peakId: peak.id, text: peak.text });
+  return NextResponse.json({ peak, market });
 }

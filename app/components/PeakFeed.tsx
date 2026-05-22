@@ -84,6 +84,7 @@ function MarketPostCard({
   /** Highlights this card for the first-visit interactive tour. */
   isTourAnchor?: boolean;
 }) {
+  const pending = Boolean(post.pending);
   const [selected, setSelected] = useState<string | null>(null);
   /** Unlocks tapping the peaksees badge to fetch Peak disagree score */
   const [hasPlacedBet, setHasPlacedBet] = useState(false);
@@ -103,7 +104,10 @@ function MarketPostCard({
         cardRef.current = el;
       }}
       data-sparkle-click="true"
-      className="poppy-hover sparkle-hover rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm backdrop-blur-md dark:border-zinc-700 dark:bg-zinc-900/95"
+      className={
+        "poppy-hover sparkle-hover rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm backdrop-blur-md dark:border-zinc-700 dark:bg-zinc-900/95 " +
+        (pending ? "opacity-90 ring-1 ring-emerald-400/40 motion-safe:animate-pulse" : "")
+      }
       aria-label={`Prediction market: ${post.question}`}
     >
       <header className="flex items-start gap-3">
@@ -140,6 +144,14 @@ function MarketPostCard({
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
             <span>{post.postedAt}</span>
+            {pending ? (
+              <>
+                <span className="text-zinc-300 dark:text-zinc-600">·</span>
+                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-700 dark:text-emerald-300">
+                  Finalizing…
+                </span>
+              </>
+            ) : null}
             <span className="text-zinc-300 dark:text-zinc-600">·</span>
             <button
               ref={peakBadgeRef}
@@ -271,13 +283,19 @@ function MarketPostCard({
         ) : null}
       </footer>
 
-      <MarketTradeBox
-        marketId={`market:${post.id}`}
-        yesProbability={yesP}
-        onTradeSuccess={() => setHasPlacedBet(true)}
-      />
+      {pending ? (
+        <p className="mt-3 rounded-xl border border-emerald-200/80 bg-emerald-500/[0.07] px-3 py-2 text-center text-[12px] font-medium text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/10 dark:text-emerald-200">
+          Turning your peak into a market…
+        </p>
+      ) : (
+        <MarketTradeBox
+          marketId={`market:${post.id}`}
+          yesProbability={yesP}
+          onTradeSuccess={() => setHasPlacedBet(true)}
+        />
+      )}
 
-      {hasPlacedBet && !peakScoreRevealed ? (
+      {hasPlacedBet && !peakScoreRevealed && !pending ? (
         <p className="mt-3 rounded-xl border border-violet-200/80 bg-violet-500/[0.07] px-3 py-2 text-center text-[12px] font-medium text-violet-800 dark:border-violet-500/35 dark:bg-violet-500/10 dark:text-violet-200">
           Tap <span className="font-bold">peaksees</span> at the top of this card to see Peak&apos;s
           disagree score versus the crowd.
@@ -287,7 +305,7 @@ function MarketPostCard({
       <PeakOpinionChip
         question={post.question}
         crowdYes={yesP}
-        enabled={peakScoreRevealed}
+        enabled={peakScoreRevealed && !pending}
         refetchNonce={peakRefetchNonce}
       />
 

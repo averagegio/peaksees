@@ -4,7 +4,7 @@ import { Pool } from "pg";
 import OpenAI from "openai";
 
 import { db } from "@/lib/db";
-import { createMarket, listMarkets } from "@/lib/markets/store";
+import { createMarket, listMarkets, type Market } from "@/lib/markets/store";
 
 const postgresUrl = process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? "";
 const postgresPool = postgresUrl
@@ -70,7 +70,9 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   dayStart.setHours(0, 0, 0, 0);
   const dayStartIso = dayStart.toISOString();
 
-  const sourcePrefix = category ? `peak_${category.toLowerCase()}_` : "peak_";
+  const sourcePrefix = category
+    ? `peak_${category.toLowerCase()}_refresh`
+    : "peak_refresh";
   const recentCount = await countMarkets({ sinceIso: since, sourcePrefix });
   if (recentCount > 0) return { generated: 0 };
 
@@ -183,6 +185,112 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   return { generated: createdCount };
 }
 
+/** Turn a user peak into a tradeable market card (single fast OpenAI call, no Tavily). */
+export async function generateMarketFromPeak(input: {
+  peakId: string;
+  text: string;
+}): Promise<Market | null> {
+  const text = input.text.trim().slice(0, 280);
+  if (text.length < 4) return null;
+
+  const openaiKey = (process.env.OPENAI_API_KEY ?? "").trim();
+  const model = (process.env.OPENAI_MODEL ?? "gpt-4o-mini").trim();
+  const fallback = heuristicMarketFromPeak(text);
+
+  if (!openaiKey) {
+    return createMarket({
+      question: fallback.question,
+      category: fallback.category,
+      hashtags: fallback.hashtags,
+      endsAt: fallback.endsAt,
+      source: `peak_post:${input.peakId}`,
+      yesProbability: fallback.yesProbability,
+    });
+  }
+
+  try {
+    const client = new OpenAI({ apiKey: openaiKey });
+    const resp = await client.chat.completions.create({
+      model,
+      temperature: 0.45,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "Convert social posts into YES/NO prediction market questions. " +
+            "Be specific, time-bounded (1-90 days), no slurs or private data. " +
+            'Return JSON: {"question":string,"category":string,"daysToResolve":number,"yesProbability":number,"hashtags":string[]}',
+        },
+        {
+          role: "user",
+          content: `Post:\n${text}\n\nReturn one market as JSON.`,
+        },
+      ],
+    });
+    const raw = resp.choices[0]?.message?.content ?? "";
+    const parsed = safeParseObject(raw);
+    const question =
+      typeof parsed?.question === "string" && parsed.question.trim().length >= 8
+        ? parsed.question.trim().slice(0, 240)
+        : fallback.question;
+    const rawCategory =
+      typeof parsed?.category === "string" ? parsed.category.trim() : fallback.category;
+    const category = rawCategory.slice(0, 24) || "Culture";
+    const daysToResolve = Math.floor(Number(parsed?.daysToResolve ?? 30));
+    const days = daysToResolve >= 1 && daysToResolve <= 90 ? daysToResolve : 30;
+    const yesProbability = Number(parsed?.yesProbability ?? 0.5);
+    const yesP =
+      Number.isFinite(yesProbability) && yesProbability >= 0.05 && yesProbability <= 0.95
+        ? yesProbability
+        : 0.5;
+    const hashtags = Array.isArray(parsed?.hashtags)
+      ? (parsed.hashtags as unknown[])
+          .filter((t) => typeof t === "string")
+          .map((t) => String(t).trim())
+          .filter((t) => /^#[^\s#]{2,32}$/.test(t))
+          .slice(0, 6)
+      : fallback.hashtags;
+    const endsAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+
+    return createMarket({
+      question,
+      category,
+      hashtags: hashtags.length ? hashtags : fallback.hashtags,
+      endsAt,
+      source: `peak_post:${input.peakId}`,
+      yesProbability: yesP,
+    });
+  } catch {
+    return createMarket({
+      question: fallback.question,
+      category: fallback.category,
+      hashtags: fallback.hashtags,
+      endsAt: fallback.endsAt,
+      source: `peak_post:${input.peakId}`,
+      yesProbability: fallback.yesProbability,
+    });
+  }
+}
+
+function heuristicMarketFromPeak(text: string) {
+  let question = text.trim();
+  if (!/[?]$/.test(question)) {
+    question = `Will this happen: ${question.slice(0, 200)}?`;
+  }
+  return {
+    question: question.slice(0, 240),
+    category: "Culture",
+    hashtags: ["#peak"],
+    yesProbability: 0.5,
+    endsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  };
+}
+
+type TrendCacheEntry = { at: number; signals: string };
+const trendSignalCache = new Map<string, TrendCacheEntry>();
+const TREND_CACHE_MS = 5 * 60_000;
+
 async function countMarkets(input: { sinceIso: string; sourcePrefix: string }) {
   if (postgresPool) {
     await ensureSchema();
@@ -212,36 +320,32 @@ async function fetchTrendSignals(input: { tavilyKey: string; category?: string; 
   const category = (input.category ?? "").trim();
   const tz = (input.tz ?? "").trim();
   const now = new Date().toISOString().slice(0, 10);
+  const cacheKey = `${now}:${category}:${tz}`;
+  const cached = trendSignalCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < TREND_CACHE_MS) {
+    return cached.signals;
+  }
+
   const baseQueries = [
     `top breaking headlines today ${now}`,
-    `site:x.com trending OR viral today ${now}${tz ? ` ${tz}` : ""}`,
-    `site:tiktok.com trending today ${now}${tz ? ` ${tz}` : ""}`,
-    `site:reddit.com top posts today ${now}`,
+    `viral trending topics today ${now}${tz ? ` ${tz}` : ""}`,
   ];
   const categoryQueries =
     category === "News"
-      ? [
-          `geopolitics headlines today ${now}`,
-          `macroeconomics headlines today ${now}`,
-          `site:reddit.com r/worldnews top today ${now}`,
-        ]
+      ? [`geopolitics and macro headlines today ${now}`]
       : category === "Sports"
-        ? [
-            `sports injuries and matchups today ${now}`,
-            `site:reddit.com r/nba OR r/nfl OR r/soccer top today ${now}`,
-          ]
+        ? [`sports matchups injuries today ${now}`]
         : category === "Culture"
-          ? [
-              `pop culture trending music movies creators today ${now}`,
-              `site:reddit.com r/popculturechat OR r/movies OR r/gaming top today ${now}`,
-            ]
+          ? [`pop culture trending music movies creators today ${now}`]
           : [];
 
-  const chunks: string[] = [];
-  for (const q of [...baseQueries, ...categoryQueries]) {
-    chunks.push(`Query: ${q}\n${await tavilySignals(key, q)}`);
-  }
-  return chunks.join("\n\n").slice(0, 2400);
+  const queries = [...baseQueries, ...categoryQueries];
+  const chunks = await Promise.all(
+    queries.map(async (q) => `Query: ${q}\n${await tavilySignals(key, q)}`),
+  );
+  const signals = chunks.join("\n\n").slice(0, 2400);
+  trendSignalCache.set(cacheKey, { at: Date.now(), signals });
+  return signals;
 }
 
 function allowedSubcategories(category: string): string[] {
@@ -265,8 +369,8 @@ async function tavilySignals(key: string, query: string) {
       body: JSON.stringify({
         api_key: key,
         query,
-        search_depth: "advanced",
-        max_results: 6,
+        search_depth: "basic",
+        max_results: 4,
         include_answer: true,
         include_images: false,
         include_raw_content: false,
@@ -310,6 +414,16 @@ function safeParse(raw: string): GenItem[] | null {
     const val = JSON.parse(raw);
     if (!Array.isArray(val)) return null;
     return val as GenItem[];
+  } catch {
+    return null;
+  }
+}
+
+function safeParseObject(raw: string): GenItem | null {
+  try {
+    const val = JSON.parse(raw);
+    if (!val || typeof val !== "object" || Array.isArray(val)) return null;
+    return val as GenItem;
   } catch {
     return null;
   }

@@ -15,7 +15,6 @@ import type { Market } from "@/lib/markets/store";
 import type { MarketPost } from "@/app/lib/mock-markets";
 import Link from "next/link";
 
-/** Real markets and mock timelines can share the same `MarketPost.id` (e.g. `"4"`); merge must stay key-unique for React. */
 function dedupePostsByMarketId(generated: MarketPost[], filler: MarketPost[]): MarketPost[] {
   const seen = new Set<string>();
   const out: MarketPost[] = [];
@@ -80,6 +79,90 @@ function buildMarketsHref(opts: {
     q.set("cursorId", opts.cursor.id);
   }
   return `/api/markets?${q}`;
+}
+
+type PeakMarketMeta = {
+  creator: string;
+  handle: string;
+  avatarHue: number;
+  postedAt: string;
+};
+
+function mergeNovelMarkets(prev: Market[], incoming: Market[]): Market[] {
+  const seen = new Set(prev.map((m) => m.id));
+  const novel = incoming.filter((m) => !seen.has(m.id));
+  if (novel.length === 0) return prev;
+  return [...novel, ...prev];
+}
+
+function buildOptimisticMarket(clientId: string, text: string): Market {
+  const trimmed = text.trim().slice(0, 280);
+  const question = /[?]$/.test(trimmed)
+    ? trimmed
+    : `Will this happen: ${trimmed.slice(0, 200)}?`;
+  const createdAt = new Date().toISOString();
+  return {
+    id: `pending:${clientId}`,
+    question: question.slice(0, 240),
+    category: "Culture",
+    subcategory: "",
+    hashtags: ["#peak"],
+    endsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    resolvedSide: null,
+    resolvedAt: null,
+    createdAt,
+    source: "pending",
+    yesProbability: 0.5,
+    noProbability: 0.5,
+    volumeCents: 0,
+  };
+}
+
+function buildOptimisticPeak(
+  clientId: string,
+  input: {
+    text: string;
+    expiresAt?: string | null;
+    userId: string;
+    displayName: string;
+    handle: string;
+    avatarHue: number;
+  },
+): Peak {
+  return {
+    id: `pending:${clientId}`,
+    userId: input.userId,
+    displayName: input.displayName,
+    handle: input.handle,
+    avatarHue: input.avatarHue,
+    avatarUrl: "",
+    text: input.text.trim().slice(0, 280),
+    createdAt: new Date().toISOString(),
+    expiresAt: input.expiresAt ?? null,
+  };
+}
+
+function replacePendingMarket(prev: Market[], clientId: string, market: Market): Market[] {
+  const filtered = prev.filter((m) => m.id !== `pending:${clientId}`);
+  return mergeNovelMarkets(filtered, [market]);
+}
+
+function dropPendingMarket(prev: Market[], clientId: string): Market[] {
+  return prev.filter((m) => m.id !== `pending:${clientId}`);
+}
+
+function replacePendingPeak(prev: Peak[], clientId: string, peak: Peak): Peak[] {
+  const filtered = prev.filter((p) => p.id !== `pending:${clientId}`);
+  return [peak, ...filtered.filter((p) => p.id !== peak.id)].slice(0, 30);
+}
+
+function formatMarketPostedAt(iso: string) {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return "Just now";
+  if (ms < 60_000) return "Just now";
+  if (ms < 3_600_000) return `${Math.max(1, Math.floor(ms / 60_000))}m ago`;
+  if (ms < 86_400_000) return `${Math.max(1, Math.floor(ms / 3_600_000))}h ago`;
+  return "Today";
 }
 
 /** True when the sentinel overlaps the scroll root viewport (within bottom margin). */
@@ -282,6 +365,7 @@ export function HomeFeedWithTabs({
   const [tabsVisible, setTabsVisible] = useState(true);
   const [peaks, setPeaks] = useState<Peak[]>([]);
   const [generatedMarkets, setGeneratedMarkets] = useState<Market[]>([]);
+  const [peakMarketMeta, setPeakMarketMeta] = useState<Record<string, PeakMarketMeta>>({});
   const [loadMoreBusy, setLoadMoreBusy] = useState(false);
   const [marketsAtEnd, setMarketsAtEnd] = useState(false);
   const [pullOffset, setPullOffset] = useState(0);
@@ -303,6 +387,15 @@ export function HomeFeedWithTabs({
   });
   const tabRef = useRef(tab);
   const lastPullRefreshAtRef = useRef(0);
+  const autogenPollRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (autogenPollRef.current != null) {
+        window.clearTimeout(autogenPollRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     tabRef.current = tab;
@@ -332,18 +425,21 @@ export function HomeFeedWithTabs({
   const generatedAsPosts: MarketPost[] = generatedMarkets.map((m) => {
     const yesP = Number(m.yesProbability) || 0.5;
     const noP = Number(m.noProbability) || 1 - yesP;
+    const meta = peakMarketMeta[m.id];
+    const isPending = m.id.startsWith("pending:");
     return {
       id: m.id.startsWith("market:") ? m.id.slice("market:".length) : m.id,
-      creator: "Peak AI",
-      handle: "@peak",
-      avatarHue: 160,
-      postedAt: "Today",
+      creator: meta?.creator ?? "Peak AI",
+      handle: meta?.handle ?? "@peak",
+      avatarHue: meta?.avatarHue ?? 160,
+      postedAt: meta?.postedAt ?? (isPending ? "Just now" : formatMarketPostedAt(m.createdAt)),
       question: m.question,
       category: m.category,
       subcategory: m.subcategory || undefined,
       hashtags: Array.isArray(m.hashtags) && m.hashtags.length ? m.hashtags : undefined,
       volumeUsd: Math.round((m.volumeCents ?? 0) / 100),
       endsAtLabel: m.endsAt,
+      pending: isPending,
       outcomes: [
         { id: "y", label: "Yes", probability: yesP },
         { id: "n", label: "No", probability: noP },
@@ -360,6 +456,43 @@ export function HomeFeedWithTabs({
   const filtersKey = `${tab}:${explore}:${marketCategory}:${tz}`;
 
   const runPullRefreshRef = useRef<() => Promise<void>>(async () => {});
+
+  const scheduleAutogenFollowUpRef = useRef<(session: number) => void>(() => {});
+
+  scheduleAutogenFollowUpRef.current = (session: number) => {
+    if (autogenPollRef.current != null) {
+      window.clearTimeout(autogenPollRef.current);
+    }
+    autogenPollRef.current = window.setTimeout(() => {
+      autogenPollRef.current = null;
+      void (async () => {
+        try {
+          const href = buildMarketsHref({
+            limit: 24,
+            autogen: false,
+            marketCategory,
+            tz,
+          });
+          const res = await fetch(href, { cache: "no-store" });
+          const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
+          if (session !== feedSessionRef.current) return;
+          const incoming = Array.isArray(data.markets) ? data.markets : [];
+          let didPrepend = false;
+          setGeneratedMarkets((prev) => {
+            const merged = mergeNovelMarkets(prev, incoming);
+            didPrepend = merged !== prev;
+            return merged;
+          });
+          if (didPrepend) {
+            marketsAtEndRef.current = false;
+            setMarketsAtEnd(false);
+          }
+        } catch {
+          // ignore
+        }
+      })();
+    }, 3500);
+  };
 
   runPullRefreshRef.current = async () => {
     if (tabRef.current === "live") return;
@@ -382,16 +515,15 @@ export function HomeFeedWithTabs({
 
       let didPrepend = false;
       setGeneratedMarkets((prev) => {
-        const seen = new Set(prev.map((m) => m.id));
-        const novel = incoming.filter((m) => !seen.has(m.id));
-        if (novel.length === 0) return prev;
-        didPrepend = true;
-        return [...novel, ...prev];
+        const merged = mergeNovelMarkets(prev, incoming);
+        didPrepend = merged !== prev;
+        return merged;
       });
       if (didPrepend) {
         marketsAtEndRef.current = false;
         setMarketsAtEnd(false);
       }
+      scheduleAutogenFollowUpRef.current(feedSessionRef.current);
     } catch {
       // ignore
     } finally {
@@ -514,6 +646,7 @@ export function HomeFeedWithTabs({
         const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
         if (session !== feedSessionRef.current) return;
         if (Array.isArray(data.markets)) setGeneratedMarkets(data.markets);
+        scheduleAutogenFollowUpRef.current(session);
       } catch {
         // ignore
       }
@@ -523,17 +656,130 @@ export function HomeFeedWithTabs({
   }, [tab, filtersKey, marketCategory, tz]);
 
   useEffect(() => {
-    function onNewPeak(e: Event) {
-      if (!showLatestPeaks) return;
+    function onPeakPending(e: Event) {
       const ce = e as CustomEvent;
-      const peak = ce.detail as Peak | undefined;
-      if (!peak || typeof peak !== "object") return;
-      setPeaks((prev) => [peak, ...prev].slice(0, 30));
+      const detail = ce.detail as
+        | {
+            clientId?: string;
+            text?: string;
+            expiresAt?: string | null;
+            user?: {
+              id: string;
+              displayName: string;
+              handle: string;
+              avatarHue: number;
+            };
+          }
+        | undefined;
+      const clientId = detail?.clientId?.trim();
+      const text = typeof detail?.text === "string" ? detail.text.trim() : "";
+      const user = detail?.user;
+      if (!clientId || !text || !user) return;
+
+      const market = buildOptimisticMarket(clientId, text);
+      const peak = buildOptimisticPeak(clientId, {
+        text,
+        expiresAt: detail?.expiresAt,
+        userId: user.id,
+        displayName: user.displayName,
+        handle: user.handle,
+        avatarHue: user.avatarHue,
+      });
+
+      setShowLatestPeaks(true);
+      setPeakMarketMeta((prev) => ({
+        ...prev,
+        [market.id]: {
+          creator: user.displayName,
+          handle: user.handle,
+          avatarHue: user.avatarHue,
+          postedAt: "Just now",
+        },
+      }));
+      setPeaks((prev) => [peak, ...prev.filter((p) => p.id !== peak.id)].slice(0, 30));
+      setGeneratedMarkets((prev) => mergeNovelMarkets(prev, [market]));
+      marketsAtEndRef.current = false;
+      setMarketsAtEnd(false);
+      const root = scrollRef.current;
+      if (root) root.scrollTop = 0;
     }
+
+    function onNewPeak(e: Event) {
+      const ce = e as CustomEvent;
+      const detail = ce.detail as
+        | { clientId?: string; peak?: Peak; market?: Market }
+        | Peak
+        | undefined;
+      const clientId =
+        detail && typeof detail === "object" && "clientId" in detail
+          ? detail.clientId?.trim()
+          : undefined;
+      const peak =
+        detail && typeof detail === "object" && "peak" in detail && detail.peak
+          ? detail.peak
+          : (detail as Peak | undefined);
+      const market =
+        detail && typeof detail === "object" && "market" in detail ? detail.market : undefined;
+      if (!peak || typeof peak !== "object") return;
+
+      setShowLatestPeaks(true);
+      setPeaks((prev) =>
+        clientId
+          ? replacePendingPeak(prev, clientId, peak)
+          : [peak, ...prev.filter((p) => p.id !== peak.id)].slice(0, 30),
+      );
+
+      if (market && typeof market === "object") {
+        setPeakMarketMeta((prev) => {
+          const next = { ...prev };
+          if (clientId) delete next[`pending:${clientId}`];
+          next[market.id] = {
+            creator: peak.displayName,
+            handle: peak.handle,
+            avatarHue: peak.avatarHue,
+            postedAt: "Just now",
+          };
+          return next;
+        });
+        setGeneratedMarkets((prev) =>
+          clientId ? replacePendingMarket(prev, clientId, market) : mergeNovelMarkets(prev, [market]),
+        );
+        marketsAtEndRef.current = false;
+        setMarketsAtEnd(false);
+        const root = scrollRef.current;
+        if (root) root.scrollTop = 0;
+      } else if (clientId) {
+        setGeneratedMarkets((prev) => dropPendingMarket(prev, clientId));
+        setPeakMarketMeta((prev) => {
+          const next = { ...prev };
+          delete next[`pending:${clientId}`];
+          return next;
+        });
+      }
+    }
+
+    function onPeakFailed(e: Event) {
+      const ce = e as CustomEvent;
+      const clientId = (ce.detail as { clientId?: string } | undefined)?.clientId?.trim();
+      if (!clientId) return;
+      setGeneratedMarkets((prev) => dropPendingMarket(prev, clientId));
+      setPeaks((prev) => prev.filter((p) => p.id !== `pending:${clientId}`));
+      setPeakMarketMeta((prev) => {
+        const next = { ...prev };
+        delete next[`pending:${clientId}`];
+        return next;
+      });
+    }
+
+    window.addEventListener("peaksees:peak-pending", onPeakPending as EventListener);
     window.addEventListener("peaksees:new-peak", onNewPeak as EventListener);
-    return () =>
+    window.addEventListener("peaksees:peak-failed", onPeakFailed as EventListener);
+    return () => {
+      window.removeEventListener("peaksees:peak-pending", onPeakPending as EventListener);
       window.removeEventListener("peaksees:new-peak", onNewPeak as EventListener);
-  }, [showLatestPeaks]);
+      window.removeEventListener("peaksees:peak-failed", onPeakFailed as EventListener);
+    };
+  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;

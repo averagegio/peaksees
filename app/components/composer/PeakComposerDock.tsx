@@ -5,8 +5,33 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PEAKFAB_PRINT } from "@/lib/brand";
 import { safeJson } from "@/lib/http";
+import type { Market } from "@/lib/markets/store";
+import type { Peak } from "@/lib/peaks/store";
 
 type AttachKind = "image" | "video" | "gif";
+
+type ComposeUser = {
+  id: string;
+  displayName: string;
+  handle: string;
+  avatarHue: number;
+};
+
+function hueForUserId(id: string) {
+  let h = 0;
+  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) % 360;
+  return h;
+}
+
+function toComposeUser(user: { id: string; email: string; displayName: string }): ComposeUser {
+  const local = (user.email.split("@")[0] ?? "trader").slice(0, 32);
+  return {
+    id: user.id,
+    displayName: user.displayName,
+    handle: `@${local}`,
+    avatarHue: hueForUserId(user.id),
+  };
+}
 
 export type AttachedFile = {
   id: string;
@@ -27,6 +52,8 @@ export function PeakComposerDock() {
   const [pollOptions, setPollOptions] = useState(["", ""]);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
+  const [posting, setPosting] = useState(false);
+  const [composeUser, setComposeUser] = useState<ComposeUser | null>(null);
 
   const imageRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
@@ -59,6 +86,26 @@ export function PeakComposerDock() {
     document.addEventListener("mousedown", outside);
     return () => document.removeEventListener("mousedown", outside);
   }, [attachMenuOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/me", { cache: "no-store" });
+        const data =
+          (await safeJson<{
+            user?: { id: string; email: string; displayName: string } | null;
+          }>(res)) ?? {};
+        if (cancelled || !data.user) return;
+        setComposeUser(toComposeUser(data.user));
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const addAttachment = useCallback((kind: AttachKind, file: File | null | undefined) => {
     if (!file || file.size === 0) return;
@@ -93,31 +140,53 @@ export function PeakComposerDock() {
   function handlePost() {
     void (async () => {
       const postText = text.trim();
-      if (!postText) return;
+      if (!postText || posting) return;
+      if (!composeUser) {
+        console.warn("[peaksees compose] not signed in");
+        return;
+      }
+
+      const clientId = crypto.randomUUID();
+      const expiresAt = presetToIso(expiresPreset);
+      setPosting(true);
+
+      window.dispatchEvent(
+        new CustomEvent("peaksees:peak-pending", {
+          detail: { clientId, text: postText, expiresAt, user: composeUser },
+        }),
+      );
+      resetComposer();
+      setModalOpen(false);
+
       try {
-        const expiresAt = presetToIso(expiresPreset);
         const res = await fetch("/api/peaks", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: postText, expiresAt }),
         });
-        const data = (await safeJson<{ peak?: unknown; error?: string }>(res)) ?? {};
+        const data = (await safeJson<{ peak?: Peak; market?: Market; error?: string }>(res)) ?? {};
         if (!res.ok) {
           console.warn("[peaksees compose] failed", data.error ?? "error");
+          window.dispatchEvent(
+            new CustomEvent("peaksees:peak-failed", { detail: { clientId } }),
+          );
           return;
         }
         window.dispatchEvent(
-          new CustomEvent("peaksees:new-peak", { detail: data.peak }),
+          new CustomEvent("peaksees:new-peak", {
+            detail: { clientId, peak: data.peak, market: data.market },
+          }),
         );
-        resetComposer();
-        setModalOpen(false);
       } catch (e) {
         console.warn("[peaksees compose] failed", e);
+        window.dispatchEvent(new CustomEvent("peaksees:peak-failed", { detail: { clientId } }));
+      } finally {
+        setPosting(false);
       }
     })();
   }
 
-  const canPost = text.trim().length > 0;
+  const canPost = text.trim().length > 0 && !posting && Boolean(composeUser);
 
   async function suggest() {
     setSuggesting(true);

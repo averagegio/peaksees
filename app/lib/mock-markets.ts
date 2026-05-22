@@ -17,6 +17,8 @@ export type MarketPost = {
   volumeUsd: number;
   endsAtLabel: string;
   outcomes: [Outcome, Outcome];
+  /** True while the server is still creating the real market. */
+  pending?: boolean;
 };
 
 export const MARKET_FEED_FOR_YOU: MarketPost[] = [

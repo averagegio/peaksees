@@ -23,15 +23,15 @@ export async function GET(request: Request) {
     cursorCreatedAt && cursorId ? { createdAt: cursorCreatedAt, id: cursorId } : undefined;
 
   if (autogen && !cursor) {
-    // Generate a small batch per refresh, but rate-limit + cap daily total.
-    await maybeGenerateMarketsOnRefresh({
+    // Run generation in the background so the feed returns immediately.
+    void maybeGenerateMarketsOnRefresh({
       count,
       minIntervalMs: 60_000,
       dailyCap: 100,
       category: category || undefined,
       subcategory: subcategory || undefined,
       tz: tz || undefined,
-    });
+    }).catch(() => {});
   }
   const markets = await listMarkets({
     limit: Number.isFinite(limit) ? limit : 50,
