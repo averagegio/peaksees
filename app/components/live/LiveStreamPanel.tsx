@@ -26,7 +26,7 @@ type TokenResponse = {
   error?: string;
 };
 
-export function LiveStreamPanel() {
+export function LiveStreamPanel({ compact = false }: { compact?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<LiveConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -194,9 +194,23 @@ export function LiveStreamPanel() {
     }
   }
 
+  const videoShell = compact
+    ? "overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700"
+    : "overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700";
+  const videoClass = compact
+    ? "h-[4.75rem] w-full bg-black object-cover sm:h-[5.5rem]"
+    : "aspect-video w-full bg-black object-cover";
+  const previewCol = compact ? "w-full max-w-[9.5rem] sm:max-w-[11rem]" : undefined;
+
   return (
-    <section className="mb-4 rounded-2xl border border-zinc-200/90 bg-white/95 p-3 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/90 sm:p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
+    <section
+      className={
+        compact
+          ? "flex h-full min-h-0 flex-col overflow-y-auto p-2 sm:p-3"
+          : "mb-4 rounded-2xl border border-zinc-200/90 bg-white/95 p-3 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/90 sm:p-4"
+      }
+    >
+      <div className={`flex items-center justify-between gap-2 ${compact ? "mb-2" : "mb-3"}`}>
         <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
           Live (LiveKit)
         </h2>
@@ -278,30 +292,27 @@ export function LiveStreamPanel() {
             </button>
           ) : null}
 
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div>
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          <div
+            className={
+              compact
+                ? "mt-2 flex flex-wrap justify-center gap-3"
+                : "mt-3 grid gap-3 sm:grid-cols-2"
+            }
+          >
+            <div className={previewCol}>
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                 {connectedRole === "publisher" ? "Your stream" : "Preview (publisher)"}
               </p>
-              <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700">
-                <video
-                  ref={localVideoRef}
-                  muted
-                  playsInline
-                  className="aspect-video w-full bg-black object-cover"
-                />
+              <div className={videoShell}>
+                <video ref={localVideoRef} muted playsInline className={videoClass} />
               </div>
             </div>
-            <div>
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            <div className={previewCol}>
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                 {connectedRole === "viewer" ? "Live feed" : "Remote (when watching)"}
               </p>
-              <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700">
-                <video
-                  ref={remoteVideoRef}
-                  playsInline
-                  className="aspect-video w-full bg-black object-cover"
-                />
+              <div className={videoShell}>
+                <video ref={remoteVideoRef} playsInline className={videoClass} />
               </div>
               <audio ref={remoteAudioRef} className="hidden" autoPlay playsInline />
             </div>

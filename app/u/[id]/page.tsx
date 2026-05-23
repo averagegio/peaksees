@@ -39,13 +39,18 @@ async function attachMarketsToFeedItems(
 
 export default async function UserProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ peak?: string }>;
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
 
   const { id } = await params;
+  const sp = await searchParams;
+  const highlightPeakId =
+    typeof sp.peak === "string" && sp.peak.trim() ? sp.peak.trim() : undefined;
   const u = await getUserById(id);
   if (!u) notFound();
 
@@ -151,6 +156,7 @@ export default async function UserProfilePage({
             initialItems={feedItems}
             isOwnProfile={isOwnProfile}
             viewerUserId={session.user.id}
+            highlightPeakId={highlightPeakId}
             emptyMessage={
               isOwnProfile
                 ? "No posts yet — use the compose button to share an update or list a market."

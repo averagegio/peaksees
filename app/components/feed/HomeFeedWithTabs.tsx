@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { FeedMarketHero } from "@/app/components/feed/FeedMarketHero";
 import { FeedSiteSection } from "@/app/components/feed/FeedSiteSection";
-import { ProfileLink } from "@/app/components/profile/ProfileLink";
 import { LiveStreamPanel } from "@/app/components/live/LiveStreamPanel";
 import { safeJson } from "@/lib/http";
 import type { Peak } from "@/lib/peaks/store";
@@ -1089,18 +1088,17 @@ export function HomeFeedWithTabs({
         <div className="feed-scroll shrink-0 overflow-x-auto border-b border-zinc-200/70 bg-zinc-50/90 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900/50">
           <ul className="mx-auto flex max-w-4xl gap-3">
             {peaks.slice(0, 10).map((p) => (
-              <li
-                key={p.id}
-                data-peak-id={p.id}
-                className="w-[min(70vw,18rem)] shrink-0 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs shadow-sm dark:border-zinc-700 dark:bg-zinc-950"
-              >
-                <ProfileLink
-                  href={`/u/${encodeURIComponent(p.userId)}`}
-                  className="font-semibold text-zinc-900 hover:underline dark:text-zinc-100"
+              <li key={p.id} className="shrink-0">
+                <Link
+                  href={`/u/${encodeURIComponent(p.userId)}?peak=${encodeURIComponent(p.id)}`}
+                  data-peak-id={p.id}
+                  className="block w-[min(70vw,18rem)] rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs shadow-sm transition hover:border-emerald-400/80 hover:bg-emerald-50/40 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 dark:border-zinc-700 dark:bg-zinc-950 dark:hover:border-emerald-600/60 dark:hover:bg-emerald-950/30"
                 >
-                  {p.displayName}
-                </ProfileLink>
-                <p className="mt-1 line-clamp-2 text-zinc-600 dark:text-zinc-300">{p.text}</p>
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                    {p.displayName}
+                  </span>
+                  <p className="mt-1 line-clamp-2 text-zinc-600 dark:text-zinc-300">{p.text}</p>
+                </Link>
               </li>
             ))}
           </ul>
@@ -1114,9 +1112,9 @@ export function HomeFeedWithTabs({
       >
         {tab === "live" ? (
           <section className="feed-hero relative w-full shrink-0 overflow-hidden">
-            <div className="feed-hero__stage flex h-[min(54dvh,34rem)] min-h-[300px] w-full items-stretch px-4 py-6 sm:px-8">
-              <div className="h-full w-full overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900/95">
-                <LiveStreamPanel />
+            <div className="feed-hero__stage flex h-[min(38dvh,24rem)] min-h-[200px] w-full items-stretch px-4 py-4 sm:px-6 sm:py-5">
+              <div className="h-full w-full overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-md dark:border-zinc-700 dark:bg-zinc-900/95">
+                <LiveStreamPanel compact />
               </div>
             </div>
           </section>

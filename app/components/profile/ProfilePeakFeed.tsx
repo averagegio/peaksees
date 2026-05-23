@@ -22,12 +22,14 @@ export function ProfilePeakFeed({
   isOwnProfile = false,
   emptyMessage = "Nothing here yet.",
   viewerUserId,
+  highlightPeakId,
 }: {
   profileUserId: string;
   initialItems: ProfilePeakFeedItem[];
   isOwnProfile?: boolean;
   emptyMessage?: string;
   viewerUserId?: string;
+  highlightPeakId?: string;
 }) {
   const [items, setItems] = useState(initialItems);
 
@@ -98,6 +100,25 @@ export function ProfilePeakFeed({
     };
   }, [isOwnProfile, profileUserId]);
 
+  useEffect(() => {
+    const peakId = highlightPeakId?.trim();
+    if (!peakId) return undefined;
+    const timer = window.setTimeout(() => {
+      if (typeof CSS === "undefined" || typeof CSS.escape !== "function") return;
+      try {
+        const el = document.querySelector(`[data-peak-id="${CSS.escape(peakId)}"]`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        el?.classList.add("ring-2", "ring-emerald-500/70", "ring-offset-2");
+        window.setTimeout(() => {
+          el?.classList.remove("ring-2", "ring-emerald-500/70", "ring-offset-2");
+        }, 2400);
+      } catch {
+        // ignore
+      }
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [highlightPeakId, items]);
+
   if (items.length === 0) {
     return <p className="text-sm text-zinc-600 dark:text-zinc-300">{emptyMessage}</p>;
   }
@@ -105,7 +126,7 @@ export function ProfilePeakFeed({
   return (
     <ul className="space-y-5">
       {items.map(({ peak, market, repeakedAt, isRepeak }) => (
-        <li key={peak.id}>
+        <li key={peak.id} data-peak-id={peak.id}>
           {market ? (
             <MarketPostCard
               post={marketAndPeakToPost(market, peak)}
