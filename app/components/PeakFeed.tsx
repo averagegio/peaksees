@@ -86,6 +86,7 @@ export function MarketPostCard({
   readOnly = false,
   viewerUserId,
   fillHeight = false,
+  marqueeMode = false,
 }: {
   post: MarketPost;
   /** Highlights this card for the first-visit interactive tour. */
@@ -96,6 +97,8 @@ export function MarketPostCard({
   viewerUserId?: string;
   /** Size to the horizontal feed slide height with internal scroll. */
   fillHeight?: boolean;
+  /** Full-width marquee slide — no hover scale (prevents overlap). */
+  marqueeMode?: boolean;
 }) {
   const pending = Boolean(post.pending);
   const interactive = !readOnly && !pending;
@@ -131,10 +134,10 @@ export function MarketPostCard({
       className={
         "rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm backdrop-blur-md dark:border-zinc-700 dark:bg-zinc-900/95 " +
         (fillHeight ? "flex h-full min-h-0 flex-col overflow-hidden " : "") +
-        (peakGenerated && !pending ? "relative overflow-hidden " : "") +
+        (peakGenerated && !pending ? "relative z-0 overflow-hidden " : "") +
         (insight.open ? "ring-2 ring-emerald-500/45 " : "") +
         (insight.loading ? "ring-2 ring-emerald-400/30 motion-safe:animate-pulse " : "") +
-        (interactive ? "poppy-hover sparkle-hover " : "") +
+        (interactive && !marqueeMode ? "poppy-hover sparkle-hover " : interactive ? "sparkle-hover " : "") +
         (pending ? "opacity-90 ring-1 ring-emerald-400/40 motion-safe:animate-pulse" : "") +
         (readOnly ? " ring-1 ring-zinc-200/80 dark:ring-zinc-700" : "")
       }

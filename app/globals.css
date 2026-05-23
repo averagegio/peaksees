@@ -40,15 +40,18 @@ body {
   height: 0;
 }
 
-/* Main feed: horizontal card rail (stable side gaps, no vertical margin collapse) */
+/* Main feed: full-width marquee (one card per viewport, no overlap) */
 .feed-scroll-x {
-  scroll-padding-inline: 0.75rem;
+  scroll-padding-inline: 0;
 }
 
-@media (min-width: 640px) {
-  .feed-scroll-x {
-    scroll-padding-inline: 1rem;
-  }
+.feed-marquee-viewport {
+  -webkit-overflow-scrolling: touch;
+}
+
+.feed-marquee-slide {
+  isolation: isolate;
+  contain: layout style;
 }
 
 @keyframes poppy-hover-bounce {

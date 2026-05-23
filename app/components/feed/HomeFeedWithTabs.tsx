@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { PeakFeed } from "@/app/components/PeakFeed";
+import { FeedMarketMarquee } from "@/app/components/feed/FeedMarketMarquee";
+import { ProfileLink } from "@/app/components/profile/ProfileLink";
 import { LiveStreamPanel } from "@/app/components/live/LiveStreamPanel";
 import { safeJson } from "@/lib/http";
 import type { Peak } from "@/lib/peaks/store";
@@ -270,33 +271,6 @@ function PullRefreshRail({
   );
 }
 
-function FeedInfiniteFooter({ loading, end }: { loading: boolean; end: boolean }) {
-  return (
-    <div className="flex h-full w-20 shrink-0 snap-end flex-col items-center justify-center px-2 sm:w-24">
-      <div className="flex min-h-[3.25rem] flex-col items-center justify-center gap-2">
-        {end ? (
-          <p className="text-center text-[12px] text-zinc-500 dark:text-zinc-400">
-            You&apos;re up to date for now
-          </p>
-        ) : loading ? (
-          <div
-            role="status"
-            aria-live="polite"
-            aria-label="Loading more"
-            className="flex flex-col items-center gap-2"
-          >
-            <div
-              className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-200 border-t-emerald-600 dark:border-zinc-600 dark:border-t-emerald-400"
-              aria-hidden
-            />
-            <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Loading more</span>
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 /** Feed tabs hide when scrolling the card rail; older markets load at the end of the row. */
 export function HomeFeedWithTabs({
   highlightMarketId,
@@ -338,6 +312,7 @@ export function HomeFeedWithTabs({
   const tabRef = useRef(tab);
   const lastPullRefreshAtRef = useRef(0);
   const autogenPollRef = useRef<number | null>(null);
+  const marqueeIndexRef = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -979,8 +954,21 @@ export function HomeFeedWithTabs({
     return () => window.removeEventListener("peaksees:tour-show-feed-chrome", showTourChrome);
   }, []);
 
+  const feedPosts = dedupePostsById(generatedAsPosts);
+
+  const onMarqueeIndexChange = useCallback(
+    (index: number) => {
+      marqueeIndexRef.current = index;
+      if (tabRef.current === "live" || marketsAtEndRef.current) return;
+      if (index < Math.max(0, feedPosts.length - 2)) return;
+      if (!loadArmedRef.current || loadingMoreRef.current) return;
+      appendOlderChunkRef.current();
+    },
+    [feedPosts.length],
+  );
+
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col">
+    <div className="flex min-h-0 w-full max-w-none flex-1 flex-col">
       <div ref={sparkleLayerRef} className="pointer-events-none fixed inset-0 z-[120]" />
       <section
         className={`shrink-0 overflow-hidden border-b border-zinc-200/65 transition-[max-height,padding,opacity,margin] duration-[320ms] ease-out dark:border-zinc-800 ${
@@ -1104,7 +1092,12 @@ export function HomeFeedWithTabs({
                 <span aria-hidden className="mt-1 block h-[2px] w-full rounded-full bg-transparent group-hover:bg-current/35" />
               </Link>
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
+                Exploring{" "}
+                <span className="font-semibold text-zinc-700 dark:text-zinc-200">{explore}</span>
+              </p>
+              <span className="text-zinc-300 dark:text-zinc-600">·</span>
               <button
                 type="button"
                 data-sparkle-click="true"
@@ -1121,41 +1114,63 @@ export function HomeFeedWithTabs({
         </div>
       </section>
 
-      <div
-        ref={scrollRef}
-        data-tour="feed-scroll"
-        className="feed-scroll feed-scroll-x min-h-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain snap-x snap-mandatory"
-      >
-        <div className="flex h-full min-h-0 flex-row items-stretch gap-3 py-3 pl-3 pr-24 sm:gap-4 sm:pl-4 sm:pr-28 sm:py-4">
-          {tab !== "live" ? (
+      <div className="relative flex min-h-0 w-full flex-1 flex-col">
+        {tab !== "live" && (pullOffset > 0 || pullRefreshing) ? (
+          <div className="absolute left-0 top-0 z-10 flex h-full items-center">
             <PullRefreshRail
               orientation="horizontal"
               expandedPx={pullOffset}
               loading={pullRefreshing}
             />
-          ) : null}
-          {tab === "live" ? (
-            <div className="h-full w-[min(92vw,26rem)] max-w-md shrink-0 snap-start overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900/95">
+          </div>
+        ) : null}
+
+        {tab !== "live" && showLatestPeaks && peaks.length > 0 ? (
+          <div className="feed-scroll shrink-0 overflow-x-auto border-b border-zinc-200/70 px-1 py-1.5 dark:border-zinc-800">
+            <ul className="flex gap-2">
+              {peaks.slice(0, 12).map((p) => (
+                <li
+                  key={p.id}
+                  data-peak-id={p.id}
+                  className="w-[min(72vw,16rem)] shrink-0 rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-[11px] shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
+                >
+                  <ProfileLink
+                    href={`/u/${encodeURIComponent(p.userId)}`}
+                    className="font-semibold text-zinc-900 hover:underline dark:text-zinc-100"
+                  >
+                    {p.displayName}
+                  </ProfileLink>
+                  <p className="mt-0.5 line-clamp-2 text-zinc-600 dark:text-zinc-300">{p.text}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {tab === "live" ? (
+          <div className="min-h-0 flex-1 overflow-hidden px-1 py-2 sm:px-1.5">
+            <div className="h-full overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900/95">
               <LiveStreamPanel />
             </div>
-          ) : null}
-          {tab !== "live" ? (
-            <PeakFeed
-              key={`${tab}-${explore}`}
-              layout="horizontal"
-              posts={dedupePostsById(generatedAsPosts)}
-              contextLabel={explore}
-              peaks={showLatestPeaks ? peaks : []}
-              tourMarketPostIndex={0}
-              viewerUserId={viewerUserId}
-            />
-          ) : null}
-          {tab !== "live" ? (
-            <div ref={sentinelRef} className="h-full shrink-0 snap-end" aria-hidden={false}>
-              <FeedInfiniteFooter loading={loadMoreBusy} end={marketsAtEnd} />
-            </div>
-          ) : null}
-        </div>
+          </div>
+        ) : (
+          <FeedMarketMarquee
+            key={`${tab}-${explore}`}
+            posts={feedPosts}
+            viewerUserId={viewerUserId}
+            tourMarketPostIndex={0}
+            viewportRef={scrollRef}
+            sentinelRef={sentinelRef}
+            highlightMarketId={highlightMarketId}
+            onActiveIndexChange={onMarqueeIndexChange}
+          />
+        )}
+
+        {tab !== "live" && (loadMoreBusy || marketsAtEnd) ? (
+          <p className="pointer-events-none absolute bottom-0 right-16 left-0 pb-1 text-center text-[10px] text-zinc-500 dark:text-zinc-400">
+            {marketsAtEnd ? "You're up to date for now" : "Loading more…"}
+          </p>
+        ) : null}
       </div>
     </div>
   );
