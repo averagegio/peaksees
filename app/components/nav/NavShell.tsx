@@ -8,7 +8,7 @@ import { BackButton } from "@/app/components/BackButton";
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { PeakpointsWalletBadge } from "@/app/components/peakpoints/PeakpointsWalletBadge";
 import { SidebarNav } from "@/app/components/sidebar/SidebarNav";
-import { FEED_TAGLINE, PEAKSEES_HEADER_BANNER } from "@/lib/brand";
+import { PEAKSEES_HEADER_BANNER } from "@/lib/brand";
 import type { PublicUser } from "@/lib/auth/users-store";
 
 function initials(displayName: string) {
@@ -76,7 +76,7 @@ export function NavShell({
         <Link
           href="/feed"
           data-tour="tour-header-banner"
-          className="flex w-full items-center justify-center bg-white px-3 py-2 sm:py-2.5 dark:bg-zinc-950"
+          className="flex w-full items-center justify-center bg-white px-2 py-0.5 sm:px-3 sm:py-1 dark:bg-zinc-950"
           onClick={() => setOpen(false)}
         >
           <Image
@@ -84,18 +84,14 @@ export function NavShell({
             alt="peaksees — prediction markets"
             width={720}
             height={220}
-            className="h-auto w-full max-h-[80px] max-w-xl object-contain sm:max-h-[96px]"
-            sizes="(max-width: 768px) 100vw, 36rem"
+            className="h-auto w-full max-h-[44px] max-w-md object-contain sm:max-h-[52px] sm:max-w-lg"
+            sizes="(max-width: 768px) 100vw, 32rem"
             priority
           />
         </Link>
 
-        <p className="border-t border-zinc-100 bg-white px-3 py-1 text-center text-[11px] leading-tight tracking-tight text-zinc-500 sm:py-1.5 sm:text-[12px] dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
-          {FEED_TAGLINE}
-        </p>
-
-        <div className="flex items-center justify-between gap-3 border-t border-zinc-100 px-3 py-1.5 dark:border-zinc-800">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 border-t border-zinc-100 px-2 py-1 dark:border-zinc-800">
+          <div className="flex items-center gap-1.5">
             {showBackButton && (
               <BackButton fallbackHref="/feed" label="Back" iconOnly />
             )}
@@ -106,7 +102,7 @@ export function NavShell({
               aria-expanded={open}
               aria-controls="peaksees-drawer-menu"
               aria-label={open ? "Close navigation menu" : "Open navigation menu"}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
               onClick={() => setOpen((x) => !x)}
             >
               <svg
@@ -132,13 +128,13 @@ export function NavShell({
 
           <div className="min-w-0 flex-1" aria-hidden />
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             {session ? (
               <>
                 <PeakpointsWalletBadge compact />
                 <Link
                   href="/dashboard"
-                  className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white ring-2 ring-emerald-500/30"
+                  className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold text-white ring-2 ring-emerald-500/30"
                   style={{ backgroundColor: "hsl(160 45% 38%)" }}
                   aria-label={`${session.user.displayName} profile`}
                 >

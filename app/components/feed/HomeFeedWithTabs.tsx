@@ -57,7 +57,7 @@ function FeedTabButton({
       role="tab"
       aria-selected={active}
       data-sparkle-click="true"
-      className={`poppy-hover sparkle-hover sparkle-hover--contained min-h-8 flex-1 rounded-full px-2.5 py-1 text-[12px] font-medium outline-none ring-emerald-500/35 transition focus-visible:ring-2 sm:py-1.5 sm:text-[13px] ${
+      className={`poppy-hover sparkle-hover sparkle-hover--contained min-h-7 flex-1 rounded-full px-2 py-0.5 text-[11px] font-medium outline-none ring-emerald-500/35 transition focus-visible:ring-2 sm:min-h-8 sm:py-1 sm:text-[12px] ${
         active
           ? "bg-white text-zinc-900 shadow-sm shadow-zinc-300/40 dark:bg-zinc-800 dark:text-emerald-300 dark:shadow-black/45"
           : "text-zinc-600 hover:bg-zinc-100/90 dark:text-zinc-400 dark:hover:bg-zinc-800/92"
@@ -999,12 +999,12 @@ export function HomeFeedWithTabs({
       <section
         className={`shrink-0 overflow-hidden border-b border-zinc-200/65 transition-[max-height,padding,opacity,margin] duration-[320ms] ease-out dark:border-zinc-800 ${
           tabsVisible
-            ? "pointer-events-auto max-h-48 opacity-100"
+            ? "pointer-events-auto max-h-[7.25rem] opacity-100 sm:max-h-[7.75rem]"
             : "pointer-events-none max-h-0 border-transparent opacity-0"
         }`}
         aria-hidden={!tabsVisible}
       >
-        <div className="px-3 py-2 sm:px-4">
+        <div className="px-2 py-1 sm:px-3 sm:py-1.5">
           <div
             role="tablist"
             aria-label="Feed tabs"
@@ -1039,10 +1039,10 @@ export function HomeFeedWithTabs({
               Live
             </FeedTabButton>
           </div>
-          <div className="mx-auto mt-3 max-w-lg border-t border-zinc-200/80 pt-3 dark:border-zinc-800">
+          <div className="mx-auto mt-1.5 max-w-lg border-t border-zinc-200/80 pt-1.5 dark:border-zinc-800 sm:mt-2 sm:pt-2">
             <div
               data-tour="feed-explore"
-              className="-mx-3 feed-scroll flex items-center gap-4 overflow-x-auto px-3 pb-1"
+              className="-mx-2 feed-scroll flex items-center gap-3 overflow-x-auto px-2 pb-0.5 sm:-mx-3 sm:px-3"
             >
               {["Trending", "News", "Sports", "Culture"].map((item) => {
                 const color =
@@ -1067,7 +1067,7 @@ export function HomeFeedWithTabs({
                   type="button"
                   data-sparkle-click="true"
                   onClick={() => setExplore(item)}
-                  className={`group sparkle-hover sparkle-hover--contained nav-chip-motion shrink-0 rounded-none px-0 py-1 text-[13px] font-semibold tracking-tight transition ${
+                  className={`group sparkle-hover sparkle-hover--contained nav-chip-motion shrink-0 rounded-none px-0 py-0.5 text-[12px] font-semibold tracking-tight transition sm:text-[13px] ${
                     explore === item
                       ? color
                       : inactive
@@ -1106,7 +1106,7 @@ export function HomeFeedWithTabs({
               <Link
                 href="/peakstats"
                 data-sparkle-click="true"
-                className="group sparkle-hover sparkle-hover--contained nav-chip-motion shrink-0 px-0 py-1 text-[13px] font-semibold tracking-tight text-fuchsia-700/65 transition hover:text-fuchsia-800 dark:text-fuchsia-300/70 dark:hover:text-fuchsia-200"
+                className="group sparkle-hover sparkle-hover--contained nav-chip-motion shrink-0 px-0 py-0.5 text-[12px] font-semibold tracking-tight text-fuchsia-700/65 transition hover:text-fuchsia-800 sm:text-[13px] dark:text-fuchsia-300/70 dark:hover:text-fuchsia-200"
               >
                 <span className="sr-only">Peakstats</span>
                 <span className="slot-roll" data-slot-speed="slow" aria-hidden>
@@ -1118,7 +1118,7 @@ export function HomeFeedWithTabs({
                 <span aria-hidden className="mt-1 block h-[2px] w-full rounded-full bg-transparent group-hover:bg-current/35" />
               </Link>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
                 data-sparkle-click="true"
@@ -1126,7 +1126,7 @@ export function HomeFeedWithTabs({
                   setShowLatestPeaks((v) => !v);
                   if (showLatestPeaks) setPeaks([]);
                 }}
-                className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                className="rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 sm:px-2.5 sm:py-1 sm:text-[11px]"
               >
                 {showLatestPeaks ? "Hide latest peaks" : "Show latest peaks"}
               </button>
@@ -1138,7 +1138,7 @@ export function HomeFeedWithTabs({
       <div
         ref={scrollRef}
         data-tour="feed-scroll"
-        className="feed-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-pt-4 sm:scroll-pt-6"
+        className="feed-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-pt-2 sm:scroll-pt-3"
       >
         {tab !== "live" ? (
           <PullRefreshRail expandedPx={pullOffset} loading={pullRefreshing} />

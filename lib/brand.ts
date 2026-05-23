@@ -1,5 +1,5 @@
-/** Full eye + wordmark header banner (PNG, centered layout). */
-export const PEAKSEES_HEADER_BANNER = "/peaksees-header-banner.png";
+/** Full eye + wordmark header banner (transparent PNG). */
+export const PEAKSEES_HEADER_BANNER = "/peaksees-header-transparent.png";
 
 /** Animated GIF loop used on the public landing page. */
 export const PEAKSEES_BG_LOOP = "/peaksees-bg-loop.gif";
