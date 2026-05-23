@@ -355,7 +355,7 @@ export function MarketPostCard({
       {interactive ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <ShareMarketButton
-            post={post}
+            getNode={() => cardRef.current}
             filenameBase={post.question}
             marketId={post.id}
             question={post.question}

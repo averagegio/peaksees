@@ -1,8 +1,5 @@
 "use client";
 
-import type { MarketPost } from "@/app/lib/mock-markets";
-import { MarketShareSnapshot } from "@/app/components/market/MarketShareSnapshot";
-import { fitImageBlobToOgCard } from "@/lib/markets/share-capture-client";
 import { toBlob } from "html-to-image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -57,13 +54,14 @@ async function shareNativeFiles(nav: NavWithShare, file: File, text: string) {
 }
 
 export function ShareMarketButton({
-  post,
+  getNode,
   filenameBase,
   marketId,
   question,
 }: {
-  post: MarketPost;
+  getNode: () => HTMLElement | null;
   filenameBase: string;
+  /** Used for stable share URLs (feed deep link). */
   marketId: string;
   question: string;
 }) {
@@ -72,15 +70,7 @@ export function ShareMarketButton({
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const captureRef = useRef<{ blob: Blob; file: File } | null>(null);
-  const snapshotRef = useRef<HTMLDivElement>(null);
   const [systemShareAvailable, setSystemShareAvailable] = useState(false);
-
-  const yesPct = Math.round((post.outcomes[0]?.probability ?? 0.5) * 100);
-  const captureKey = `${marketId}-${yesPct}-${post.question.length}`;
-
-  useEffect(() => {
-    captureRef.current = null;
-  }, [captureKey]);
 
   useEffect(() => {
     const nav =
@@ -106,7 +96,7 @@ export function ShareMarketButton({
   }, [menuOpen]);
 
   const shareUrl = `${appOrigin()}/m/${encodeURIComponent(marketId)}`;
-  const tweetText = `${question.trim().slice(0, 220)}${question.trim().length > 220 ? "…" : ""}`;
+  const tweetText = `${question.trim().slice(0, 220)}${question.trim().length > 220 ? "?" : ""}`;
 
   const uploadShareImage = useCallback(
     async (blob: Blob) => {
@@ -130,22 +120,21 @@ export function ShareMarketButton({
     const cached = captureRef.current;
     if (cached) return cached;
 
-    const node = snapshotRef.current;
+    const node = getNode();
     if (!node) throw new Error("Nothing to capture");
 
-    const rawBlob = await toBlob(node, {
+    const blob = await toBlob(node, {
       cacheBust: true,
       pixelRatio: 2,
-      backgroundColor: "#f4f4f5",
+      backgroundColor: "#ffffff",
     });
-    if (!rawBlob) throw new Error("Image export failed");
+    if (!blob) throw new Error("Image export failed");
 
-    const blob = await fitImageBlobToOgCard(rawBlob);
     const name = `${slugFilename(filenameBase) || "market"}.png`;
     const file = new File([blob], name, { type: "image/png" });
     captureRef.current = { blob, file };
     return captureRef.current;
-  }, [filenameBase]);
+  }, [filenameBase, getNode]);
 
   const runDestination = async (dest: "x" | "linkedin" | "instagram" | "tiktok") => {
     setBusy(true);
@@ -160,12 +149,12 @@ export function ShareMarketButton({
           try {
             await uploadShareImage(blob);
           } catch {
-            // Crawler can still use generated fallback if upload fails.
+            // Server still serves a generated card image if upload fails.
           }
           openWindowSafe(
             `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareUrl)}`,
           );
-          setHint("Opening X — link preview uses a snapshot of this market card.");
+          setHint("Opening X ? your market card should appear as the link preview.");
           setMenuOpen(false);
           break;
         }
@@ -174,7 +163,7 @@ export function ShareMarketButton({
           openWindowSafe(
             `https://www.linkedin.com/sharing/share-offsite/?mini=true&url=${encodeURIComponent(shareUrl)}`,
           );
-          setHint("Image downloaded — add it manually in LinkedIn for a richer post.");
+          setHint("Image downloaded ? add it manually in LinkedIn for a richer post.");
           setMenuOpen(false);
           break;
         }
@@ -187,7 +176,7 @@ export function ShareMarketButton({
           if (!ok) {
             await triggerDownload(blob, file.name);
             setHint(
-              "Image saved — open Instagram, tap New post, then pick this image from your gallery.",
+              "Image saved ? open Instagram, tap New post, then pick this image from your gallery.",
             );
           }
           setMenuOpen(false);
@@ -198,14 +187,12 @@ export function ShareMarketButton({
           if (!ok) {
             await triggerDownload(blob, file.name);
             setHint(
-              "Image saved — open TikTok, tap + → Upload, then select this image from your gallery.",
+              "Image saved ? open TikTok, tap + ? Upload, then select this image from your gallery.",
             );
           }
           setMenuOpen(false);
           break;
         }
-        default:
-          break;
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Share failed");
@@ -224,7 +211,7 @@ export function ShareMarketButton({
       const ok = await shareNativeFiles(nav, file, `${tweetText}\n${shareUrl}`);
       if (!ok) {
         await triggerDownload(blob, file.name);
-        setHint("Sharing not available — image downloaded.");
+        setHint("Sharing not available ? image downloaded.");
       }
       setMenuOpen(false);
     } catch (e) {
@@ -260,7 +247,7 @@ export function ShareMarketButton({
                     Share market
                   </p>
                   <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
-                    Snapshot of this card for link previews
+                    Export image & open the app you want
                   </p>
                 </div>
                 <button
@@ -269,14 +256,14 @@ export function ShareMarketButton({
                   aria-label="Close"
                   onClick={() => setMenuOpen(false)}
                 >
-                  ✕
+                  ?
                 </button>
               </header>
 
               <div className="max-h-[calc(85dvh-8rem)] overflow-y-auto p-3">
                 <p className="mb-3 rounded-xl bg-zinc-50 px-3 py-2 text-[13px] leading-snug text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
                   {tweetText.slice(0, 120)}
-                  {tweetText.length > 120 ? "…" : ""}
+                  {tweetText.length > 120 ? "?" : ""}
                 </p>
 
                 <div className="flex flex-col gap-1 py-1" role="menu">
@@ -288,7 +275,7 @@ export function ShareMarketButton({
                     onClick={() => void runDestination("x")}
                   >
                     <span className="w-8 text-center" aria-hidden>
-                      𝕏
+                      ??
                     </span>
                     Post on X / Twitter
                   </button>
@@ -324,7 +311,7 @@ export function ShareMarketButton({
                     onClick={() => void runDestination("tiktok")}
                   >
                     <span className="w-8 text-center" aria-hidden>
-                      ♪
+                      ?
                     </span>
                     TikTok
                   </button>
@@ -337,7 +324,7 @@ export function ShareMarketButton({
                     className="mt-2 w-full rounded-xl border border-zinc-200 py-3 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
                     onClick={() => void nativeShareOnly()}
                   >
-                    System share…
+                    System share?
                   </button>
                 ) : null}
 
@@ -358,22 +345,8 @@ export function ShareMarketButton({
         )
       : null;
 
-  const snapshotPortal =
-    portalReady && typeof document !== "undefined"
-      ? createPortal(
-          <div
-            className="pointer-events-none fixed left-[-9999px] top-0 z-[-1] opacity-0"
-            aria-hidden
-          >
-            <MarketShareSnapshot ref={snapshotRef} post={post} />
-          </div>,
-          document.body,
-        )
-      : null;
-
   return (
     <>
-      {snapshotPortal}
       <div className="flex flex-col items-start gap-2">
         <button
           type="button"
@@ -391,7 +364,7 @@ export function ShareMarketButton({
           <span className="h-4 w-4" aria-hidden>
             <ShareIcon />
           </span>
-          {busy ? "Working…" : "Share"}
+          {busy ? "Working?" : "Share"}
         </button>
 
         {!menuOpen && hint ? (

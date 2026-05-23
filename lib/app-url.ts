@@ -12,5 +12,5 @@ export function marketSharePageUrl(marketId: string) {
 
 export function marketShareImageUrl(marketId: string) {
   /** Bump when share capture layout changes so X/LinkedIn refresh cached previews. */
-  return `${appBaseUrl()}/api/markets/${encodeURIComponent(marketId.trim())}/share-image?v=4`;
+  return `${appBaseUrl()}/api/markets/${encodeURIComponent(marketId.trim())}/share-image?v=5`;
 }
