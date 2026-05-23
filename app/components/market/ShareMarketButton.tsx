@@ -1,5 +1,8 @@
 "use client";
 
+import type { MarketPost } from "@/app/lib/mock-markets";
+import { MarketShareSnapshot } from "@/app/components/market/MarketShareSnapshot";
+import { fitImageBlobToOgCard } from "@/lib/markets/share-capture-client";
 import { toBlob } from "html-to-image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -54,14 +57,13 @@ async function shareNativeFiles(nav: NavWithShare, file: File, text: string) {
 }
 
 export function ShareMarketButton({
-  getNode,
+  post,
   filenameBase,
   marketId,
   question,
 }: {
-  getNode: () => HTMLElement | null;
+  post: MarketPost;
   filenameBase: string;
-  /** Used for stable share URLs (feed deep link). */
   marketId: string;
   question: string;
 }) {
@@ -70,7 +72,15 @@ export function ShareMarketButton({
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const captureRef = useRef<{ blob: Blob; file: File } | null>(null);
+  const snapshotRef = useRef<HTMLDivElement>(null);
   const [systemShareAvailable, setSystemShareAvailable] = useState(false);
+
+  const yesPct = Math.round((post.outcomes[0]?.probability ?? 0.5) * 100);
+  const captureKey = `${marketId}-${yesPct}-${post.question.length}`;
+
+  useEffect(() => {
+    captureRef.current = null;
+  }, [captureKey]);
 
   useEffect(() => {
     const nav =
@@ -98,25 +108,44 @@ export function ShareMarketButton({
   const shareUrl = `${appOrigin()}/m/${encodeURIComponent(marketId)}`;
   const tweetText = `${question.trim().slice(0, 220)}${question.trim().length > 220 ? "…" : ""}`;
 
+  const uploadShareImage = useCallback(
+    async (blob: Blob) => {
+      const res = await fetch(
+        `/api/markets/${encodeURIComponent(marketId)}/share-image`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "image/png" },
+          body: blob,
+        },
+      );
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? "Could not upload share image");
+      }
+    },
+    [marketId],
+  );
+
   const ensureCapture = useCallback(async () => {
     const cached = captureRef.current;
     if (cached) return cached;
 
-    const node = getNode();
+    const node = snapshotRef.current;
     if (!node) throw new Error("Nothing to capture");
 
-    const blob = await toBlob(node, {
+    const rawBlob = await toBlob(node, {
       cacheBust: true,
       pixelRatio: 2,
-      backgroundColor: "#ffffff",
+      backgroundColor: "#f4f4f5",
     });
-    if (!blob) throw new Error("Image export failed");
+    if (!rawBlob) throw new Error("Image export failed");
 
+    const blob = await fitImageBlobToOgCard(rawBlob);
     const name = `${slugFilename(filenameBase) || "market"}.png`;
     const file = new File([blob], name, { type: "image/png" });
     captureRef.current = { blob, file };
     return captureRef.current;
-  }, [filenameBase, getNode]);
+  }, [filenameBase]);
 
   const runDestination = async (dest: "x" | "linkedin" | "instagram" | "tiktok") => {
     setBusy(true);
@@ -124,21 +153,22 @@ export function ShareMarketButton({
     setHint(null);
     try {
       const nav = navigator as NavWithShare;
-
-      if (dest === "x") {
-        openWindowSafe(
-          `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareUrl)}`,
-        );
-        setHint(
-          "Opening X — link preview uses the peaksees share card (not a cropped feed screenshot).",
-        );
-        setMenuOpen(false);
-        return;
-      }
-
       const { blob, file } = await ensureCapture();
 
       switch (dest) {
+        case "x": {
+          try {
+            await uploadShareImage(blob);
+          } catch {
+            // Crawler can still use generated fallback if upload fails.
+          }
+          openWindowSafe(
+            `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareUrl)}`,
+          );
+          setHint("Opening X — link preview uses a snapshot of this market card.");
+          setMenuOpen(false);
+          break;
+        }
         case "linkedin": {
           await triggerDownload(blob, file.name);
           openWindowSafe(
@@ -230,7 +260,7 @@ export function ShareMarketButton({
                     Share market
                   </p>
                   <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
-                    Export image & open the app you want
+                    Snapshot of this card for link previews
                   </p>
                 </div>
                 <button
@@ -328,8 +358,22 @@ export function ShareMarketButton({
         )
       : null;
 
+  const snapshotPortal =
+    portalReady && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className="pointer-events-none fixed left-[-9999px] top-0 z-[-1] opacity-0"
+            aria-hidden
+          >
+            <MarketShareSnapshot ref={snapshotRef} post={post} />
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
     <>
+      {snapshotPortal}
       <div className="flex flex-col items-start gap-2">
         <button
           type="button"
