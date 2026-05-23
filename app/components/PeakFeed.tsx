@@ -1,15 +1,18 @@
 "use client";
 
 import type { MarketPost } from "@/app/lib/mock-markets";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Peak } from "@/lib/peaks/store";
 import { usePostPin } from "@/app/hooks/usePostPin";
 import { PostActions } from "@/app/components/post/PostActions";
 import { MarketTradeBox } from "@/app/components/market/MarketTradeBox";
 import { PeakOpinionChip } from "@/app/components/market/PeakOpinionChip";
+import { MarketInsightUncover } from "@/app/components/market/MarketInsightUncover";
 import { ShareMarketButton } from "@/app/components/market/ShareMarketButton";
+import { useMarketInsightReveal } from "@/app/hooks/useMarketInsightReveal";
 import { FollowUserButton } from "@/app/components/profile/FollowUserButton";
 import { ProfileLink } from "@/app/components/profile/ProfileLink";
+import { isPeakGeneratedMarketCard } from "@/lib/markets/is-peak-market";
 
 function formatUsd(n: number) {
   return new Intl.NumberFormat("en-US", {
@@ -82,6 +85,7 @@ export function MarketPostCard({
   isTourAnchor = false,
   readOnly = false,
   viewerUserId,
+  fillHeight = false,
 }: {
   post: MarketPost;
   /** Highlights this card for the first-visit interactive tour. */
@@ -90,6 +94,8 @@ export function MarketPostCard({
   readOnly?: boolean;
   /** Logged-in viewer — enables follow on real user cards. */
   viewerUserId?: string;
+  /** Size to the horizontal feed slide height with internal scroll. */
+  fillHeight?: boolean;
 }) {
   const pending = Boolean(post.pending);
   const interactive = !readOnly && !pending;
@@ -102,6 +108,13 @@ export function MarketPostCard({
   const yesP = Number(yes?.probability ?? 0.5);
   const cardRef = useRef<HTMLElement | null>(null);
   const peakBadgeRef = useRef<HTMLButtonElement | null>(null);
+  const peakGenerated = isPeakGeneratedMarketCard(post);
+  const insight = useMarketInsightReveal(post.id, peakGenerated && !pending);
+
+  useEffect(() => {
+    return insight.bindGestures(cardRef.current);
+  }, [insight.bindGestures, post.id]);
+
   const handleSlug = encodeURIComponent(post.handle.replace(/^@/, ""));
   const profileHref = post.profileUserId
     ? `/u/${encodeURIComponent(post.profileUserId)}`
@@ -117,13 +130,24 @@ export function MarketPostCard({
       data-sparkle-click={interactive ? "true" : undefined}
       className={
         "rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm backdrop-blur-md dark:border-zinc-700 dark:bg-zinc-900/95 " +
+        (fillHeight ? "flex h-full min-h-0 flex-col overflow-hidden " : "") +
+        (peakGenerated && !pending ? "relative overflow-hidden " : "") +
+        (insight.open ? "ring-2 ring-emerald-500/45 " : "") +
+        (insight.loading ? "ring-2 ring-emerald-400/30 motion-safe:animate-pulse " : "") +
         (interactive ? "poppy-hover sparkle-hover " : "") +
         (pending ? "opacity-90 ring-1 ring-emerald-400/40 motion-safe:animate-pulse" : "") +
         (readOnly ? " ring-1 ring-zinc-200/80 dark:ring-zinc-700" : "")
       }
       aria-label={`Prediction market: ${post.question}`}
     >
-      <header className="flex items-start gap-3">
+      <div
+        className={
+          fillHeight
+            ? "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+            : undefined
+        }
+      >
+      <header className="flex shrink-0 items-start gap-3">
         <ProfileLink
           href={profileHref}
           className="group shrink-0"
@@ -256,6 +280,13 @@ export function MarketPostCard({
         </div>
       ) : null}
 
+      {peakGenerated && !pending ? (
+        <p className="mt-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+          <span className="md:hidden">Press &amp; hold</span>
+          <span className="hidden md:inline">Double-click</span> for depth, rules &amp; payout
+        </p>
+      ) : null}
+
       <div className="mt-4 space-y-2">
         {[yes, no].map((outcome) => {
           const pct = Math.round(outcome.probability * 100);
@@ -366,9 +397,24 @@ export function MarketPostCard({
       {interactive ? (
         <PostActions postKey={`market:${post.id}`} title={post.question} />
       ) : null}
+
+      </div>
+
+      {peakGenerated && !pending ? (
+        <MarketInsightUncover
+          open={insight.open}
+          loading={insight.loading}
+          book={insight.book}
+          rules={insight.rules}
+          onClose={insight.close}
+        />
+      ) : null}
     </article>
   );
 }
+
+const FEED_CARD_SLIDE =
+  "flex h-full w-[min(92vw,24rem)] max-w-md shrink-0 snap-start snap-always";
 
 export function PeakFeed({
   posts,
@@ -376,6 +422,7 @@ export function PeakFeed({
   peaks = [],
   tourMarketPostIndex,
   viewerUserId,
+  layout = "horizontal",
 }: {
   posts: MarketPost[];
   contextLabel?: string;
@@ -383,8 +430,78 @@ export function PeakFeed({
   /** Index in `posts` to attach tour spotlight (first market card). */
   tourMarketPostIndex?: number;
   viewerUserId?: string;
+  layout?: "horizontal" | "vertical";
 }) {
   const tourIx = tourMarketPostIndex ?? -1;
+  const horizontal = layout === "horizontal";
+
+  if (horizontal) {
+    return (
+      <ul className="flex h-full min-h-0 flex-row items-stretch gap-3 sm:gap-4">
+        {contextLabel ? (
+          <li className={FEED_CARD_SLIDE}>
+            <div className="flex h-full flex-col justify-center rounded-2xl border border-zinc-200/90 bg-white/95 px-4 py-3 text-sm text-zinc-600 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-300">
+              Exploring: <span className="font-semibold">{contextLabel}</span>
+            </div>
+          </li>
+        ) : null}
+        {peaks.length > 0 ? (
+          <li className={FEED_CARD_SLIDE}>
+            <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/95">
+              <p className="shrink-0 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                Latest peaks
+              </p>
+              <ul className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-y-contain">
+                {peaks.slice(0, 18).map((p) => (
+                  <li
+                    key={p.id}
+                    data-peak-id={p.id}
+                    data-sparkle-click="true"
+                    className="sparkle-hover sparkle-hover--contained rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <ProfileLink
+                        href={`/u/${encodeURIComponent(p.userId)}`}
+                        className="font-semibold hover:underline"
+                      >
+                        {p.displayName}
+                      </ProfileLink>
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                        {new Date(p.createdAt).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap break-words text-sm text-zinc-700 dark:text-zinc-200">
+                      {p.text}
+                    </p>
+                    {p.expiresAt ? (
+                      <p className="mt-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                        Expires {new Date(p.expiresAt).toLocaleString()}
+                      </p>
+                    ) : null}
+                    <PostActions postKey={`peak:${p.id}`} title={p.text} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </li>
+        ) : null}
+        {posts.map((post, i) => (
+          <li key={post.id} className={FEED_CARD_SLIDE}>
+            <MarketPostCard
+              post={post}
+              isTourAnchor={i === tourIx}
+              viewerUserId={viewerUserId}
+              fillHeight
+            />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ul className="mx-auto flex w-full max-w-xl flex-col gap-3 px-2 pb-28 pt-2 sm:gap-5 sm:px-4 sm:pb-24 sm:pt-3 md:pt-4">

@@ -8,7 +8,7 @@ import { BackButton } from "@/app/components/BackButton";
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { PeakpointsWalletBadge } from "@/app/components/peakpoints/PeakpointsWalletBadge";
 import { SidebarNav } from "@/app/components/sidebar/SidebarNav";
-import { PEAKSEES_HEADER_BANNER } from "@/lib/brand";
+import { FEED_MISSION, PEAKSEES_HEADER_BANNER } from "@/lib/brand";
 import type { PublicUser } from "@/lib/auth/users-store";
 
 function initials(displayName: string) {
@@ -89,6 +89,10 @@ export function NavShell({
             priority
           />
         </Link>
+
+        <p className="border-t border-zinc-100 bg-white px-3 py-0.5 text-center text-[10px] leading-tight tracking-tight text-zinc-500 sm:text-[11px] dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+          {FEED_MISSION}
+        </p>
 
         <div className="flex items-center justify-between gap-2 border-t border-zinc-100 px-2 py-1 dark:border-zinc-800">
           <div className="flex items-center gap-1.5">

@@ -40,6 +40,17 @@ body {
   height: 0;
 }
 
+/* Main feed: horizontal card rail (stable side gaps, no vertical margin collapse) */
+.feed-scroll-x {
+  scroll-padding-inline: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .feed-scroll-x {
+    scroll-padding-inline: 1rem;
+  }
+}
+
 @keyframes poppy-hover-bounce {
   0%,
   100% {
@@ -433,5 +444,96 @@ body {
   .peak-fab-trigger:focus-visible .peak-fab-img {
     transform: scale(1.06);
     filter: brightness(1.07) saturate(1.08);
+  }
+}
+
+/* Market card — depth & rules uncover overlay */
+@keyframes market-insight-uncover-in {
+  from {
+    clip-path: inset(100% 0 0 0 round 1rem);
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 1rem);
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes market-insight-uncover-out {
+  from {
+    clip-path: inset(0 0 0 0 round 1rem);
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    clip-path: inset(100% 0 0 0 round 1rem);
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes market-insight-sheen {
+  from {
+    transform: translateY(100%) skewY(-6deg);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(-120%) skewY(-6deg);
+    opacity: 0.35;
+  }
+}
+
+@keyframes market-insight-stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.market-insight-uncover--in {
+  animation: market-insight-uncover-in 440ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.market-insight-uncover--out {
+  animation: market-insight-uncover-out 360ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.market-insight-uncover__sheen {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(16, 185, 129, 0.12) 45%,
+    transparent 70%
+  );
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .market-insight-uncover--in .market-insight-uncover__sheen {
+    animation: market-insight-sheen 520ms cubic-bezier(0.22, 1, 0.36, 1) 80ms forwards;
+  }
+
+  .market-insight-uncover--in .market-insight-stagger {
+    animation: market-insight-stagger-in 400ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .market-insight-uncover--in .market-insight-stagger:nth-child(2) {
+    animation-delay: 60ms;
+  }
+
+  .market-insight-uncover--in .market-insight-stagger:nth-child(3) {
+    animation-delay: 110ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-insight-uncover--in,
+  .market-insight-uncover--out {
+    animation-duration: 1ms;
   }
 }

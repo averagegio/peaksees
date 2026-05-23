@@ -4,11 +4,6 @@ import { useEffect, useRef, useState } from "react";
 
 import { PeakFeed } from "@/app/components/PeakFeed";
 import { LiveStreamPanel } from "@/app/components/live/LiveStreamPanel";
-import {
-  MARKET_FEED_FOLLOWING,
-  MARKET_FEED_FOR_YOU,
-  MARKET_FEED_LIVE,
-} from "@/app/lib/mock-markets";
 import { safeJson } from "@/lib/http";
 import type { Peak } from "@/lib/peaks/store";
 import type { Market } from "@/lib/markets/store";
@@ -20,26 +15,15 @@ import {
 } from "@/app/lib/peak-market";
 import Link from "next/link";
 
-function dedupePostsByMarketId(generated: MarketPost[], filler: MarketPost[]): MarketPost[] {
+function dedupePostsById(posts: MarketPost[]): MarketPost[] {
   const seen = new Set<string>();
   const out: MarketPost[] = [];
-  for (const p of generated) {
-    if (seen.has(p.id)) continue;
-    seen.add(p.id);
-    out.push(p);
-  }
-  for (const p of filler) {
+  for (const p of posts) {
     if (seen.has(p.id)) continue;
     seen.add(p.id);
     out.push(p);
   }
   return out;
-}
-
-/** Prefer real generated markets; mock filler only when the feed is still sparse. */
-function buildFeedPosts(generated: MarketPost[], filler: MarketPost[]): MarketPost[] {
-  if (generated.length >= 2) return generated;
-  return dedupePostsByMarketId(generated, filler);
 }
 
 function FeedTabButton({
@@ -121,15 +105,15 @@ function replacePendingPeak(prev: Peak[], clientId: string, peak: Peak): Peak[] 
   return [peak, ...filtered.filter((p) => p.id !== peak.id)].slice(0, 30);
 }
 
-/** True when the sentinel overlaps the scroll root viewport (within bottom margin). */
+/** True when the sentinel is visible inside the scroll root (horizontal feed). */
 function scrollRootShowsSentinel(
   scrollRoot: HTMLElement,
   sentinel: HTMLElement,
-  marginPastBottomPx: number,
+  marginPastEndPx: number,
 ): boolean {
   const r = scrollRoot.getBoundingClientRect();
   const s = sentinel.getBoundingClientRect();
-  return s.top <= r.bottom + marginPastBottomPx && s.bottom >= r.top;
+  return s.left <= r.right + marginPastEndPx && s.right >= r.left;
 }
 
 function PullRefreshChevron({ ready }: { ready: boolean }) {
@@ -152,9 +136,9 @@ function PullRefreshChevron({ ready }: { ready: boolean }) {
   );
 }
 
-/** Pull inset: maps finger travel to rail height with light saturation (rubber-band). */
-function pullDisplacement(dy: number) {
-  const dampened = dy * 0.42;
+/** Pull inset: maps drag travel to rail size with light saturation (rubber-band). */
+function pullDisplacement(delta: number) {
+  const dampened = delta * 0.42;
   return Math.min(96, dampened * (1 + Math.log1p(dampened / 140)));
 }
 
@@ -162,19 +146,22 @@ function PullRefreshRail({
   expandedPx,
   loading,
   thresholdPx = 48,
+  orientation = "horizontal",
 }: {
   expandedPx: number;
   loading: boolean;
   /** Pull distance needed before release triggers refresh. */
   thresholdPx?: number;
+  orientation?: "horizontal" | "vertical";
 }) {
   const maxProgressPx = 80;
-  const h = loading ? 78 : expandedPx;
-  if (h < 2 && !loading) return null;
+  const size = loading ? 78 : expandedPx;
+  if (size < 2 && !loading) return null;
   const progress = loading ? 1 : Math.min(1, expandedPx / maxProgressPx);
   const ready = !loading && expandedPx >= thresholdPx;
   const railR = 15;
   const circ = 2 * Math.PI * railR;
+  const isHorizontal = orientation === "horizontal";
 
   return (
     <div
@@ -182,8 +169,13 @@ function PullRefreshRail({
       aria-live={loading ? "polite" : undefined}
       aria-busy={loading || undefined}
       data-pull-rail=""
-      className="flex w-full shrink-0 flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-emerald-500/[0.06] via-transparent to-transparent pb-2 motion-safe:transition-[height] motion-safe:duration-[240ms] motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)] dark:from-emerald-400/[0.07]"
-      style={{ height: h }}
+      className={
+        "flex shrink-0 items-center justify-center overflow-hidden motion-safe:duration-[240ms] motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)] " +
+        (isHorizontal
+          ? "h-full flex-row bg-gradient-to-r from-emerald-500/[0.06] via-transparent to-transparent pr-2 motion-safe:transition-[width] dark:from-emerald-400/[0.07]"
+          : "w-full flex-col bg-gradient-to-b from-emerald-500/[0.06] via-transparent to-transparent pb-2 motion-safe:transition-[height] dark:from-emerald-400/[0.07]")
+      }
+      style={isHorizontal ? { width: size } : { height: size }}
     >
       <div
         className={`relative mx-auto flex h-[46px] w-[46px] items-center justify-center motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out ${
@@ -280,8 +272,8 @@ function PullRefreshRail({
 
 function FeedInfiniteFooter({ loading, end }: { loading: boolean; end: boolean }) {
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-none flex-col px-2 pb-28 pt-4 sm:px-4">
-      <div className="flex min-h-[3.25rem] flex-col items-center justify-center gap-2 pb-8">
+    <div className="flex h-full w-20 shrink-0 snap-end flex-col items-center justify-center px-2 sm:w-24">
+      <div className="flex min-h-[3.25rem] flex-col items-center justify-center gap-2">
         {end ? (
           <p className="text-center text-[12px] text-zinc-500 dark:text-zinc-400">
             You&apos;re up to date for now
@@ -305,7 +297,7 @@ function FeedInfiniteFooter({ loading, end }: { loading: boolean; end: boolean }
   );
 }
 
-/** Feed tabs hide on scroll down; older market cards load as you scroll (infinite feed). */
+/** Feed tabs hide when scrolling the card rail; older markets load at the end of the row. */
 export function HomeFeedWithTabs({
   highlightMarketId,
   highlightPeakId,
@@ -331,7 +323,7 @@ export function HomeFeedWithTabs({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const scrollTopPrev = useRef(0);
+  const scrollLeftPrev = useRef(0);
   const sparkleLayerRef = useRef<HTMLDivElement>(null);
   const loadArmedRef = useRef(true);
   const loadingMoreRef = useRef(false);
@@ -339,9 +331,9 @@ export function HomeFeedWithTabs({
   const generatedMarketsRef = useRef<Market[]>([]);
   const marketsAtEndRef = useRef(false);
   const pullOffsetRef = useRef(0);
-  const pullGestureRef = useRef<{ active: boolean; startY: number }>({
+  const pullGestureRef = useRef<{ active: boolean; startX: number }>({
     active: false,
-    startY: 0,
+    startX: 0,
   });
   const tabRef = useRef(tab);
   const lastPullRefreshAtRef = useRef(0);
@@ -373,13 +365,6 @@ export function HomeFeedWithTabs({
     marketsAtEndRef.current = marketsAtEnd;
   }, [marketsAtEnd]);
 
-  const posts =
-    tab === "foryou"
-      ? MARKET_FEED_FOR_YOU
-      : tab === "following"
-        ? MARKET_FEED_FOLLOWING
-        : MARKET_FEED_LIVE;
-
   const generatedAsPosts: MarketPost[] = generatedMarkets.map((m) => {
     const yesP = Number(m.yesProbability) || 0.5;
     const noP = Number(m.noProbability) || 1 - yesP;
@@ -399,6 +384,7 @@ export function HomeFeedWithTabs({
       endsAtLabel: m.endsAt,
       pending: isPending,
       profileUserId: meta?.profileUserId,
+      marketSource: m.source,
       outcomes: [
         { id: "y", label: "Yes", probability: yesP },
         { id: "n", label: "No", probability: noP },
@@ -678,7 +664,7 @@ export function HomeFeedWithTabs({
       }
 
       const root = scrollRef.current;
-      if (root) root.scrollTop = 0;
+      if (root) root.scrollLeft = 0;
     }
 
     function onNewPeak(e: Event) {
@@ -725,7 +711,7 @@ export function HomeFeedWithTabs({
         marketsAtEndRef.current = false;
         setMarketsAtEnd(false);
         const root = scrollRef.current;
-        if (root) root.scrollTop = 0;
+        if (root) root.scrollLeft = 0;
       } else if (clientId) {
         setGeneratedMarkets((prev) => dropPendingMarket(prev, clientId));
         setPeakMarketMeta((prev) => {
@@ -761,8 +747,8 @@ export function HomeFeedWithTabs({
 
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = 0;
-    scrollTopPrev.current = 0;
+    if (el) el.scrollLeft = 0;
+    scrollLeftPrev.current = 0;
   }, [tab]);
 
   useEffect(() => {
@@ -770,14 +756,14 @@ export function HomeFeedWithTabs({
     if (!el) return undefined;
 
     const onScroll = () => {
-      const t = Math.max(0, el.scrollTop);
+      const t = Math.max(0, el.scrollLeft);
       if (t < 16) setTabsVisible(true);
-      else if (t > scrollTopPrev.current + 6) setTabsVisible(false);
-      else if (t + 6 < scrollTopPrev.current) setTabsVisible(true);
-      scrollTopPrev.current = t;
+      else if (t > scrollLeftPrev.current + 6) setTabsVisible(false);
+      else if (t + 6 < scrollLeftPrev.current) setTabsVisible(true);
+      scrollLeftPrev.current = t;
     };
 
-    scrollTopPrev.current = el.scrollTop;
+    scrollLeftPrev.current = el.scrollLeft;
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
@@ -790,23 +776,23 @@ export function HomeFeedWithTabs({
 
     const onTouchStart = (e: TouchEvent) => {
       if (pullRefreshingRef.current) return;
-      if (el.scrollTop > 2) return;
+      if (el.scrollLeft > 2) return;
       g.active = true;
-      g.startY = e.touches[0].clientY;
+      g.startX = e.touches[0].clientX;
     };
 
     const onTouchMove = (e: TouchEvent) => {
       if (!g.active || pullRefreshingRef.current) return;
-      if (el.scrollTop > 2) {
+      if (el.scrollLeft > 2) {
         g.active = false;
         pullOffsetRef.current = 0;
         setPullOffset(0);
         return;
       }
-      const dy = e.touches[0].clientY - g.startY;
-      if (dy > 0) {
+      const dx = e.touches[0].clientX - g.startX;
+      if (dx > 0) {
         e.preventDefault();
-        const v = pullDisplacement(dy);
+        const v = pullDisplacement(dx);
         pullOffsetRef.current = v;
         setPullOffset(v);
       }
@@ -827,14 +813,14 @@ export function HomeFeedWithTabs({
     el.addEventListener("touchcancel", onTouchEnd);
 
     let mouseArmed = false;
-    let mouseStartY = 0;
+    let mouseStartX = 0;
     let mousePtrId = -1;
 
     const ptrDown = (e: PointerEvent) => {
       if (e.pointerType === "touch") return;
-      if (pullRefreshingRef.current || el.scrollTop > 2) return;
+      if (pullRefreshingRef.current || el.scrollLeft > 2) return;
       mouseArmed = true;
-      mouseStartY = e.clientY;
+      mouseStartX = e.clientX;
       mousePtrId = e.pointerId;
       try {
         el.setPointerCapture(e.pointerId);
@@ -846,16 +832,16 @@ export function HomeFeedWithTabs({
     const ptrMove = (e: PointerEvent) => {
       if (e.pointerType === "touch" || !mouseArmed || e.pointerId !== mousePtrId) return;
       if (pullRefreshingRef.current || (e.buttons & 1) === 0) return;
-      if (el.scrollTop > 2) {
+      if (el.scrollLeft > 2) {
         mouseArmed = false;
         pullOffsetRef.current = 0;
         setPullOffset(0);
         return;
       }
-      const dy = e.clientY - mouseStartY;
-      if (dy > 0) {
+      const dx = e.clientX - mouseStartX;
+      if (dx > 0) {
         e.preventDefault();
-        const v = pullDisplacement(dy);
+        const v = pullDisplacement(dx);
         pullOffsetRef.current = v;
         setPullOffset(v);
       }
@@ -912,7 +898,7 @@ export function HomeFeedWithTabs({
 
         appendOlderChunkRef.current();
       },
-      { root, rootMargin: "140px", threshold: 0 },
+      { root, rootMargin: "0px 160px 0px 0px", threshold: 0 },
     );
 
     io.observe(sent);
@@ -947,10 +933,10 @@ export function HomeFeedWithTabs({
       try {
         if (marketId) {
           const el = root.querySelector(`[data-market-id="${CSS.escape(marketId)}"]`);
-          el?.scrollIntoView({ behavior: "smooth", block: "center" });
+          el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
         } else if (peakId) {
           const el = root.querySelector(`[data-peak-id="${CSS.escape(peakId)}"]`);
-          el?.scrollIntoView({ behavior: "smooth", block: "center" });
+          el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
         }
       } catch {
         // ignore
@@ -1138,25 +1124,38 @@ export function HomeFeedWithTabs({
       <div
         ref={scrollRef}
         data-tour="feed-scroll"
-        className="feed-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-pt-2 sm:scroll-pt-3"
+        className="feed-scroll feed-scroll-x min-h-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain snap-x snap-mandatory"
       >
-        {tab !== "live" ? (
-          <PullRefreshRail expandedPx={pullOffset} loading={pullRefreshing} />
-        ) : null}
-        {tab === "live" ? <LiveStreamPanel /> : null}
-        <PeakFeed
-          key={`${tab}-${explore}`}
-          posts={buildFeedPosts(generatedAsPosts, posts)}
-          contextLabel={explore}
-          peaks={showLatestPeaks ? peaks : []}
-          tourMarketPostIndex={0}
-          viewerUserId={viewerUserId}
-        />
-        {tab !== "live" ? (
-          <div ref={sentinelRef} className="w-full shrink-0" aria-hidden={false}>
-            <FeedInfiniteFooter loading={loadMoreBusy} end={marketsAtEnd} />
-          </div>
-        ) : null}
+        <div className="flex h-full min-h-0 flex-row items-stretch gap-3 py-3 pl-3 pr-24 sm:gap-4 sm:pl-4 sm:pr-28 sm:py-4">
+          {tab !== "live" ? (
+            <PullRefreshRail
+              orientation="horizontal"
+              expandedPx={pullOffset}
+              loading={pullRefreshing}
+            />
+          ) : null}
+          {tab === "live" ? (
+            <div className="h-full w-[min(92vw,26rem)] max-w-md shrink-0 snap-start overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900/95">
+              <LiveStreamPanel />
+            </div>
+          ) : null}
+          {tab !== "live" ? (
+            <PeakFeed
+              key={`${tab}-${explore}`}
+              layout="horizontal"
+              posts={dedupePostsById(generatedAsPosts)}
+              contextLabel={explore}
+              peaks={showLatestPeaks ? peaks : []}
+              tourMarketPostIndex={0}
+              viewerUserId={viewerUserId}
+            />
+          ) : null}
+          {tab !== "live" ? (
+            <div ref={sentinelRef} className="h-full shrink-0 snap-end" aria-hidden={false}>
+              <FeedInfiniteFooter loading={loadMoreBusy} end={marketsAtEnd} />
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );

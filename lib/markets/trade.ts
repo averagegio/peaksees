@@ -3,11 +3,6 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 
-import {
-  MARKET_FEED_FOLLOWING,
-  MARKET_FEED_FOR_YOU,
-  MARKET_FEED_LIVE,
-} from "@/app/lib/mock-markets";
 import { db } from "@/lib/db";
 import { holdTradeEscrow } from "@/lib/markets/escrow";
 import { normalizeMarketId } from "@/lib/markets/id";
@@ -175,33 +170,8 @@ export async function buyMarketSide(input: {
          FOR UPDATE`,
         [marketId],
       );
-      let m = mRes.rows[0];
-      if (!m) {
-        const seeded = seedFromMock(marketId);
-        if (!seeded) throw new Error("Market not found");
-        await client.query(
-          `INSERT INTO markets (id, question, category, ends_at, created_at, source, yes_probability, no_probability, volume_cents)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0)`,
-          [
-            seeded.id,
-            seeded.question,
-            seeded.category,
-            seeded.endsAt,
-            new Date().toISOString(),
-            "seed_mock",
-            seeded.yesProbability,
-            seeded.noProbability,
-          ],
-        );
-        m = {
-          id: seeded.id,
-          question: seeded.question,
-          yes_probability: seeded.yesProbability,
-          no_probability: seeded.noProbability,
-          ends_at: seeded.endsAt,
-          resolved_side: null,
-        };
-      }
+      const m = mRes.rows[0];
+      if (!m) throw new Error("Market not found");
 
       const closed = marketClosedReason({
         endsAt: m.ends_at,
@@ -293,32 +263,7 @@ export async function buyMarketSide(input: {
         resolved_side: string | null;
       }
     | undefined;
-  if (!market) {
-    const seeded = seedFromMock(marketId);
-    if (!seeded) throw new Error("Market not found");
-    const createdAtSeed = new Date().toISOString();
-    db.prepare(
-      `INSERT INTO markets (id, question, category, ends_at, created_at, source, yes_probability, no_probability, volume_cents)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-    ).run(
-      seeded.id,
-      seeded.question,
-      seeded.category,
-      seeded.endsAt,
-      createdAtSeed,
-      "seed_mock",
-      seeded.yesProbability,
-      seeded.noProbability,
-    );
-    market = {
-      id: seeded.id,
-      question: seeded.question,
-      yes_probability: seeded.yesProbability,
-      no_probability: seeded.noProbability,
-      ends_at: seeded.endsAt,
-      resolved_side: null,
-    };
-  }
+  if (!market) throw new Error("Market not found");
 
   const closed = marketClosedReason({
     endsAt: market.ends_at,
@@ -401,28 +346,3 @@ function clampPriceCents(n: number) {
   if (!Number.isFinite(n)) return 50;
   return Math.min(99, Math.max(1, Math.floor(n)));
 }
-
-function seedFromMock(marketId: string): null | {
-  id: string;
-  question: string;
-  category: string;
-  endsAt: string;
-  yesProbability: number;
-  noProbability: number;
-} {
-  const raw = normalizeMarketId(marketId);
-  const all = [...MARKET_FEED_FOR_YOU, ...MARKET_FEED_FOLLOWING, ...MARKET_FEED_LIVE];
-  const found = all.find((m) => m.id === raw);
-  if (!found) return null;
-  const yes = found.outcomes.find((o) => o.id === "y")?.probability ?? found.outcomes[0]?.probability ?? 0.5;
-  const yesP = Math.min(0.99, Math.max(0.01, Number(yes)));
-  return {
-    id: found.id,
-    question: found.question,
-    category: found.category,
-    endsAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-    yesProbability: yesP,
-    noProbability: 1 - yesP,
-  };
-}
-

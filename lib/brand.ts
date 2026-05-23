@@ -14,3 +14,6 @@ export const PEAKSEES_LANDING_HERO =
 export const FEED_TAGLINE =
   "A social feed where people trade on opinions instead of just posting them.";
 
+/** Short mission line beside feed controls. */
+export const FEED_MISSION = "A social feed where we trade on opinions";
+

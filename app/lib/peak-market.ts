@@ -34,6 +34,7 @@ export function marketAndPeakToPost(
     endsAtLabel: market.endsAt,
     pending: isPending,
     profileUserId: peak.userId,
+    marketSource: market.source,
     outcomes: [
       { id: "y", label: "Yes", probability: yesP },
       { id: "n", label: "No", probability: noP },
@@ -57,6 +58,7 @@ export function marketToPost(market: Market, peak?: Peak | null): MarketPost {
     hashtags: Array.isArray(market.hashtags) && market.hashtags.length ? market.hashtags : undefined,
     volumeUsd: Math.round((market.volumeCents ?? 0) / 100),
     endsAtLabel: market.endsAt,
+    marketSource: market.source,
     outcomes: [
       { id: "y", label: "Yes", probability: yesP },
       { id: "n", label: "No", probability: noP },
