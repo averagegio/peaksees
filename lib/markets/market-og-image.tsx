@@ -14,11 +14,16 @@ function formatEndsAtLabel(iso: string) {
   }
 }
 
-export function marketOgImageResponse(market: Market) {
+function displayHost(siteHost: string) {
+  return siteHost.replace(/^www\./, "");
+}
+
+export function marketOgImageResponse(market: Market, siteHost = "peaksees.com") {
   const yesPct = Math.round(Number(market.yesProbability) * 100);
   const noPct = 100 - yesPct;
   const question =
-    market.question.length > 140 ? `${market.question.slice(0, 137)}…` : market.question;
+    market.question.length > 120 ? `${market.question.slice(0, 117)}…` : market.question;
+  const host = displayHost(siteHost);
 
   return new ImageResponse(
     (
@@ -27,133 +32,108 @@ export function marketOgImageResponse(market: Market) {
           width: "100%",
           height: "100%",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "linear-gradient(135deg, #ecfdf5 0%, #f4f4f5 45%, #eef2ff 100%)",
-          padding: 48,
+          flexDirection: "column",
+          background: "linear-gradient(145deg, #022c22 0%, #064e3b 38%, #0f172a 100%)",
+          padding: "52px 56px",
+          color: "white",
+          fontFamily: "system-ui, sans-serif",
         }}
       >
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 14,
+              background: "#10b981",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 26,
+              fontWeight: 800,
+            }}
+          >
+            P
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.02em" }}>peaksees</div>
+            <div style={{ fontSize: 18, color: "rgba(255,255,255,0.72)" }}>Prediction market</div>
+          </div>
+          <div
+            style={{
+              marginLeft: "auto",
+              fontSize: 17,
+              fontWeight: 700,
+              color: "#a7f3d0",
+              background: "rgba(16,185,129,0.22)",
+              border: "2px solid rgba(52,211,153,0.45)",
+              padding: "10px 18px",
+              borderRadius: 999,
+            }}
+          >
+            {market.category}
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: 40,
+            fontSize: 46,
+            fontWeight: 800,
+            lineHeight: 1.12,
+            letterSpacing: "-0.03em",
+            maxHeight: 220,
+            overflow: "hidden",
+          }}
+        >
+          {question}
+        </div>
+
+        <div style={{ display: "flex", gap: 20, marginTop: 36, flex: 1, alignItems: "flex-end" }}>
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              background: "rgba(255,255,255,0.08)",
+              border: "2px solid rgba(52,211,153,0.35)",
+              borderRadius: 20,
+              padding: "22px 26px",
+            }}
+          >
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#6ee7b7" }}>Yes</div>
+            <div style={{ fontSize: 52, fontWeight: 800, lineHeight: 1 }}>{yesPct}%</div>
+          </div>
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              background: "rgba(255,255,255,0.06)",
+              border: "2px solid rgba(255,255,255,0.16)",
+              borderRadius: 20,
+              padding: "22px 26px",
+            }}
+          >
+            <div style={{ fontSize: 22, fontWeight: 700, color: "rgba(255,255,255,0.65)" }}>No</div>
+            <div style={{ fontSize: 52, fontWeight: 800, lineHeight: 1 }}>{noPct}%</div>
+          </div>
+        </div>
+
         <div
           style={{
             display: "flex",
-            flexDirection: "column",
-            width: "100%",
-            height: "100%",
-            background: "rgba(255,255,255,0.97)",
-            borderRadius: 28,
-            border: "2px solid rgba(16,185,129,0.25)",
-            boxShadow: "0 24px 60px rgba(15,23,42,0.12)",
-            padding: "40px 44px",
+            justifyContent: "space-between",
+            marginTop: 28,
+            fontSize: 19,
+            fontWeight: 600,
+            color: "rgba(255,255,255,0.7)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 999,
-                background: "#059669",
-                color: "white",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 22,
-                fontWeight: 700,
-              }}
-            >
-              P
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color: "#18181b" }}>peaksees</div>
-              <div style={{ fontSize: 18, color: "#71717a" }}>{market.category}</div>
-            </div>
-            <div
-              style={{
-                marginLeft: "auto",
-                fontSize: 16,
-                fontWeight: 700,
-                color: "#047857",
-                background: "rgba(16,185,129,0.12)",
-                padding: "8px 16px",
-                borderRadius: 999,
-              }}
-            >
-              Prediction market
-            </div>
-          </div>
-
-          <div
-            style={{
-              marginTop: 28,
-              fontSize: 42,
-              fontWeight: 700,
-              lineHeight: 1.15,
-              color: "#09090b",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {question}
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 32 }}>
-            {[
-              { label: "Yes", pct: yesPct, color: "#10b981" },
-              { label: "No", pct: noPct, color: "#71717a" },
-            ].map((row) => (
-              <div
-                key={row.label}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 16,
-                  border: "2px solid #e4e4e7",
-                  borderRadius: 18,
-                  padding: "18px 22px",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: `${row.pct}%`,
-                    background: "rgba(16,185,129,0.18)",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "relative",
-                    display: "flex",
-                    width: "100%",
-                    justifyContent: "space-between",
-                    fontSize: 28,
-                    fontWeight: 700,
-                    color: "#18181b",
-                  }}
-                >
-                  <span>{row.label}</span>
-                  <span>{row.pct}%</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div
-            style={{
-              marginTop: "auto",
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: 18,
-              color: "#52525b",
-              fontWeight: 600,
-            }}
-          >
-            <span>Settles {formatEndsAtLabel(market.endsAt)}</span>
-            <span>peaksees.vercel.app</span>
-          </div>
+          <span>Settles {formatEndsAtLabel(market.endsAt)}</span>
+          <span>{host}</span>
         </div>
       </div>
     ),

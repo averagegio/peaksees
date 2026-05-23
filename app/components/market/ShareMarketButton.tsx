@@ -98,24 +98,6 @@ export function ShareMarketButton({
   const shareUrl = `${appOrigin()}/m/${encodeURIComponent(marketId)}`;
   const tweetText = `${question.trim().slice(0, 220)}${question.trim().length > 220 ? "…" : ""}`;
 
-  const uploadShareImage = useCallback(
-    async (blob: Blob) => {
-      const res = await fetch(
-        `/api/markets/${encodeURIComponent(marketId)}/share-image`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "image/png" },
-          body: blob,
-        },
-      );
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? "Could not upload share image");
-      }
-    },
-    [marketId],
-  );
-
   const ensureCapture = useCallback(async () => {
     const cached = captureRef.current;
     if (cached) return cached;
@@ -142,22 +124,21 @@ export function ShareMarketButton({
     setHint(null);
     try {
       const nav = navigator as NavWithShare;
+
+      if (dest === "x") {
+        openWindowSafe(
+          `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareUrl)}`,
+        );
+        setHint(
+          "Opening X — link preview uses the peaksees share card (not a cropped feed screenshot).",
+        );
+        setMenuOpen(false);
+        return;
+      }
+
       const { blob, file } = await ensureCapture();
 
       switch (dest) {
-        case "x": {
-          try {
-            await uploadShareImage(blob);
-          } catch {
-            // Server still serves a generated card image if upload fails.
-          }
-          openWindowSafe(
-            `https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareUrl)}`,
-          );
-          setHint("Opening X — your market card should appear as the link preview.");
-          setMenuOpen(false);
-          break;
-        }
         case "linkedin": {
           await triggerDownload(blob, file.name);
           openWindowSafe(
@@ -193,6 +174,8 @@ export function ShareMarketButton({
           setMenuOpen(false);
           break;
         }
+        default:
+          break;
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Share failed");
