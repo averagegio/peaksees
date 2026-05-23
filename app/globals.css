@@ -54,6 +54,29 @@ body {
   contain: layout style;
 }
 
+/* Feed page: normal vertical scroll (scrollbar hidden); marquee is horizontal-only inside its stage */
+.feed-page-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.feed-page-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.feed-marquee-stage {
+  contain: layout paint;
+}
+
+.feed-hero {
+  width: 100%;
+}
+
+.feed-hero__stage {
+  width: 100%;
+}
+
 @keyframes poppy-hover-bounce {
   0%,
   100% {

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { FeedMarketMarquee } from "@/app/components/feed/FeedMarketMarquee";
+import { FeedMarketHero } from "@/app/components/feed/FeedMarketHero";
+import { FeedSiteSection } from "@/app/components/feed/FeedSiteSection";
 import { ProfileLink } from "@/app/components/profile/ProfileLink";
 import { LiveStreamPanel } from "@/app/components/live/LiveStreamPanel";
 import { safeJson } from "@/lib/http";
@@ -286,7 +287,6 @@ export function HomeFeedWithTabs({
   const [showLatestPeaks, setShowLatestPeaks] = useState(
     () => Boolean(highlightPeakId?.trim()),
   );
-  const [tabsVisible, setTabsVisible] = useState(true);
   const [peaks, setPeaks] = useState<Peak[]>([]);
   const [generatedMarkets, setGeneratedMarkets] = useState<Market[]>([]);
   const [peakMarketMeta, setPeakMarketMeta] = useState<Record<string, PeakMarketMeta>>({});
@@ -296,6 +296,7 @@ export function HomeFeedWithTabs({
   const [pullRefreshing, setPullRefreshing] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const pageScrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const scrollLeftPrev = useRef(0);
   const sparkleLayerRef = useRef<HTMLDivElement>(null);
@@ -638,8 +639,10 @@ export function HomeFeedWithTabs({
         setMarketsAtEnd(false);
       }
 
-      const root = scrollRef.current;
-      if (root) root.scrollLeft = 0;
+      const page = pageScrollRef.current;
+      const marquee = scrollRef.current;
+      if (page) page.scrollTop = 0;
+      if (marquee) marquee.scrollLeft = 0;
     }
 
     function onNewPeak(e: Event) {
@@ -685,8 +688,10 @@ export function HomeFeedWithTabs({
         );
         marketsAtEndRef.current = false;
         setMarketsAtEnd(false);
-        const root = scrollRef.current;
-        if (root) root.scrollLeft = 0;
+        const page = pageScrollRef.current;
+        const marquee = scrollRef.current;
+        if (page) page.scrollTop = 0;
+        if (marquee) marquee.scrollLeft = 0;
       } else if (clientId) {
         setGeneratedMarkets((prev) => dropPendingMarket(prev, clientId));
         setPeakMarketMeta((prev) => {
@@ -721,27 +726,12 @@ export function HomeFeedWithTabs({
   }, []);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollLeft = 0;
+    const page = pageScrollRef.current;
+    const marquee = scrollRef.current;
+    if (page) page.scrollTop = 0;
+    if (marquee) marquee.scrollLeft = 0;
     scrollLeftPrev.current = 0;
   }, [tab]);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return undefined;
-
-    const onScroll = () => {
-      const t = Math.max(0, el.scrollLeft);
-      if (t < 16) setTabsVisible(true);
-      else if (t > scrollLeftPrev.current + 6) setTabsVisible(false);
-      else if (t + 6 < scrollLeftPrev.current) setTabsVisible(true);
-      scrollLeftPrev.current = t;
-    };
-
-    scrollLeftPrev.current = el.scrollLeft;
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -946,14 +936,6 @@ export function HomeFeedWithTabs({
     return () => window.removeEventListener("click", spawnSparkles);
   }, []);
 
-  useEffect(() => {
-    function showTourChrome() {
-      setTabsVisible(true);
-    }
-    window.addEventListener("peaksees:tour-show-feed-chrome", showTourChrome);
-    return () => window.removeEventListener("peaksees:tour-show-feed-chrome", showTourChrome);
-  }, []);
-
   const feedPosts = dedupePostsById(generatedAsPosts);
 
   const onMarqueeIndexChange = useCallback(
@@ -967,57 +949,51 @@ export function HomeFeedWithTabs({
     [feedPosts.length],
   );
 
+  const loadHint =
+    tab !== "live"
+      ? loadMoreBusy
+        ? "Loading more…"
+        : marketsAtEnd
+          ? "You're up to date"
+          : null
+      : null;
+
   return (
     <div className="flex min-h-0 w-full max-w-none flex-1 flex-col">
       <div ref={sparkleLayerRef} className="pointer-events-none fixed inset-0 z-[120]" />
-      <section
-        className={`shrink-0 overflow-hidden border-b border-zinc-200/65 transition-[max-height,padding,opacity,margin] duration-[320ms] ease-out dark:border-zinc-800 ${
-          tabsVisible
-            ? "pointer-events-auto max-h-[7.25rem] opacity-100 sm:max-h-[7.75rem]"
-            : "pointer-events-none max-h-0 border-transparent opacity-0"
-        }`}
-        aria-hidden={!tabsVisible}
-      >
-        <div className="px-2 py-1 sm:px-3 sm:py-1.5">
+
+      <header className="relative z-20 shrink-0 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/90">
+        <div className="mx-auto w-full max-w-4xl px-4 py-3 sm:px-6">
           <div
             role="tablist"
             aria-label="Feed tabs"
             data-tour="feed-tabs"
-            className="feed-scroll mx-auto flex w-full max-w-[25rem] gap-px overflow-x-auto rounded-full border border-zinc-200/75 bg-white/90 p-[2px] shadow-sm backdrop-blur-sm dark:border-zinc-700/85 dark:bg-zinc-900/80"
+            className="feed-scroll mx-auto flex w-full max-w-md gap-1 overflow-x-auto rounded-full border border-zinc-200/80 bg-zinc-50/90 p-1 dark:border-zinc-700 dark:bg-zinc-900/80"
           >
             <FeedTabButton
               active={tab === "foryou"}
-              onClick={() => {
-                setTab("foryou");
-                setTabsVisible(true);
-              }}
+              onClick={() => setTab("foryou")}
             >
               For you
             </FeedTabButton>
             <FeedTabButton
               active={tab === "following"}
-              onClick={() => {
-                setTab("following");
-                setTabsVisible(true);
-              }}
+              onClick={() => setTab("following")}
             >
               Following
             </FeedTabButton>
             <FeedTabButton
               active={tab === "live"}
-              onClick={() => {
-                setTab("live");
-                setTabsVisible(true);
-              }}
+              onClick={() => setTab("live")}
             >
               Live
             </FeedTabButton>
           </div>
-          <div className="mx-auto mt-1.5 max-w-lg border-t border-zinc-200/80 pt-1.5 dark:border-zinc-800 sm:mt-2 sm:pt-2">
-            <div
-              data-tour="feed-explore"
-              className="-mx-2 feed-scroll flex items-center gap-3 overflow-x-auto px-2 pb-0.5 sm:-mx-3 sm:px-3"
-            >
+
+          <div
+            data-tour="feed-explore"
+            className="feed-scroll mt-3 flex items-center justify-center gap-4 overflow-x-auto pb-0.5"
+          >
               {["Trending", "News", "Sports", "Culture"].map((item) => {
                 const color =
                   item === "Trending"
@@ -1091,86 +1067,86 @@ export function HomeFeedWithTabs({
                 </span>
                 <span aria-hidden className="mt-1 block h-[2px] w-full rounded-full bg-transparent group-hover:bg-current/35" />
               </Link>
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
-                Exploring{" "}
-                <span className="font-semibold text-zinc-700 dark:text-zinc-200">{explore}</span>
-              </p>
-              <span className="text-zinc-300 dark:text-zinc-600">·</span>
-              <button
-                type="button"
-                data-sparkle-click="true"
-                onClick={() => {
-                  setShowLatestPeaks((v) => !v);
-                  if (showLatestPeaks) setPeaks([]);
-                }}
-                className="rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 sm:px-2.5 sm:py-1 sm:text-[11px]"
-              >
-                {showLatestPeaks ? "Hide latest peaks" : "Show latest peaks"}
-              </button>
-            </div>
+          </div>
+
+          <div className="mt-3 flex justify-center">
+            <button
+              type="button"
+              data-sparkle-click="true"
+              onClick={() => {
+                setShowLatestPeaks((v) => !v);
+                if (showLatestPeaks) setPeaks([]);
+              }}
+              className="text-[11px] font-medium text-zinc-500 underline-offset-2 hover:text-zinc-800 hover:underline dark:text-zinc-400 dark:hover:text-zinc-200"
+            >
+              {showLatestPeaks ? "Hide latest peaks" : "Show latest peaks"}
+            </button>
           </div>
         </div>
-      </section>
+      </header>
 
-      <div className="relative flex min-h-0 w-full flex-1 flex-col">
-        {tab !== "live" && (pullOffset > 0 || pullRefreshing) ? (
-          <div className="absolute left-0 top-0 z-10 flex h-full items-center">
-            <PullRefreshRail
-              orientation="horizontal"
-              expandedPx={pullOffset}
-              loading={pullRefreshing}
+      {showLatestPeaks && peaks.length > 0 ? (
+        <div className="feed-scroll shrink-0 overflow-x-auto border-b border-zinc-200/70 bg-zinc-50/90 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900/50">
+          <ul className="mx-auto flex max-w-4xl gap-3">
+            {peaks.slice(0, 10).map((p) => (
+              <li
+                key={p.id}
+                data-peak-id={p.id}
+                className="w-[min(70vw,18rem)] shrink-0 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs shadow-sm dark:border-zinc-700 dark:bg-zinc-950"
+              >
+                <ProfileLink
+                  href={`/u/${encodeURIComponent(p.userId)}`}
+                  className="font-semibold text-zinc-900 hover:underline dark:text-zinc-100"
+                >
+                  {p.displayName}
+                </ProfileLink>
+                <p className="mt-1 line-clamp-2 text-zinc-600 dark:text-zinc-300">{p.text}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div
+        ref={pageScrollRef}
+        className="feed-scroll feed-page-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain"
+        data-tour="feed-scroll"
+      >
+        {tab === "live" ? (
+          <section className="feed-hero relative w-full shrink-0 overflow-hidden">
+            <div className="feed-hero__stage flex h-[min(54dvh,34rem)] min-h-[300px] w-full items-stretch px-4 py-6 sm:px-8">
+              <div className="h-full w-full overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900/95">
+                <LiveStreamPanel />
+              </div>
+            </div>
+          </section>
+        ) : (
+          <div className="relative w-full">
+            {pullOffset > 0 || pullRefreshing ? (
+              <div className="absolute left-0 top-[4.5rem] z-30 flex h-[calc(min(54dvh,34rem)-4.5rem)] items-center sm:top-[5rem]">
+                <PullRefreshRail
+                  orientation="horizontal"
+                  expandedPx={pullOffset}
+                  loading={pullRefreshing}
+                />
+              </div>
+            ) : null}
+            <FeedMarketHero
+              key={`${tab}-${explore}`}
+              posts={feedPosts}
+              viewerUserId={viewerUserId}
+              tourMarketPostIndex={0}
+              viewportRef={scrollRef}
+              sentinelRef={sentinelRef}
+              highlightMarketId={highlightMarketId}
+              onActiveIndexChange={onMarqueeIndexChange}
+              exploreLabel={explore}
+              loadHint={loadHint}
             />
           </div>
-        ) : null}
-
-        {tab !== "live" && showLatestPeaks && peaks.length > 0 ? (
-          <div className="feed-scroll shrink-0 overflow-x-auto border-b border-zinc-200/70 px-1 py-1.5 dark:border-zinc-800">
-            <ul className="flex gap-2">
-              {peaks.slice(0, 12).map((p) => (
-                <li
-                  key={p.id}
-                  data-peak-id={p.id}
-                  className="w-[min(72vw,16rem)] shrink-0 rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-[11px] shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
-                >
-                  <ProfileLink
-                    href={`/u/${encodeURIComponent(p.userId)}`}
-                    className="font-semibold text-zinc-900 hover:underline dark:text-zinc-100"
-                  >
-                    {p.displayName}
-                  </ProfileLink>
-                  <p className="mt-0.5 line-clamp-2 text-zinc-600 dark:text-zinc-300">{p.text}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        {tab === "live" ? (
-          <div className="min-h-0 flex-1 overflow-hidden px-1 py-2 sm:px-1.5">
-            <div className="h-full overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900/95">
-              <LiveStreamPanel />
-            </div>
-          </div>
-        ) : (
-          <FeedMarketMarquee
-            key={`${tab}-${explore}`}
-            posts={feedPosts}
-            viewerUserId={viewerUserId}
-            tourMarketPostIndex={0}
-            viewportRef={scrollRef}
-            sentinelRef={sentinelRef}
-            highlightMarketId={highlightMarketId}
-            onActiveIndexChange={onMarqueeIndexChange}
-          />
         )}
 
-        {tab !== "live" && (loadMoreBusy || marketsAtEnd) ? (
-          <p className="pointer-events-none absolute bottom-0 right-16 left-0 pb-1 text-center text-[10px] text-zinc-500 dark:text-zinc-400">
-            {marketsAtEnd ? "You're up to date for now" : "Loading more…"}
-          </p>
-        ) : null}
+        <FeedSiteSection />
       </div>
     </div>
   );

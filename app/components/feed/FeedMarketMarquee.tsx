@@ -38,6 +38,7 @@ export function FeedMarketMarquee({
   sentinelRef,
   highlightMarketId,
   onActiveIndexChange,
+  variant = "default",
 }: {
   posts: MarketPost[];
   viewerUserId?: string;
@@ -46,7 +47,9 @@ export function FeedMarketMarquee({
   sentinelRef: RefObject<HTMLDivElement | null>;
   highlightMarketId?: string;
   onActiveIndexChange?: (index: number) => void;
+  variant?: "default" | "hero";
 }) {
+  const isHero = variant === "hero";
   const [slideWidth, setSlideWidth] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
   const activeIndexRef = useRef(0);
@@ -160,18 +163,22 @@ export function FeedMarketMarquee({
 
   if (posts.length === 0) {
     return (
-      <div className="flex h-full w-full items-center justify-center px-3 text-sm text-zinc-500 dark:text-zinc-400">
+      <div
+        className={
+          "flex h-full w-full items-center justify-center text-sm text-zinc-500 dark:text-zinc-400 " +
+          (isHero ? "px-8" : "px-3")
+        }
+      >
         Markets are generating — pull to refresh or check back in a moment.
       </div>
     );
   }
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col">
+    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
       <div
         ref={viewportRef}
-        data-tour="feed-scroll"
-        className="feed-marquee-viewport feed-scroll feed-scroll-x min-h-0 w-full flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth snap-x snap-mandatory"
+        className="feed-marquee-viewport feed-scroll feed-scroll-x min-h-0 w-full flex-1 touch-pan-x overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-none scroll-smooth snap-x snap-mandatory"
         onPointerDown={pauseForUser}
         onTouchStart={pauseForUser}
         onWheel={pauseForUser}
@@ -184,7 +191,13 @@ export function FeedMarketMarquee({
               className="feed-marquee-slide box-border h-full shrink-0 snap-start snap-always"
               style={slideWidth > 0 ? { width: slideWidth } : undefined}
             >
-              <div className="h-full min-h-0 px-1 sm:px-1.5">
+              <div
+                className={
+                  isHero
+                    ? "h-full min-h-0 px-4 py-4 sm:px-8 sm:py-5"
+                    : "h-full min-h-0 px-1 sm:px-1.5"
+                }
+              >
                 <MarketPostCard
                   post={post}
                   isTourAnchor={i === tourMarketPostIndex}
@@ -206,7 +219,10 @@ export function FeedMarketMarquee({
 
       {posts.length > 1 ? (
         <div
-          className="pointer-events-none absolute bottom-2 left-0 right-14 flex justify-center gap-1.5"
+          className={
+            "pointer-events-none absolute left-0 right-14 flex justify-center gap-1.5 " +
+            (isHero ? "bottom-5" : "bottom-2")
+          }
           aria-hidden
         >
           {posts.map((p, i) => (
