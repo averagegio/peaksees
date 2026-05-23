@@ -4,8 +4,8 @@ export const PEAKSEES_HEADER_BANNER = "/peaksees-header-banner.png";
 /** Animated GIF loop used on the public landing page. */
 export const PEAKSEES_BG_LOOP = "/peaksees-bg-loop.gif";
 
-/** Circular eye + candlestick artwork for compose FAB (`peakprint`). */
-export const PEAKFAB_PRINT = "/peakprint.png";
+/** Circular eye + candlestick artwork for compose FAB (transparent PNG). */
+export const PEAKFAB_PRINT = "/peakprint-transparent.png";
 
 /** Landing page left hero image provided by user. */
 export const PEAKSEES_LANDING_HERO =

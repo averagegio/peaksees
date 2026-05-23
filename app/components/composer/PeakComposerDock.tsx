@@ -272,20 +272,20 @@ export function PeakComposerDock() {
           data-tour="compose-fab"
           aria-haspopup="dialog"
           aria-expanded={modalOpen}
-          className="peak-fab-trigger peak-fab-special relative isolate box-border h-11 w-11 shrink-0 overflow-hidden rounded-full bg-white p-[3px] shadow-md ring-2 ring-emerald-500/30 ring-offset-1 ring-offset-zinc-100 transition active:scale-[0.93] dark:bg-zinc-950 dark:ring-emerald-500/38 dark:ring-offset-zinc-950"
+          className="peak-fab-trigger peak-fab-special relative isolate box-border h-14 w-14 shrink-0 overflow-visible rounded-full bg-transparent p-0 shadow-lg shadow-black/20 ring-2 ring-emerald-500/35 ring-offset-2 ring-offset-zinc-100 transition active:scale-[0.93] dark:ring-emerald-400/40 dark:ring-offset-zinc-950"
           title="Compose a peak"
           onClick={() => setModalOpen(true)}
         >
           <Image
             src={PEAKFAB_PRINT}
             alt=""
-            fill
-            sizes="40px"
-            className="peak-fab-img object-contain object-center"
+            width={56}
+            height={56}
+            className="peak-fab-img h-full w-full object-contain object-center drop-shadow-sm"
             priority
             aria-hidden
           />
-          <span className="sr-only">Compose peak</span>
+          <span className="sr-only">Compose a peak</span>
         </button>
       </div>
 
