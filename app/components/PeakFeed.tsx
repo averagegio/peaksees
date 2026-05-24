@@ -10,6 +10,7 @@ import { PeakOpinionChip } from "@/app/components/market/PeakOpinionChip";
 import { MarketInsightUncover } from "@/app/components/market/MarketInsightUncover";
 import { ShareMarketButton } from "@/app/components/market/ShareMarketButton";
 import { useMarketInsightReveal } from "@/app/hooks/useMarketInsightReveal";
+import { marketCardHaptic } from "@/app/lib/haptics";
 import { FollowUserButton } from "@/app/components/profile/FollowUserButton";
 import { ProfileLink } from "@/app/components/profile/ProfileLink";
 import { isPeakGeneratedMarketCard } from "@/lib/markets/is-peak-market";
@@ -41,6 +42,58 @@ function BookmarkRibbonIcon({ filled }: { filled: boolean }) {
   );
 }
 
+function MarketDepthIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[22px] w-[22px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden
+    >
+      <path strokeLinecap="round" d="M4 7h16M4 12h12M4 17h8" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M18 11v6M15 14l3 3 3-3"
+        className={active ? "opacity-100" : "opacity-70"}
+      />
+    </svg>
+  );
+}
+
+function MarketDepthTapButton({
+  onReveal,
+  open,
+  loading,
+}: {
+  onReveal: () => void;
+  open: boolean;
+  loading: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      data-no-insight-gesture="true"
+      data-sparkle-click="true"
+      onClick={onReveal}
+      disabled={loading && !open}
+      aria-pressed={open}
+      aria-label={open ? "Market depth open — tap to refresh" : "Show orderbook depth and rules"}
+      title={open ? "Depth & rules (open)" : "Depth & rules"}
+      className={
+        "shrink-0 self-start rounded-full p-2 outline-none transition hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-emerald-500 dark:hover:bg-zinc-800 " +
+        (open
+          ? "text-emerald-600 dark:text-emerald-400"
+          : "text-zinc-500 dark:text-zinc-400")
+      }
+    >
+      <MarketDepthIcon active={open} />
+    </button>
+  );
+}
+
 function MarketPostBookmark({ postKey }: { postKey: string }) {
   const { pinned, toggle, pinning } = usePostPin(postKey);
   return (
@@ -55,11 +108,11 @@ function MarketPostBookmark({ postKey }: { postKey: string }) {
       }
       disabled={pinning}
       aria-pressed={pinned}
-      aria-label={pinned ? "Remove bookmark" : "Bookmark this market"}
+      aria-label={pinned ? "Remove from bookmarks" : "Save to bookmarks"}
       title={
         pinned
-          ? "Remove bookmark — same as undo Repeak below"
-          : "Bookmark — same as Repeak below (saved pins)"
+          ? "Saved — open Bookmarks from the menu"
+          : "Save to Bookmarks (menu → Bookmarks)"
       }
       onClick={() => void toggle()}
     >
@@ -135,8 +188,12 @@ export function MarketPostCard({
         "rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm backdrop-blur-md dark:border-zinc-700 dark:bg-zinc-900/95 " +
         (fillHeight ? "flex h-full min-h-0 flex-col overflow-hidden " : "") +
         (peakGenerated && !pending ? "relative z-0 overflow-hidden " : "") +
+        (insight.isPulling ? "market-insight-gesture-active select-none " : "") +
         (insight.open ? "ring-2 ring-emerald-500/45 " : "") +
-        (insight.loading ? "ring-2 ring-emerald-400/30 motion-safe:animate-pulse " : "") +
+        (insight.isPulling ? "ring-2 ring-emerald-500/35 " : "") +
+        (insight.loading && !insight.isPulling
+          ? "ring-2 ring-emerald-400/30 motion-safe:animate-pulse "
+          : "") +
         (interactive && !marqueeMode ? "poppy-hover sparkle-hover " : interactive ? "sparkle-hover " : "") +
         (pending ? "opacity-90 ring-1 ring-emerald-400/40 motion-safe:animate-pulse" : "") +
         (readOnly ? " ring-1 ring-zinc-200/80 dark:ring-zinc-700" : "")
@@ -145,8 +202,18 @@ export function MarketPostCard({
     >
       <div
         className={
-          fillHeight
-            ? "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+          (fillHeight
+            ? "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] "
+            : "") +
+          (insight.isPulling && peakGenerated
+            ? "motion-safe:translate-y-[var(--insight-pull-shift,0px)] transition-transform duration-75"
+            : "")
+        }
+        style={
+          insight.isPulling && peakGenerated
+            ? ({
+                ["--insight-pull-shift" as string]: `${Math.min(12, insight.pullProgress * 14)}px`,
+              })
             : undefined
         }
       >
@@ -264,7 +331,23 @@ export function MarketPostCard({
             ) : null}
           </div>
         </div>
-        {interactive ? <MarketPostBookmark postKey={`market:${post.id}`} /> : null}
+        {interactive && peakGenerated ? (
+          <div className="flex shrink-0 items-start gap-0.5">
+            <span className="md:hidden">
+              <MarketDepthTapButton
+                open={insight.open}
+                loading={insight.loading}
+                onReveal={() => {
+                  marketCardHaptic("press");
+                  void insight.reveal();
+                }}
+              />
+            </span>
+            <MarketPostBookmark postKey={`market:${post.id}`} />
+          </div>
+        ) : interactive ? (
+          <MarketPostBookmark postKey={`market:${post.id}`} />
+        ) : null}
       </header>
 
       <h2 className="mt-4 text-[17px] font-semibold leading-snug tracking-tight text-zinc-900 dark:text-zinc-50">
@@ -285,7 +368,7 @@ export function MarketPostCard({
 
       {peakGenerated && !pending ? (
         <p className="mt-1 text-[10px] text-zinc-400 dark:text-zinc-500">
-          <span className="md:hidden">Press &amp; hold</span>
+          <span className="md:hidden">Tap depth icon or pull down</span>
           <span className="hidden md:inline">Double-click</span> for depth, rules &amp; payout
         </p>
       ) : null}
@@ -410,6 +493,7 @@ export function MarketPostCard({
           book={insight.book}
           rules={insight.rules}
           onClose={insight.close}
+          pullProgress={insight.pullProgress}
         />
       ) : null}
     </article>

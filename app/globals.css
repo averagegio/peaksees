@@ -473,6 +473,24 @@ body {
   }
 }
 
+/* Market card — press-and-pull depth reveal (mobile) */
+.market-insight-gesture-active {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.market-insight-uncover--pulling {
+  transition:
+    clip-path 60ms linear,
+    opacity 80ms ease-out;
+}
+
+.market-insight-uncover--pulling .market-insight-uncover__sheen {
+  opacity: 0.2;
+  transform: translateY(0);
+}
+
 /* Market card — depth & rules uncover overlay */
 @keyframes market-insight-uncover-in {
   from {

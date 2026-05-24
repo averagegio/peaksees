@@ -55,25 +55,37 @@ export function usePostPin(postKey: string) {
   const toggle = useCallback(async () => {
     if (busyRef.current) return;
     busyRef.current = true;
+    const nextPinned = !pinned;
     setPinning(true);
+    setPinned(nextPinned);
     try {
       const res = await fetch("/api/pins", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ postKey }),
       });
-      const data = (await safeJson<{ pinned?: boolean }>(res)) ?? {};
+      const data = (await safeJson<{ pinned?: boolean; error?: string }>(res)) ?? {};
+      if (!res.ok) {
+        setPinned(!nextPinned);
+        return;
+      }
       if (typeof data.pinned === "boolean") {
         setPinned(data.pinned);
-        window.dispatchEvent(new CustomEvent<PinsSyncDetail>(PINS_SYNC, { detail: { postKey, pinned: data.pinned } }));
+        window.dispatchEvent(
+          new CustomEvent<PinsSyncDetail>(PINS_SYNC, {
+            detail: { postKey, pinned: data.pinned },
+          }),
+        );
+      } else {
+        setPinned(!nextPinned);
       }
     } catch {
-      // ignore
+      setPinned(!nextPinned);
     } finally {
       busyRef.current = false;
       setPinning(false);
     }
-  }, [postKey]);
+  }, [postKey, pinned]);
 
   return { pinned, toggle, refresh, pinning };
 }

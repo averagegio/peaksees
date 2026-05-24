@@ -52,14 +52,18 @@ export function MarketInsightUncover({
   book,
   rules,
   onClose,
+  pullProgress = 0,
 }: {
   open: boolean;
   loading: boolean;
   book: MarketOrderbookPayload | null;
   rules: MarketContractPayload | null;
   onClose: () => void;
+  /** 0–1 while mobile press-and-pull preview is active */
+  pullProgress?: number;
 }) {
-  const [present, setPresent] = useState(open);
+  const pulling = !open && pullProgress > 0.04;
+  const [present, setPresent] = useState(open || pulling);
   const [animatedIn, setAnimatedIn] = useState(false);
 
   useEffect(() => {
@@ -70,10 +74,15 @@ export function MarketInsightUncover({
       });
       return () => cancelAnimationFrame(id);
     }
+    if (pulling) {
+      setPresent(true);
+      setAnimatedIn(false);
+      return undefined;
+    }
     setAnimatedIn(false);
-    const t = window.setTimeout(() => setPresent(false), 380);
+    const t = window.setTimeout(() => setPresent(false), 280);
     return () => window.clearTimeout(t);
-  }, [open]);
+  }, [open, pulling]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -88,15 +97,29 @@ export function MarketInsightUncover({
 
   const spread = book?.spread;
   const contractHref = rules?.contractUrl ?? (book ? `/m/${book.marketId}/contract` : null);
+  const pullPct = Math.round(Math.min(1, Math.max(0, pullProgress)) * 100);
+  const pullClip = `inset(${100 - pullPct}% 0 0 0 round 1rem)`;
 
   return (
     <div
       className={
         "market-insight-uncover absolute inset-0 z-20 flex flex-col overflow-hidden rounded-2xl " +
-        (animatedIn ? "market-insight-uncover--in" : "market-insight-uncover--out")
+        (pulling
+          ? "market-insight-uncover--pulling"
+          : animatedIn
+            ? "market-insight-uncover--in"
+            : "market-insight-uncover--out")
+      }
+      style={
+        pulling
+          ? {
+              clipPath: pullClip,
+              opacity: 0.45 + pullProgress * 0.5,
+            }
+          : undefined
       }
       role="dialog"
-      aria-modal="true"
+      aria-modal={open ? true : undefined}
       aria-label="Market depth and rules"
     >
       <div className="market-insight-uncover__sheen pointer-events-none absolute inset-0" aria-hidden />
@@ -112,29 +135,50 @@ export function MarketInsightUncover({
               </p>
             ) : null}
           </div>
-          <button
-            type="button"
-            data-no-insight-gesture="true"
-            onClick={onClose}
-            className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          >
-            Close
-          </button>
+          {open ? (
+            <button
+              type="button"
+              data-no-insight-gesture="true"
+              onClick={onClose}
+              className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              Close
+            </button>
+          ) : null}
         </div>
 
         <div className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          {loading && !book && !rules ? (
+          {pulling && !open ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <div
+                className="market-insight-pull-meter h-1 w-24 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
+                aria-hidden
+              >
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-[width] duration-75"
+                  style={{ width: `${pullPct}%` }}
+                />
+              </div>
+              <p className="mt-3 text-center text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                {pullPct >= 100
+                  ? "Uncovering depth…"
+                  : "Keep pulling down"}
+              </p>
+            </div>
+          ) : null}
+
+          {open && loading && !book && !rules ? (
             <p className="py-6 text-center text-xs text-zinc-500">Uncovering market depth…</p>
           ) : null}
 
-          {book ? (
+          {open && book ? (
             <div className="space-y-3 border-b border-zinc-200/80 pb-3 dark:border-zinc-800">
               <LevelTable title="Yes" bids={book.yes.bids} asks={book.yes.asks} />
               <LevelTable title="No" bids={book.no.bids} asks={book.no.asks} />
             </div>
           ) : null}
 
-          {rules ? (
+          {open && rules ? (
             <div className="market-insight-stagger mt-3 space-y-2">
               <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">
                 Market rules
@@ -174,7 +218,7 @@ export function MarketInsightUncover({
             </div>
           ) : null}
 
-          {!loading && !book && !rules ? (
+          {open && !loading && !book && !rules ? (
             <p className="py-4 text-center text-xs text-red-600 dark:text-red-400">
               Could not load market insight.
             </p>
