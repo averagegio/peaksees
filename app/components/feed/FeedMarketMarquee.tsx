@@ -606,26 +606,25 @@ export function FeedMarketMarquee({
               aria-hidden
             />
           </div>
+          {posts.length > 1 ? (
+            <FeedMarqueeDotScrub
+              posts={posts}
+              activeIndex={activeIndex}
+              variant={variant}
+              viewportRef={viewportRef}
+              pullRefreshing={pullRefreshing}
+              pauseForUser={pauseForUser}
+              goToSlide={(ix) => goToSlide(ix, "smooth")}
+              scrubToIndex={scrubToIndexDuringPill}
+              scrubScrollTo={scrubScrollTo}
+              clearScrubScrollStyles={clearScrubScrollStyles}
+              onScrubIndex={handleScrubIndex}
+              onScrubbingChange={handleScrubbingChange}
+              viewportReady={slideWidth > 0}
+            />
+          ) : null}
         </div>
       </div>
-
-      {posts.length > 1 ? (
-        <FeedMarqueeDotScrub
-          posts={posts}
-          activeIndex={activeIndex}
-          variant={variant}
-          viewportRef={viewportRef}
-          pullRefreshing={pullRefreshing}
-          pauseForUser={pauseForUser}
-          goToSlide={(ix) => goToSlide(ix, "smooth")}
-          scrubToIndex={scrubToIndexDuringPill}
-          scrubScrollTo={scrubScrollTo}
-          clearScrubScrollStyles={clearScrubScrollStyles}
-          onScrubIndex={handleScrubIndex}
-          onScrubbingChange={handleScrubbingChange}
-          viewportReady={slideWidth > 0}
-        />
-      ) : null}
     </div>
   );
 }

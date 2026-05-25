@@ -168,15 +168,14 @@ export function FeedMarqueeDotScrub({
   });
 
   const railClass =
-    "feed-marquee-dots pointer-events-none absolute inset-x-0 bottom-0 z-[100] flex items-end justify-center " +
-    (isHero ? "pb-1" : "pb-0") +
-    (isMobileUi ? " feed-marquee-dots--mobile" : "");
+    "feed-marquee-dots absolute inset-x-0 bottom-0 z-30 flex items-end justify-center " +
+    (isMobileUi ? "feed-marquee-dots--mobile pointer-events-auto " : "pointer-events-none ") +
+    (isHero ? "pb-1" : "pb-0");
 
-  const setPillVisibleDom = useCallback((visible: boolean) => {
+  const setPillScrubbingDom = useCallback((scrubbing: boolean) => {
     const pill = pillRef.current;
     if (!pill) return;
-    pill.classList.toggle("feed-marquee-scrub-pill--visible", visible);
-    pill.classList.toggle("feed-marquee-scrub-pill--hidden", !visible);
+    pill.classList.toggle("feed-marquee-scrub-pill--scrubbing", scrubbing);
   }, []);
 
   const setCarouselPaused = useCallback(
@@ -191,10 +190,10 @@ export function FeedMarqueeDotScrub({
     lastHapticIndexRef.current = -1;
     lastScrubIndexRef.current = -1;
     setPillVisible(false);
-    setPillVisibleDom(false);
+    setPillScrubbingDom(false);
     setCarouselPaused(false);
     clearScrubScrollStyles();
-  }, [clearScrubScrollStyles, setCarouselPaused, setPillVisibleDom]);
+  }, [clearScrubScrollStyles, setCarouselPaused, setPillScrubbingDom]);
 
   const pulseScrubIndex = useCallback((ix: number) => {
     if (ix !== lastHapticIndexRef.current) {
@@ -207,10 +206,6 @@ export function FeedMarqueeDotScrub({
     (viewport: HTMLElement, hit: HTMLElement, clientX: number) => {
       const fraction = scrubFractionFromHit(hit, clientX);
       const ix = indexFromFraction(fraction, posts.length);
-      const slideW = slideWidthPx(viewport);
-      const maxLeft = Math.max(0, (posts.length - 1) * slideW);
-
-      scrubScrollTo(fraction * maxLeft);
 
       if (ix !== lastScrubIndexRef.current) {
         lastScrubIndexRef.current = ix;
@@ -222,13 +217,13 @@ export function FeedMarqueeDotScrub({
 
       return ix;
     },
-    [onScrubIndex, pauseForUser, posts.length, pulseScrubIndex, scrubScrollTo, scrubToIndex],
+    [onScrubIndex, pauseForUser, posts.length, pulseScrubIndex, scrubToIndex],
   );
 
   const startScrub = useCallback(
     (
       viewport: HTMLElement,
-      pill: HTMLElement,
+      _hitEl: HTMLElement,
       clientX: number,
       touchId: number,
       pointerId: number,
@@ -238,7 +233,7 @@ export function FeedMarqueeDotScrub({
       pauseForUser();
       setCarouselPaused(true);
       setPillVisible(true);
-      setPillVisibleDom(true);
+      setPillScrubbingDom(true);
       marketCardHaptic("press");
 
       scrubRef.current = { active: true, touchId, pointerId };
@@ -258,7 +253,7 @@ export function FeedMarqueeDotScrub({
       posts.length,
       pullRefreshing,
       setCarouselPaused,
-      setPillVisibleDom,
+      setPillScrubbingDom,
     ],
   );
 
@@ -271,7 +266,7 @@ export function FeedMarqueeDotScrub({
     lastHapticIndexRef.current = -1;
     lastScrubIndexRef.current = -1;
     setPillVisible(false);
-    setPillVisibleDom(false);
+    setPillScrubbingDom(false);
     setCarouselPaused(false);
     clearScrubScrollStyles();
 
@@ -289,7 +284,7 @@ export function FeedMarqueeDotScrub({
     pauseForUser,
     posts.length,
     setCarouselPaused,
-    setPillVisibleDom,
+    setPillScrubbingDom,
     viewportRef,
   ]);
 
@@ -304,8 +299,7 @@ export function FeedMarqueeDotScrub({
 
     const viewport = viewportRef.current;
     const hit = hitRef.current;
-    const pill = pillRef.current;
-    if (!viewport || !hit || !pill || posts.length < 2) return;
+    if (!viewport || !hit || posts.length < 2) return;
 
     const useCoarseTouch =
       typeof window !== "undefined" &&
@@ -314,8 +308,9 @@ export function FeedMarqueeDotScrub({
     const onTouchStart = (e: TouchEvent) => {
       if (pullRefreshing || e.touches.length !== 1) return;
       e.stopPropagation();
+      e.preventDefault();
       const t = e.touches[0]!;
-      startScrub(viewport, pill, t.clientX, t.identifier, -1);
+      startScrub(viewport, hit, t.clientX, t.identifier, -1);
     };
 
     const onTouchMove = (e: TouchEvent) => {
@@ -343,7 +338,7 @@ export function FeedMarqueeDotScrub({
       if (useCoarseTouch) return;
       e.stopPropagation();
       e.preventDefault();
-      startScrub(viewport, pill, e.clientX, -1, e.pointerId);
+      startScrub(viewport, hit, e.clientX, -1, e.pointerId);
       try {
         hit.setPointerCapture(e.pointerId);
       } catch {
@@ -367,10 +362,10 @@ export function FeedMarqueeDotScrub({
       }
     };
 
-    hit.addEventListener("touchstart", onTouchStart, { passive: false });
-    hit.addEventListener("touchmove", onTouchMove, { passive: false });
-    hit.addEventListener("touchend", onTouchEnd, { passive: true });
-    hit.addEventListener("touchcancel", onTouchEnd, { passive: true });
+    hit.addEventListener("touchstart", onTouchStart, { capture: true, passive: false });
+    hit.addEventListener("touchmove", onTouchMove, { capture: true, passive: false });
+    hit.addEventListener("touchend", onTouchEnd, { capture: true, passive: true });
+    hit.addEventListener("touchcancel", onTouchEnd, { capture: true, passive: true });
 
     if (!useCoarseTouch) {
       hit.addEventListener("pointerdown", onPointerDown);
@@ -380,10 +375,10 @@ export function FeedMarqueeDotScrub({
     }
 
     listenersCleanupRef.current = () => {
-      hit.removeEventListener("touchstart", onTouchStart);
-      hit.removeEventListener("touchmove", onTouchMove);
-      hit.removeEventListener("touchend", onTouchEnd);
-      hit.removeEventListener("touchcancel", onTouchEnd);
+      hit.removeEventListener("touchstart", onTouchStart, { capture: true });
+      hit.removeEventListener("touchmove", onTouchMove, { capture: true });
+      hit.removeEventListener("touchend", onTouchEnd, { capture: true });
+      hit.removeEventListener("touchcancel", onTouchEnd, { capture: true });
       hit.removeEventListener("pointerdown", onPointerDown);
       hit.removeEventListener("pointermove", onPointerMove);
       hit.removeEventListener("pointerup", onPointerUp);
@@ -458,8 +453,8 @@ export function FeedMarqueeDotScrub({
           aria-valuemax={posts.length}
           aria-valuenow={activeIndex + 1}
           className={
-            "feed-marquee-scrub-pill feed-marquee-scrub-pill--hidden flex items-center justify-center gap-2 rounded-full px-5 py-2.5 " +
-            (pillVisible ? "feed-marquee-scrub-pill--visible" : "")
+            "feed-marquee-scrub-pill feed-marquee-scrub-pill--idle flex items-center justify-center gap-2 rounded-full px-5 py-2.5 " +
+            (pillVisible ? "feed-marquee-scrub-pill--scrubbing" : "")
           }
         >
           <DotIndicators

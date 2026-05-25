@@ -38,17 +38,29 @@ function hapticClick(freq: number, durationSec = 0.014, gain = 0.07) {
 /**
  * Fire device vibration when supported; uses a quiet tap tone as fallback (e.g. iOS).
  */
+function prefersCoarsePointer() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(pointer: coarse)").matches;
+}
+
+function playHapticTone(kind: MarketCardHapticKind) {
+  if (kind === "press") hapticClick(220, 0.016, 0.09);
+  else if (kind === "pull") hapticClick(140, 0.02, 0.1);
+  else if (kind === "scrub") hapticClick(200, 0.012, 0.08);
+  else hapticClick(160, 0.014, 0.07);
+}
+
 export function marketCardHaptic(
   kind: MarketCardHapticKind = "reveal",
 ): boolean {
   if (typeof navigator === "undefined") return false;
 
   const now = Date.now();
-  if (kind === "scrub" && now - lastVibrateAt < 85) return false;
+  if (kind === "scrub" && now - lastVibrateAt < 70) return false;
 
   let vibrated = false;
   const vibrate = navigator.vibrate?.bind(navigator);
-  if (vibrate) {
+  if (vibrate && !prefersCoarsePointer()) {
     try {
       vibrate(0);
       const ok = vibrate(PATTERNS[kind] ?? 10);
@@ -58,10 +70,9 @@ export function marketCardHaptic(
     }
   }
 
-  if (!vibrated) {
-    if (kind === "press") hapticClick(220);
-    else if (kind === "pull") hapticClick(140, 0.018, 0.09);
-    else if (kind === "scrub") hapticClick(180, 0.01, 0.05);
+  // iOS and most mobile browsers ignore vibrate — always play a tap tone on touch.
+  if (!vibrated || prefersCoarsePointer()) {
+    playHapticTone(kind);
   }
 
   if (vibrated || kind !== "scrub") lastVibrateAt = now;

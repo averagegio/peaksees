@@ -101,12 +101,12 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  min-height: 4.5rem;
-  padding: 0 1rem 0.5rem;
+  min-height: 5.5rem;
+  padding: 0 1rem 0.65rem;
   touch-action: none;
   -webkit-touch-callout: none;
 }
@@ -125,38 +125,41 @@ body {
     background-color 0.15s ease;
 }
 
-.feed-marquee-scrub-pill--hidden {
-  visibility: hidden;
-  opacity: 0;
-  transform: scale(0.9);
-  pointer-events: none;
-  background: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-}
-
-/* Visible after tap: soft glass capsule (reference scrub pill) */
-.feed-marquee-scrub-pill--visible {
+/* Always-visible idle pill with dots (mobile) */
+.feed-marquee-scrub-pill--idle {
   visibility: visible;
   opacity: 1;
   transform: scale(1);
   pointer-events: none;
   min-width: 5.5rem;
-  border: 1px solid rgb(255 255 255 / 0.08) !important;
-  background: rgb(28 28 32 / 0.52) !important;
-  box-shadow:
-    0 1px 12px rgb(0 0 0 / 0.28),
-    inset 0 1px 0 rgb(255 255 255 / 0.06);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  border: 1px solid rgb(0 0 0 / 0.08) !important;
+  background: rgb(255 255 255 / 0.72) !important;
+  box-shadow: 0 1px 10px rgb(0 0 0 / 0.12);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
-.dark .feed-marquee-scrub-pill--visible {
+.dark .feed-marquee-scrub-pill--idle {
   border-color: rgb(255 255 255 / 0.1) !important;
-  background: rgb(24 24 28 / 0.58) !important;
+  background: rgb(24 24 28 / 0.62) !important;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.38);
+}
+
+/* Stronger glass while scrubbing */
+.feed-marquee-scrub-pill--scrubbing {
+  border-color: rgb(91 124 255 / 0.35) !important;
+  background: rgb(255 255 255 / 0.88) !important;
   box-shadow:
-    0 2px 14px rgb(0 0 0 / 0.42),
-    inset 0 1px 0 rgb(255 255 255 / 0.05);
+    0 2px 16px rgb(0 0 0 / 0.18),
+    0 0 0 1px rgb(91 124 255 / 0.2);
+  transform: scale(1.04);
+}
+
+.dark .feed-marquee-scrub-pill--scrubbing {
+  background: rgb(28 28 34 / 0.78) !important;
+  box-shadow:
+    0 2px 18px rgb(0 0 0 / 0.5),
+    0 0 0 1px rgb(91 124 255 / 0.28);
 }
 
 .feed-marquee-scrub-dot {
@@ -164,7 +167,7 @@ body {
   width: 0.375rem;
   height: 0.375rem;
   border-radius: 9999px;
-  background: rgb(255 255 255 / 0.22);
+  background: rgb(113 113 122 / 0.55);
   transition:
     transform 0.07s ease,
     width 0.07s ease,
@@ -174,7 +177,7 @@ body {
 }
 
 .dark .feed-marquee-scrub-dot {
-  background: rgb(255 255 255 / 0.18);
+  background: rgb(255 255 255 / 0.28);
 }
 
 .feed-marquee-scrub-dot--active {
