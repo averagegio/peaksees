@@ -85,15 +85,14 @@ export function FeedMarketMarquee({
   const pausedUntilRef = useRef(0);
   const scrollingProgrammaticallyRef = useRef(false);
   const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const userDraggingRef = useRef(false);
-  const pullGestureRef = useRef<{
+  const pullRootRef = useRef<HTMLDivElement | null>(null);
+  const pullOffsetRef = useRef(0);
+  const touchPullRef = useRef<{
     active: boolean;
-    pointerId: number;
     startX: number;
     startY: number;
     mode: PullMode | null;
-  }>({ active: false, pointerId: -1, startX: 0, startY: 0, mode: null });
-  const pullOffsetRef = useRef(0);
+  }>({ active: false, startX: 0, startY: 0, mode: null });
 
   const measure = useCallback(() => {
     const el = viewportRef.current;
@@ -119,8 +118,8 @@ export function FeedMarketMarquee({
   }, []);
 
   const resetPull = useCallback(() => {
-    pullGestureRef.current.active = false;
-    pullGestureRef.current.mode = null;
+    touchPullRef.current.active = false;
+    touchPullRef.current.mode = null;
     pullOffsetRef.current = 0;
     setPullOffset(0);
     setPullMode(null);
@@ -201,12 +200,12 @@ export function FeedMarketMarquee({
 
   useEffect(() => {
     const el = viewportRef.current;
-    if (!el || posts.length < 2 || prefersReducedMotion() || userDraggingRef.current) {
+    if (!el || posts.length < 2 || prefersReducedMotion()) {
       return undefined;
     }
 
     const tick = () => {
-      if (Date.now() < pausedUntilRef.current || userDraggingRef.current) return;
+      if (Date.now() < pausedUntilRef.current) return;
       const w = el.clientWidth;
       if (w <= 0) return;
       const next = (activeIndexRef.current + 1) % posts.length;
@@ -224,19 +223,127 @@ export function FeedMarketMarquee({
   }, [posts.length, viewportRef, slideWidth]);
 
   useEffect(() => {
-    const el = viewportRef.current;
-    if (!el) return undefined;
+    const root = pullRootRef.current;
+    const viewport = viewportRef.current;
+    if (!root || !viewport || !pullEnabled) return undefined;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (pullRefreshing || e.touches.length !== 1) return;
+      if (isMarqueeGestureBlocker(e.target)) return;
+
+      const t = e.touches[0]!;
+      pauseForUser();
+      touchPullRef.current = {
+        active: true,
+        startX: t.clientX,
+        startY: t.clientY,
+        mode: null,
+      };
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      const g = touchPullRef.current;
+      if (!g.active || pullRefreshing || e.touches.length !== 1) return;
+
+      const t = e.touches[0]!;
+      const dx = t.clientX - g.startX;
+      const dy = t.clientY - g.startY;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+
+      if (!g.mode) {
+        if (absX < 6 && absY < 6) return;
+
+        if (absX > absY * 1.15) {
+          if (dx < 0 || viewport.scrollLeft > 2) {
+            g.active = false;
+            return;
+          }
+          if (dx > 0 && viewport.scrollLeft <= 2) {
+            g.mode = "horizontal";
+            setPullMode("horizontal");
+            e.preventDefault();
+            setPullOffsetPx(pullDisplacement(dx));
+            return;
+          }
+          g.active = false;
+          return;
+        }
+
+        if (isCoarsePointer() && pageScrollAtTop && dy > 0 && absY > absX * 1.15) {
+          g.mode = "vertical";
+          setPullMode("vertical");
+          e.preventDefault();
+          setPullOffsetPx(pullDisplacement(dy));
+          return;
+        }
+
+        g.active = false;
+        return;
+      }
+
+      if (g.mode === "horizontal") {
+        if (dx <= 0) {
+          resetPull();
+          return;
+        }
+        e.preventDefault();
+        setPullOffsetPx(pullDisplacement(dx));
+      } else if (g.mode === "vertical") {
+        if (dy <= 0) {
+          resetPull();
+          return;
+        }
+        e.preventDefault();
+        setPullOffsetPx(pullDisplacement(dy));
+      }
+    };
+
+    const onTouchEnd = () => {
+      const g = touchPullRef.current;
+      if (!g.active) return;
+
+      const mode = g.mode;
+      const offset = pullOffsetRef.current;
+      resetPull();
+
+      if (offset >= PULL_THRESHOLD_PX && mode && onPullRefresh) {
+        void onPullRefresh();
+      }
+    };
+
+    root.addEventListener("touchstart", onTouchStart, { passive: true });
+    root.addEventListener("touchmove", onTouchMove, { passive: false });
+    root.addEventListener("touchend", onTouchEnd);
+    root.addEventListener("touchcancel", onTouchEnd);
+
+    return () => {
+      root.removeEventListener("touchstart", onTouchStart);
+      root.removeEventListener("touchmove", onTouchMove);
+      root.removeEventListener("touchend", onTouchEnd);
+      root.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, [
+    pullEnabled,
+    pullRefreshing,
+    pageScrollAtTop,
+    onPullRefresh,
+    pauseForUser,
+    resetPull,
+    setPullOffsetPx,
+    viewportRef,
+  ]);
+
+  useEffect(() => {
+    const root = pullRootRef.current;
+    if (!root || !pullEnabled) return undefined;
 
     const onPointerDown = (e: PointerEvent) => {
-      if (pullRefreshing || isMarqueeGestureBlocker(e.target)) return;
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-
+      if (e.pointerType === "touch" || pullRefreshing) return;
+      if (e.button !== 0 || isMarqueeGestureBlocker(e.target)) return;
       pauseForUser();
-      userDraggingRef.current = false;
-
-      pullGestureRef.current = {
+      touchPullRef.current = {
         active: true,
-        pointerId: e.pointerId,
         startX: e.clientX,
         startY: e.clientY,
         mode: null,
@@ -244,8 +351,9 @@ export function FeedMarketMarquee({
     };
 
     const onPointerMove = (e: PointerEvent) => {
-      const g = pullGestureRef.current;
-      if (!g.active || e.pointerId !== g.pointerId || pullRefreshing) return;
+      const g = touchPullRef.current;
+      const viewport = viewportRef.current;
+      if (!g.active || !viewport || pullRefreshing || e.pointerType === "touch") return;
 
       const dx = e.clientX - g.startX;
       const dy = e.clientY - g.startY;
@@ -253,37 +361,20 @@ export function FeedMarketMarquee({
       if (!g.mode) {
         const absX = Math.abs(dx);
         const absY = Math.abs(dy);
-        if (absX < 8 && absY < 8) return;
-
-        if (pullEnabled && el.scrollLeft <= 2 && dx > 0 && absX > absY * 1.15) {
+        if (absX < 6 && absY < 6) return;
+        if (viewport.scrollLeft <= 2 && dx > 0 && absX > absY * 1.15) {
           g.mode = "horizontal";
           setPullMode("horizontal");
-          return;
-        }
-        if (
-          pullEnabled &&
-          isCoarsePointer() &&
-          pageScrollAtTop &&
-          dy > 0 &&
-          absY > absX * 1.15
-        ) {
+        } else if (pageScrollAtTop && dy > 0 && absY > absX * 1.15) {
           g.mode = "vertical";
           setPullMode("vertical");
+        } else {
+          g.active = false;
           return;
         }
-        if (absX > absY * 1.05 && absX > 6) {
-          g.active = false;
-          userDraggingRef.current = true;
-          pausedUntilRef.current = Date.now() + USER_IDLE_MS;
-          return;
-        }
-        if (absX > 10 || absY > 10) {
-          g.active = false;
-        }
-        return;
       }
 
-      if (g.mode === "horizontal" && dx > 0 && el.scrollLeft <= 2) {
+      if (g.mode === "horizontal" && dx > 0) {
         e.preventDefault();
         setPullOffsetPx(pullDisplacement(dx));
       } else if (g.mode === "vertical" && dy > 0) {
@@ -293,30 +384,27 @@ export function FeedMarketMarquee({
     };
 
     const onPointerUp = (e: PointerEvent) => {
-      const g = pullGestureRef.current;
-      userDraggingRef.current = false;
-
-      if (g.active && e.pointerId === g.pointerId) {
-        const mode = g.mode;
-        const offset = pullOffsetRef.current;
-        resetPull();
-        if (pullEnabled && offset >= PULL_THRESHOLD_PX && mode && onPullRefresh) {
-          void onPullRefresh();
-        }
+      if (e.pointerType === "touch") return;
+      const g = touchPullRef.current;
+      if (!g.active) return;
+      const mode = g.mode;
+      const offset = pullOffsetRef.current;
+      resetPull();
+      if (offset >= PULL_THRESHOLD_PX && mode && onPullRefresh) {
+        void onPullRefresh();
       }
     };
 
-    el.addEventListener("pointerdown", onPointerDown);
-    el.addEventListener("pointermove", onPointerMove, { passive: false });
-    el.addEventListener("pointerup", onPointerUp);
-    el.addEventListener("pointercancel", onPointerUp);
+    root.addEventListener("pointerdown", onPointerDown);
+    root.addEventListener("pointermove", onPointerMove, { passive: false });
+    root.addEventListener("pointerup", onPointerUp);
+    root.addEventListener("pointercancel", onPointerUp);
 
     return () => {
-      userDraggingRef.current = false;
-      el.removeEventListener("pointerdown", onPointerDown);
-      el.removeEventListener("pointermove", onPointerMove);
-      el.removeEventListener("pointerup", onPointerUp);
-      el.removeEventListener("pointercancel", onPointerUp);
+      root.removeEventListener("pointerdown", onPointerDown);
+      root.removeEventListener("pointermove", onPointerMove);
+      root.removeEventListener("pointerup", onPointerUp);
+      root.removeEventListener("pointercancel", onPointerUp);
     };
   }, [
     pullEnabled,
@@ -355,7 +443,10 @@ export function FeedMarketMarquee({
   }
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
+    <div
+      ref={pullRootRef}
+      className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden"
+    >
       {pullMode === "vertical" && (pullOffset > 0 || pullRefreshing) ? (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center">
           <PullRefreshRail
@@ -381,7 +472,6 @@ export function FeedMarketMarquee({
             "feed-marquee-viewport feed-scroll feed-scroll-x relative min-h-0 w-full flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-none snap-x snap-mandatory " +
             (pullOffset > 0 ? "feed-marquee--pulling" : "")
           }
-          onTouchStart={pauseForUser}
           onWheel={pauseForUser}
         >
           <div

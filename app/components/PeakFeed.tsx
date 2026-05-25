@@ -165,7 +165,9 @@ export function MarketPostCard({
   const cardRef = useRef<HTMLElement | null>(null);
   const peakBadgeRef = useRef<HTMLButtonElement | null>(null);
   const peakGenerated = isPeakGeneratedMarketCard(post);
-  const insight = useMarketInsightReveal(post.id, peakGenerated && !pending);
+  const insight = useMarketInsightReveal(post.id, peakGenerated && !pending, {
+    pullGesture: !marqueeMode,
+  });
 
   useEffect(() => {
     return insight.bindGestures(cardRef.current);

@@ -47,7 +47,8 @@ body {
 
 .feed-marquee-viewport {
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pan-y;
+  /* pan-x only so horizontal swipes scroll the rail (iOS ignores scroll if pan-y + custom pointer handlers fight it). */
+  touch-action: pan-x;
   scroll-snap-type: x mandatory;
 }
 

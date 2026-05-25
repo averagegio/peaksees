@@ -32,7 +32,12 @@ type PullGesture = {
   committed: boolean;
 };
 
-export function useMarketInsightReveal(marketId: string, enabled: boolean) {
+export function useMarketInsightReveal(
+  marketId: string,
+  enabled: boolean,
+  options?: { pullGesture?: boolean },
+) {
+  const pullGesture = options?.pullGesture !== false;
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [book, setBook] = useState<MarketOrderbookPayload | null>(null);
@@ -96,7 +101,7 @@ export function useMarketInsightReveal(marketId: string, enabled: boolean) {
       };
 
       const onPointerDown = (e: PointerEvent) => {
-        if (!isCoarsePointer() || isGestureTarget(e.target)) return;
+        if (!pullGesture || !isCoarsePointer() || isGestureTarget(e.target)) return;
         if (e.pointerType === "mouse" && e.button !== 0) return;
         if (open) return;
 
@@ -192,7 +197,7 @@ export function useMarketInsightReveal(marketId: string, enabled: boolean) {
         el.removeEventListener("dblclick", onDblClick);
       };
     },
-    [enabled, open, fetchInsight, reveal, resetPull],
+    [enabled, pullGesture, open, fetchInsight, reveal, resetPull],
   );
 
   useEffect(() => {
