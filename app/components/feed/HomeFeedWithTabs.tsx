@@ -117,160 +117,6 @@ function scrollRootShowsSentinel(
   return s.left <= r.right + marginPastEndPx && s.right >= r.left;
 }
 
-function PullRefreshChevron({ ready }: { ready: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.25}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-5 w-5 motion-safe:transition-transform motion-safe:duration-300 motion-safe:ease-out"
-      style={{
-        transform: ready ? "rotate(180deg)" : "rotate(0deg)",
-      }}
-      aria-hidden
-    >
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
-
-/** Pull inset: maps drag travel to rail size with light saturation (rubber-band). */
-function pullDisplacement(delta: number) {
-  const dampened = delta * 0.42;
-  return Math.min(96, dampened * (1 + Math.log1p(dampened / 140)));
-}
-
-function PullRefreshRail({
-  expandedPx,
-  loading,
-  thresholdPx = 48,
-  orientation = "horizontal",
-}: {
-  expandedPx: number;
-  loading: boolean;
-  /** Pull distance needed before release triggers refresh. */
-  thresholdPx?: number;
-  orientation?: "horizontal" | "vertical";
-}) {
-  const maxProgressPx = 80;
-  const size = loading ? 78 : expandedPx;
-  if (size < 2 && !loading) return null;
-  const progress = loading ? 1 : Math.min(1, expandedPx / maxProgressPx);
-  const ready = !loading && expandedPx >= thresholdPx;
-  const railR = 15;
-  const circ = 2 * Math.PI * railR;
-  const isHorizontal = orientation === "horizontal";
-
-  return (
-    <div
-      role={loading ? "status" : undefined}
-      aria-live={loading ? "polite" : undefined}
-      aria-busy={loading || undefined}
-      data-pull-rail=""
-      className={
-        "flex shrink-0 items-center justify-center overflow-hidden motion-safe:duration-[240ms] motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)] " +
-        (isHorizontal
-          ? "h-full flex-row bg-gradient-to-r from-emerald-500/[0.06] via-transparent to-transparent pr-2 motion-safe:transition-[width] dark:from-emerald-400/[0.07]"
-          : "w-full flex-col bg-gradient-to-b from-emerald-500/[0.06] via-transparent to-transparent pb-2 motion-safe:transition-[height] dark:from-emerald-400/[0.07]")
-      }
-      style={isHorizontal ? { width: size } : { height: size }}
-    >
-      <div
-        className={`relative mx-auto flex h-[46px] w-[46px] items-center justify-center motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out ${
-          loading ? "animate-pull-refresh-breathe" : ready ? "scale-[1.06]" : "scale-100"
-        }`}
-      >
-        {loading ? (
-          <>
-            <svg
-              viewBox="0 0 40 40"
-              className="absolute inset-0 h-[46px] w-[46px] -rotate-90 motion-safe:animate-spin motion-safe:[animation-duration:780ms] dark:text-emerald-400 text-emerald-600"
-              aria-hidden
-            >
-              <circle
-                cx="20"
-                cy="20"
-                r={railR}
-                fill="none"
-                strokeWidth="2.5"
-                className="text-zinc-200 dark:text-zinc-600"
-                stroke="currentColor"
-              />
-              <circle
-                cx="20"
-                cy="20"
-                r={railR}
-                fill="none"
-                strokeWidth="3"
-                strokeLinecap="round"
-                stroke="currentColor"
-                strokeDasharray="22 999"
-              />
-            </svg>
-            <span className="relative z-[1] h-[30px] w-[30px] rounded-full border border-emerald-200/35 bg-white/95 shadow-inner shadow-emerald-500/12 dark:border-emerald-500/20 dark:bg-zinc-900/96 dark:shadow-black/40" />
-          </>
-        ) : (
-          <>
-            <svg
-              viewBox="0 0 40 40"
-              className="absolute inset-0 h-[46px] w-[46px] -rotate-90 text-emerald-600 motion-reduce:hidden dark:text-emerald-400"
-              aria-hidden
-            >
-              <circle
-                cx="20"
-                cy="20"
-                r={railR}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                className="text-emerald-200/70 dark:text-zinc-600"
-              />
-              <circle
-                cx="20"
-                cy="20"
-                r={railR}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeDasharray={`${circ} ${circ}`}
-                strokeDashoffset={circ * (1 - progress)}
-                className="opacity-95 drop-shadow-sm transition-[stroke-dashoffset] duration-75 ease-out"
-              />
-            </svg>
-            <div
-              className="relative z-[1] flex h-[34px] w-[34px] items-center justify-center rounded-full border border-zinc-200/90 bg-white/95 text-emerald-700 shadow-sm dark:border-zinc-600 dark:bg-zinc-900/95 dark:text-emerald-300"
-              style={{
-                opacity: 0.45 + progress * 0.55,
-              }}
-            >
-              <PullRefreshChevron ready={ready} />
-            </div>
-          </>
-        )}
-      </div>
-      {loading ? (
-        <span className="mt-1.5 text-[11px] font-semibold tracking-wide text-emerald-800/90 dark:text-emerald-300/95">
-          Refreshing feed…
-        </span>
-      ) : expandedPx >= 8 ? (
-        <span
-          className={`mt-1.5 text-[11px] font-medium motion-safe:transition-colors motion-safe:duration-200 ${
-            ready
-              ? "text-emerald-700 dark:text-emerald-300"
-              : "text-zinc-500 dark:text-zinc-400"
-          }`}
-        >
-          {ready ? "Release to refresh" : "Pull to refresh"}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 /** Feed tabs hide when scrolling the card rail; older markets load at the end of the row. */
 export function HomeFeedWithTabs({
   highlightMarketId,
@@ -291,8 +137,8 @@ export function HomeFeedWithTabs({
   const [peakMarketMeta, setPeakMarketMeta] = useState<Record<string, PeakMarketMeta>>({});
   const [loadMoreBusy, setLoadMoreBusy] = useState(false);
   const [marketsAtEnd, setMarketsAtEnd] = useState(false);
-  const [pullOffset, setPullOffset] = useState(0);
   const [pullRefreshing, setPullRefreshing] = useState(false);
+  const [pageScrollAtTop, setPageScrollAtTop] = useState(true);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const pageScrollRef = useRef<HTMLDivElement>(null);
@@ -304,11 +150,6 @@ export function HomeFeedWithTabs({
   const feedSessionRef = useRef(0);
   const generatedMarketsRef = useRef<Market[]>([]);
   const marketsAtEndRef = useRef(false);
-  const pullOffsetRef = useRef(0);
-  const pullGestureRef = useRef<{ active: boolean; startX: number }>({
-    active: false,
-    startX: 0,
-  });
   const tabRef = useRef(tab);
   const lastPullRefreshAtRef = useRef(0);
   const autogenPollRef = useRef<number | null>(null);
@@ -325,9 +166,6 @@ export function HomeFeedWithTabs({
   useEffect(() => {
     tabRef.current = tab;
   }, [tab]);
-  useEffect(() => {
-    pullOffsetRef.current = pullOffset;
-  }, [pullOffset]);
   const pullRefreshingRef = useRef(false);
   useEffect(() => {
     pullRefreshingRef.current = pullRefreshing;
@@ -730,118 +568,17 @@ export function HomeFeedWithTabs({
     if (page) page.scrollTop = 0;
     if (marquee) marquee.scrollLeft = 0;
     scrollLeftPrev.current = 0;
+    setPageScrollAtTop(true);
   }, [tab]);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || tab === "live") return undefined;
-
-    const g = pullGestureRef.current;
-
-    const onTouchStart = (e: TouchEvent) => {
-      if (pullRefreshingRef.current) return;
-      if (el.scrollLeft > 2) return;
-      g.active = true;
-      g.startX = e.touches[0].clientX;
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      if (!g.active || pullRefreshingRef.current) return;
-      if (el.scrollLeft > 2) {
-        g.active = false;
-        pullOffsetRef.current = 0;
-        setPullOffset(0);
-        return;
-      }
-      const dx = e.touches[0].clientX - g.startX;
-      if (dx > 0) {
-        e.preventDefault();
-        const v = pullDisplacement(dx);
-        pullOffsetRef.current = v;
-        setPullOffset(v);
-      }
-    };
-
-    const onTouchEnd = () => {
-      if (!g.active) return;
-      g.active = false;
-      const armed = pullOffsetRef.current >= 48;
-      pullOffsetRef.current = 0;
-      setPullOffset(0);
-      if (armed && !pullRefreshingRef.current) void runPullRefreshRef.current();
-    };
-
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
-    el.addEventListener("touchmove", onTouchMove, { passive: false });
-    el.addEventListener("touchend", onTouchEnd);
-    el.addEventListener("touchcancel", onTouchEnd);
-
-    let mouseArmed = false;
-    let mouseStartX = 0;
-    let mousePtrId = -1;
-
-    const ptrDown = (e: PointerEvent) => {
-      if (e.pointerType === "touch") return;
-      if (pullRefreshingRef.current || el.scrollLeft > 2) return;
-      mouseArmed = true;
-      mouseStartX = e.clientX;
-      mousePtrId = e.pointerId;
-      try {
-        el.setPointerCapture(e.pointerId);
-      } catch {
-        mouseArmed = false;
-      }
-    };
-
-    const ptrMove = (e: PointerEvent) => {
-      if (e.pointerType === "touch" || !mouseArmed || e.pointerId !== mousePtrId) return;
-      if (pullRefreshingRef.current || (e.buttons & 1) === 0) return;
-      if (el.scrollLeft > 2) {
-        mouseArmed = false;
-        pullOffsetRef.current = 0;
-        setPullOffset(0);
-        return;
-      }
-      const dx = e.clientX - mouseStartX;
-      if (dx > 0) {
-        e.preventDefault();
-        const v = pullDisplacement(dx);
-        pullOffsetRef.current = v;
-        setPullOffset(v);
-      }
-    };
-
-    const ptrUp = (e: PointerEvent) => {
-      if (e.pointerType === "touch" || !mouseArmed || e.pointerId !== mousePtrId) return;
-      mouseArmed = false;
-      mousePtrId = -1;
-      try {
-        el.releasePointerCapture(e.pointerId);
-      } catch {
-        // ignore
-      }
-      const armed = pullOffsetRef.current >= 48;
-      pullOffsetRef.current = 0;
-      setPullOffset(0);
-      if (armed && !pullRefreshingRef.current) void runPullRefreshRef.current();
-    };
-
-    el.addEventListener("pointerdown", ptrDown);
-    el.addEventListener("pointermove", ptrMove, { passive: false });
-    el.addEventListener("pointerup", ptrUp);
-    el.addEventListener("pointercancel", ptrUp);
-
-    return () => {
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove", onTouchMove);
-      el.removeEventListener("touchend", onTouchEnd);
-      el.removeEventListener("touchcancel", onTouchEnd);
-      el.removeEventListener("pointerdown", ptrDown);
-      el.removeEventListener("pointermove", ptrMove);
-      el.removeEventListener("pointerup", ptrUp);
-      el.removeEventListener("pointercancel", ptrUp);
-    };
-  }, [tab]);
+    const page = pageScrollRef.current;
+    if (!page) return undefined;
+    const onScroll = () => setPageScrollAtTop(page.scrollTop < 8);
+    onScroll();
+    page.addEventListener("scroll", onScroll, { passive: true });
+    return () => page.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     if (tab === "live") return undefined;
@@ -1119,29 +856,21 @@ export function HomeFeedWithTabs({
             </div>
           </section>
         ) : (
-          <div className="relative w-full">
-            {pullOffset > 0 || pullRefreshing ? (
-              <div className="absolute left-0 top-[4.5rem] z-30 flex h-[calc(min(54dvh,34rem)-4.5rem)] items-center sm:top-[5rem]">
-                <PullRefreshRail
-                  orientation="horizontal"
-                  expandedPx={pullOffset}
-                  loading={pullRefreshing}
-                />
-              </div>
-            ) : null}
-            <FeedMarketHero
-              key={`${tab}-${explore}`}
-              posts={feedPosts}
-              viewerUserId={viewerUserId}
-              tourMarketPostIndex={0}
-              viewportRef={scrollRef}
-              sentinelRef={sentinelRef}
-              highlightMarketId={highlightMarketId}
-              onActiveIndexChange={onMarqueeIndexChange}
-              exploreLabel={explore}
-              loadHint={loadHint}
-            />
-          </div>
+          <FeedMarketHero
+            key={`${tab}-${explore}`}
+            posts={feedPosts}
+            viewerUserId={viewerUserId}
+            tourMarketPostIndex={0}
+            viewportRef={scrollRef}
+            sentinelRef={sentinelRef}
+            highlightMarketId={highlightMarketId}
+            onActiveIndexChange={onMarqueeIndexChange}
+            exploreLabel={explore}
+            loadHint={loadHint}
+            onPullRefresh={() => void runPullRefreshRef.current()}
+            pullRefreshing={pullRefreshing}
+            pageScrollAtTop={pageScrollAtTop}
+          />
         )}
 
         <FeedSiteSection />

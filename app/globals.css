@@ -77,6 +77,14 @@ body {
   width: 100%;
 }
 
+.feed-marquee--scrubbing {
+  scroll-snap-type: none;
+}
+
+.feed-marquee--pulling {
+  overscroll-behavior: contain;
+}
+
 @keyframes poppy-hover-bounce {
   0%,
   100% {

@@ -15,6 +15,9 @@ export function FeedMarketHero({
   onActiveIndexChange,
   exploreLabel,
   loadHint,
+  onPullRefresh,
+  pullRefreshing,
+  pageScrollAtTop,
 }: {
   posts: MarketPost[];
   viewerUserId?: string;
@@ -25,6 +28,9 @@ export function FeedMarketHero({
   onActiveIndexChange?: (index: number) => void;
   exploreLabel: string;
   loadHint?: string | null;
+  onPullRefresh?: () => void | Promise<void>;
+  pullRefreshing?: boolean;
+  pageScrollAtTop?: boolean;
 }) {
   return (
     <section
@@ -43,7 +49,9 @@ export function FeedMarketHero({
             </p>
             <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
               Exploring <span className="font-semibold text-zinc-800 dark:text-zinc-200">{exploreLabel}</span>
-              <span className="hidden sm:inline"> · swipe or wait for the next card</span>
+              <span className="md:hidden"> · pull down to refresh</span>
+              <span className="hidden md:inline"> · swipe or wait for the next card</span>
+              <span className="md:hidden"> · hold to scrub</span>
             </p>
           </div>
           {loadHint ? (
@@ -61,6 +69,9 @@ export function FeedMarketHero({
             highlightMarketId={highlightMarketId}
             onActiveIndexChange={onActiveIndexChange}
             variant="hero"
+            onPullRefresh={onPullRefresh}
+            pullRefreshing={pullRefreshing}
+            pageScrollAtTop={pageScrollAtTop}
           />
         </div>
       </div>
