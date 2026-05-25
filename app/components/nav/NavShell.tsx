@@ -2,13 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
+
+import { PeakseesHeaderBanner } from "@/app/components/PeakseesHeaderBanner";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { BackButton } from "@/app/components/BackButton";
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { PeakpointsWalletBadge } from "@/app/components/peakpoints/PeakpointsWalletBadge";
 import { SidebarNav } from "@/app/components/sidebar/SidebarNav";
-import { FEED_MISSION, PEAKSEES_HEADER_BANNER } from "@/lib/brand";
+import { FEED_MISSION } from "@/lib/brand";
 import type { PublicUser } from "@/lib/auth/users-store";
 
 function initials(displayName: string) {
@@ -79,11 +81,7 @@ export function NavShell({
           className="flex w-full items-center justify-center bg-white px-2 py-0.5 sm:px-3 sm:py-1 dark:bg-zinc-950"
           onClick={() => setOpen(false)}
         >
-          <Image
-            src={PEAKSEES_HEADER_BANNER}
-            alt="peaksees — prediction markets"
-            width={720}
-            height={220}
+          <PeakseesHeaderBanner
             className="h-auto w-full max-h-[44px] max-w-md object-contain sm:max-h-[52px] sm:max-w-lg"
             sizes="(max-width: 768px) 100vw, 32rem"
             priority
@@ -196,12 +194,11 @@ export function NavShell({
           aria-hidden={!open}
         >
           <div className="flex items-center justify-between border-b border-zinc-100 px-3 py-2.5 dark:border-zinc-800">
-            <Image
-              src={PEAKSEES_HEADER_BANNER}
+            <PeakseesHeaderBanner
               alt=""
               width={320}
               height={96}
-              className="h-10 max-h-10 w-auto max-w-[12rem] object-contain object-left opacity-95 dark:brightness-[1.02]"
+              className="h-10 max-h-10 w-auto max-w-[12rem] object-contain object-left opacity-95"
             />
             <button
               type="button"

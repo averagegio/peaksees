@@ -12,18 +12,19 @@ import {
 import { marketCardHaptic } from "@/app/lib/haptics";
 import type { MarketPost } from "@/app/lib/mock-markets";
 
-/** Min horizontal movement before scrub engages (avoids accidental arms). */
-const SCRUB_ARM_PX = 10;
-/** ~55% of viewport width dragged = move one card (slower, easier to control). */
-const SCRUB_VIEWPORT_PER_CARD = 0.55;
+const SCRUB_ARM_PX = 8;
+/** Viewport fraction dragged to advance one card. */
+const SCRUB_VIEWPORT_PER_CARD = 0.42;
 const MOBILE_VISIBLE_DOTS = 5;
 
 type ScrubGesture = {
   armed: boolean;
+  active: boolean;
   pointerId: number;
   startX: number;
   startY: number;
   startIndex: number;
+  startScrollLeft: number;
 };
 
 function detectTouchScrubUi() {
@@ -71,12 +72,18 @@ function indexFromScroll(viewport: HTMLElement, count: number) {
   return Math.max(0, Math.min(count - 1, Math.round(viewport.scrollLeft / w)));
 }
 
-function scrollToIndex(viewport: HTMLElement, index: number, count: number) {
+function maxScrollLeft(viewport: HTMLElement, count: number) {
   const w = slideWidthPx(viewport);
-  const ix = Math.max(0, Math.min(count - 1, index));
-  const left = ix * w;
-  viewport.scrollTo({ left, behavior: "auto" });
-  return ix;
+  return Math.max(0, (count - 1) * w);
+}
+
+function setViewportScrubMode(viewport: HTMLElement | null, on: boolean) {
+  if (!viewport) return;
+  if (on) {
+    viewport.classList.add("feed-marquee--scrubbing");
+  } else {
+    viewport.classList.remove("feed-marquee--scrubbing");
+  }
 }
 
 function DotIndicators({
@@ -123,7 +130,7 @@ function DotIndicators({
 }
 
 /**
- * Mobile: tap pill, drag sideways to scrub. Index tracks carousel 1:1 (not scrollWidth).
+ * Mobile: tap pill, drag sideways to scrub. Uses touch + pointer and syncs scroll immediately.
  */
 export function FeedMarqueeDotScrub({
   posts,
@@ -143,23 +150,24 @@ export function FeedMarqueeDotScrub({
   pullRefreshing?: boolean;
   pauseForUser: () => void;
   goToSlide: (index: number) => void;
-  /** Immediate index sync for pill dots + badge while dragging. */
   onScrubIndex?: (index: number) => void;
   onScrubbingChange?: (scrubbing: boolean) => void;
 }) {
   const isHero = variant === "hero";
   const isMobileUi = useTouchScrubUi();
-  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [pillEngaged, setPillEngaged] = useState(false);
 
   const pillRef = useRef<HTMLDivElement | null>(null);
   const listenersCleanupRef = useRef<(() => void) | null>(null);
   const lastHapticIndexRef = useRef(-1);
   const scrubRef = useRef<ScrubGesture>({
     armed: false,
+    active: false,
     pointerId: -1,
     startX: 0,
     startY: 0,
     startIndex: 0,
+    startScrollLeft: 0,
   });
 
   const railClass =
@@ -167,91 +175,118 @@ export function FeedMarqueeDotScrub({
     (isHero ? "bottom-0 pb-3 pt-8" : "bottom-0 pb-2 pt-6") +
     (isMobileUi ? " feed-marquee-dots--mobile" : "");
 
-  const setScrubbing = useCallback(
+  const setMarqueeScrubbing = useCallback(
     (scrubbing: boolean) => {
-      setIsScrubbing(scrubbing);
+      setPillEngaged(scrubbing);
       onScrubbingChange?.(scrubbing);
+      setViewportScrubMode(viewportRef.current, scrubbing);
     },
-    [onScrubbingChange],
+    [onScrubbingChange, viewportRef],
   );
 
   const resetGesture = useCallback(() => {
     scrubRef.current = {
       armed: false,
+      active: false,
       pointerId: -1,
       startX: 0,
       startY: 0,
       startIndex: 0,
+      startScrollLeft: 0,
     };
     lastHapticIndexRef.current = -1;
-    setScrubbing(false);
-  }, [setScrubbing]);
+    setMarqueeScrubbing(false);
+  }, [setMarqueeScrubbing]);
 
-  const pulseScrubIndex = useCallback(
-    (ix: number) => {
-      if (ix !== lastHapticIndexRef.current) {
-        lastHapticIndexRef.current = ix;
-        marketCardHaptic("scrub");
-      }
-    },
-    [],
-  );
+  const pulseScrubIndex = useCallback((ix: number) => {
+    if (ix !== lastHapticIndexRef.current) {
+      lastHapticIndexRef.current = ix;
+      marketCardHaptic("scrub");
+    }
+  }, []);
 
   const applyScrubFromDrag = useCallback(
-    (viewport: HTMLElement, dx: number) => {
+    (viewport: HTMLElement, clientX: number) => {
       const slideW = slideWidthPx(viewport);
-      const pxPerCard = Math.max(slideW * SCRUB_VIEWPORT_PER_CARD, 48);
-      const deltaCards = -dx / pxPerCard;
-      const ix = Math.round(scrubRef.current.startIndex + deltaCards);
-      const clamped = Math.max(0, Math.min(posts.length - 1, ix));
-      const settled = scrollToIndex(viewport, clamped, posts.length);
-      onScrubIndex?.(settled);
-      pulseScrubIndex(settled);
-      return settled;
+      const dx = clientX - scrubRef.current.startX;
+      const maxLeft = maxScrollLeft(viewport, posts.length);
+      const left = Math.max(
+        0,
+        Math.min(maxLeft, scrubRef.current.startScrollLeft - dx),
+      );
+      viewport.scrollLeft = left;
+      const ix = indexFromScroll(viewport, posts.length);
+      onScrubIndex?.(ix);
+      pulseScrubIndex(ix);
+      return ix;
     },
     [onScrubIndex, posts.length, pulseScrubIndex],
   );
 
-  const armScrub = useCallback(
-    (pointerId: number, pill: HTMLElement) => {
-      if (scrubRef.current.armed) return;
-      scrubRef.current.armed = true;
-      lastHapticIndexRef.current = scrubRef.current.startIndex;
-      setScrubbing(true);
-      try {
-        pill.setPointerCapture(pointerId);
-      } catch {
-        // ignore
-      }
-      marketCardHaptic("pull");
+  const beginGesture = useCallback(
+    (viewport: HTMLElement, clientX: number, clientY: number, pointerId: number) => {
+      if (pullRefreshing || scrubRef.current.active) return;
+
+      pauseForUser();
+      const startIx = indexFromScroll(viewport, posts.length);
+      const slideW = slideWidthPx(viewport);
+      scrubRef.current = {
+        armed: false,
+        active: true,
+        pointerId,
+        startX: clientX,
+        startY: clientY,
+        startIndex: startIx,
+        startScrollLeft: startIx * slideW,
+      };
+      lastHapticIndexRef.current = startIx;
+      setMarqueeScrubbing(true);
+      marketCardHaptic("press");
     },
-    [setScrubbing],
+    [pauseForUser, posts.length, pullRefreshing, setMarqueeScrubbing],
   );
 
-  const endScrub = useCallback(
-    (pointerId: number, pill: HTMLElement | null) => {
-      const el = viewportRef.current;
-      const wasArmed = scrubRef.current.armed;
-      scrubRef.current.armed = false;
-      setScrubbing(false);
-      lastHapticIndexRef.current = -1;
+  const armScrub = useCallback(() => {
+    if (scrubRef.current.armed) return;
+    scrubRef.current.armed = true;
+    marketCardHaptic("pull");
+  }, []);
 
-      if (pill) {
-        try {
-          pill.releasePointerCapture(pointerId);
-        } catch {
-          // ignore
-        }
+  const tryArmFromDelta = useCallback(
+    (clientX: number, clientY: number) => {
+      if (scrubRef.current.armed || !scrubRef.current.active) return false;
+      const dx = clientX - scrubRef.current.startX;
+      const dy = clientY - scrubRef.current.startY;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+      if (absDx >= SCRUB_ARM_PX && absDx >= absDy * 1.02) {
+        armScrub();
+        return true;
       }
-      if (el && wasArmed) {
-        pauseForUser();
-        const ix = indexFromScroll(el, posts.length);
+      return false;
+    },
+    [armScrub],
+  );
+
+  const endScrub = useCallback(() => {
+    if (!scrubRef.current.active) return;
+    const el = viewportRef.current;
+    const wasArmed = scrubRef.current.armed;
+    scrubRef.current.active = false;
+    scrubRef.current.armed = false;
+    scrubRef.current.pointerId = -1;
+    lastHapticIndexRef.current = -1;
+    setMarqueeScrubbing(false);
+
+    if (el) {
+      pauseForUser();
+      const ix = indexFromScroll(el, posts.length);
+      if (wasArmed) {
         goToSlide(ix);
-        onScrubIndex?.(ix);
       }
-    },
-    [goToSlide, onScrubIndex, pauseForUser, posts.length, setScrubbing, viewportRef],
-  );
+      onScrubIndex?.(ix);
+    }
+  }, [goToSlide, onScrubIndex, pauseForUser, posts.length, setMarqueeScrubbing, viewportRef]);
 
   const bindPillListeners = useCallback(() => {
     listenersCleanupRef.current?.();
@@ -262,30 +297,38 @@ export function FeedMarqueeDotScrub({
       return;
     }
 
-    const el = viewportRef.current;
+    const viewport = viewportRef.current;
     const pill = pillRef.current;
-    if (!el || !pill || posts.length < 2) return;
+    if (!viewport || !pill || posts.length < 2) return;
 
     const onTouchStart = (e: TouchEvent) => {
       if (pullRefreshing || e.touches.length !== 1) return;
-      marketCardHaptic("press");
+      e.stopPropagation();
+      const t = e.touches[0]!;
+      beginGesture(viewport, t.clientX, t.clientY, t.identifier);
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!scrubRef.current.active || e.touches.length !== 1) return;
+      const t = e.touches[0]!;
+      if (tryArmFromDelta(t.clientX, t.clientY)) {
+        e.preventDefault();
+      }
+      if (!scrubRef.current.armed) return;
+      e.preventDefault();
+      applyScrubFromDrag(viewport, t.clientX);
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!scrubRef.current.active) return;
+      if (e.touches.length > 0) return;
+      endScrub();
     };
 
     const onPointerDown = (e: PointerEvent) => {
       if (pullRefreshing || e.pointerType === "mouse") return;
-
-      pauseForUser();
-      const startIx = indexFromScroll(el, posts.length);
-      scrubRef.current = {
-        armed: false,
-        pointerId: e.pointerId,
-        startX: e.clientX,
-        startY: e.clientY,
-        startIndex: startIx,
-      };
-      lastHapticIndexRef.current = startIx;
-      setScrubbing(false);
-
+      e.stopPropagation();
+      beginGesture(viewport, e.clientX, e.clientY, e.pointerId);
       try {
         pill.setPointerCapture(e.pointerId);
       } catch {
@@ -294,64 +337,57 @@ export function FeedMarqueeDotScrub({
     };
 
     const onPointerMove = (e: PointerEvent) => {
-      if (e.pointerId !== scrubRef.current.pointerId) return;
-
-      const dx = e.clientX - scrubRef.current.startX;
-      const absDx = Math.abs(dx);
-      const absDy = Math.abs(e.clientY - scrubRef.current.startY);
-
-      if (!scrubRef.current.armed) {
-        if (absDx >= SCRUB_ARM_PX && absDx >= absDy * 1.05) {
-          armScrub(e.pointerId, pill);
-        }
+      if (!scrubRef.current.active || e.pointerId !== scrubRef.current.pointerId) {
         return;
       }
-
+      if (tryArmFromDelta(e.clientX, e.clientY)) {
+        e.preventDefault();
+      }
+      if (!scrubRef.current.armed) return;
       e.preventDefault();
-      applyScrubFromDrag(el, dx);
+      applyScrubFromDrag(viewport, e.clientX);
     };
 
     const onPointerUp = (e: PointerEvent) => {
-      if (e.pointerId !== scrubRef.current.pointerId) return;
-      endScrub(e.pointerId, pill);
-      scrubRef.current.pointerId = -1;
+      if (!scrubRef.current.active || e.pointerId !== scrubRef.current.pointerId) return;
+      endScrub();
     };
 
-    pill.addEventListener("touchstart", onTouchStart, { passive: true });
+    pill.addEventListener("touchstart", onTouchStart, { passive: false });
     pill.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("pointermove", onPointerMove, {
-      passive: false,
-      capture: true,
-    });
+    document.addEventListener("touchmove", onTouchMove, { passive: false, capture: true });
+    document.addEventListener("touchend", onTouchEnd, { capture: true });
+    document.addEventListener("touchcancel", onTouchEnd, { capture: true });
+    document.addEventListener("pointermove", onPointerMove, { passive: false, capture: true });
     document.addEventListener("pointerup", onPointerUp, { capture: true });
     document.addEventListener("pointercancel", onPointerUp, { capture: true });
 
     listenersCleanupRef.current = () => {
       pill.removeEventListener("touchstart", onTouchStart);
       pill.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("touchmove", onTouchMove, { capture: true });
+      document.removeEventListener("touchend", onTouchEnd, { capture: true });
+      document.removeEventListener("touchcancel", onTouchEnd, { capture: true });
       document.removeEventListener("pointermove", onPointerMove, { capture: true });
       document.removeEventListener("pointerup", onPointerUp, { capture: true });
       document.removeEventListener("pointercancel", onPointerUp, { capture: true });
     };
   }, [
     applyScrubFromDrag,
-    armScrub,
+    beginGesture,
     endScrub,
     isMobileUi,
-    pauseForUser,
     posts.length,
     pullRefreshing,
     resetGesture,
-    setScrubbing,
+    tryArmFromDelta,
     viewportRef,
   ]);
 
   const setPillRef = useCallback(
     (node: HTMLDivElement | null) => {
       pillRef.current = node;
-      if (node) {
-        bindPillListeners();
-      }
+      if (node) bindPillListeners();
     },
     [bindPillListeners],
   );
@@ -377,11 +413,13 @@ export function FeedMarqueeDotScrub({
     MOBILE_VISIBLE_DOTS,
   );
 
+  const showOutline = isMobileUi && pillEngaged;
+
   const pillClass =
     "feed-marquee-scrub-pill flex items-center justify-center rounded-full " +
     (isMobileUi
       ? "pointer-events-auto gap-1.5 px-2.5 py-1.5 min-h-8 min-w-[3.25rem] " +
-        (isScrubbing ? "feed-marquee-scrub-pill--outline" : "")
+        (showOutline ? "feed-marquee-scrub-pill--outline" : "")
       : "pointer-events-none gap-1.5 px-3 py-1.5 ");
 
   if (posts.length < 2) return null;
@@ -408,7 +446,7 @@ export function FeedMarqueeDotScrub({
           activeIndex={activeIndex}
           indices={isMobileUi ? mobileDotIndices : undefined}
           compact={isMobileUi}
-          scrubbing={isMobileUi && isScrubbing}
+          scrubbing={isMobileUi && pillEngaged}
         />
       </div>
     </div>

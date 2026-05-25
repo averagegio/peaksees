@@ -8,7 +8,7 @@ import { LogoutButton } from "@/app/components/LogoutButton";
 import { PeakpointsWalletBadge } from "@/app/components/peakpoints/PeakpointsWalletBadge";
 import { ProfileEditor } from "@/app/components/profile/ProfileEditor";
 import { ProfilePeakFeed } from "@/app/components/profile/ProfilePeakFeed";
-import { PEAKSEES_HEADER_BANNER } from "@/lib/brand";
+import { PeakseesHeaderBanner } from "@/app/components/PeakseesHeaderBanner";
 import { ProfileFollowSocial } from "@/app/components/profile/ProfileFollowSocial";
 import { formatAtHandle } from "@/lib/auth/handle";
 import { getSession } from "@/lib/auth/session";
@@ -45,12 +45,11 @@ export default async function DashboardPage() {
       <header className="border-b border-zinc-200/90 bg-white px-4 py-5 dark:border-zinc-800 dark:bg-zinc-950">
         <div className="mx-auto flex max-w-2xl flex-col gap-6">
           <Link href="/feed" className="mx-auto flex w-full max-w-lg justify-center">
-            <Image
-              src={PEAKSEES_HEADER_BANNER}
+            <PeakseesHeaderBanner
               alt="peaksees home"
               width={640}
               height={200}
-              className="h-auto w-full max-h-[112px] object-contain sm:max-h-[128px] dark:brightness-[1.02]"
+              className="h-auto w-full max-h-[112px] object-contain sm:max-h-[128px]"
             />
           </Link>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 pt-4 dark:border-zinc-800">

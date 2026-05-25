@@ -1,6 +1,9 @@
 /** Full eye + wordmark header banner (transparent PNG). */
 export const PEAKSEES_HEADER_BANNER = "/peaksees-header-transparent.png";
 
+/** Dark UI variant — near-white letter fills knocked out to transparent. */
+export const PEAKSEES_HEADER_BANNER_DARK = "/peaksees-header-dark.png";
+
 /** Animated GIF loop used on the public landing page. */
 export const PEAKSEES_BG_LOOP = "/peaksees-bg-loop.gif";
 

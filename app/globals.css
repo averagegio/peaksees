@@ -113,13 +113,15 @@ body {
 }
 
 .feed-marquee-scrub-pill--outline {
-  background: transparent;
-  box-shadow: none;
-  border-color: rgb(113 113 122 / 0.45);
+  background: rgb(255 255 255 / 0.06);
+  box-shadow: 0 0 0 1px rgb(113 113 122 / 0.55);
+  border-color: rgb(82 82 91 / 0.75);
 }
 
 .dark .feed-marquee-scrub-pill--outline {
-  border-color: rgb(82 82 91 / 0.55);
+  background: rgb(255 255 255 / 0.04);
+  box-shadow: 0 0 0 1px rgb(161 161 170 / 0.45);
+  border-color: rgb(161 161 170 / 0.55);
 }
 
 .feed-marquee-scrub-pill--outline [data-marquee-dot] {

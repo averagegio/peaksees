@@ -1,8 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import { BackButton } from "@/app/components/BackButton";
-import { PEAKSEES_HEADER_BANNER } from "@/lib/brand";
+import { PeakseesHeaderBanner } from "@/app/components/PeakseesHeaderBanner";
 
 export function AuthPageHeader({ crumb }: { crumb: string }) {
   return (
@@ -11,8 +10,7 @@ export function AuthPageHeader({ crumb }: { crumb: string }) {
         <BackButton fallbackHref="/" iconOnly />
       </div>
       <Link href="/" className="flex flex-col items-center gap-3 px-4 py-3 sm:flex-row sm:justify-center sm:gap-6 sm:py-4">
-        <Image
-          src={PEAKSEES_HEADER_BANNER}
+        <PeakseesHeaderBanner
           alt="peaksees"
           width={560}
           height={170}

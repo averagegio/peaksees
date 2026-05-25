@@ -1,13 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { PeakseesHeaderBanner } from "@/app/components/PeakseesHeaderBanner";
 import { SiteFooter } from "@/app/components/marketing/SiteFooter";
 import { getSession } from "@/lib/auth/session";
-import {
-  PEAKSEES_BG_LOOP,
-  PEAKSEES_HEADER_BANNER,
-  PEAKSEES_LANDING_HERO,
-} from "@/lib/brand";
+import { PEAKSEES_BG_LOOP, PEAKSEES_LANDING_HERO } from "@/lib/brand";
 
 export default async function Home() {
   const session = await getSession();
@@ -45,8 +42,7 @@ export default async function Home() {
           </p>
 
           <div className="mt-6 rounded-2xl border border-zinc-300/80 bg-white/85 p-5 shadow-lg shadow-zinc-900/8 backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/85 dark:shadow-black/25">
-            <Image
-              src={PEAKSEES_HEADER_BANNER}
+            <PeakseesHeaderBanner
               alt="peaksees"
               width={520}
               height={160}
