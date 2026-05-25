@@ -12,6 +12,8 @@ import { marketCardHaptic } from "@/app/lib/haptics";
 import type { MarketPost } from "@/app/lib/mock-markets";
 
 const SCRUB_DRAG_PX = 6;
+/** Dots visible inside the mobile scrub pill (sliding window around active card). */
+const MOBILE_VISIBLE_DOTS = 5;
 
 type ScrubGesture = {
   armed: boolean;
@@ -35,18 +37,34 @@ function useCoarsePointer() {
   return coarse;
 }
 
+function visibleDotIndices(count: number, active: number, maxVisible: number) {
+  if (count <= maxVisible) {
+    return Array.from({ length: count }, (_, i) => i);
+  }
+  const half = Math.floor(maxVisible / 2);
+  const start = Math.max(0, Math.min(active - half, count - maxVisible));
+  return Array.from({ length: maxVisible }, (_, i) => start + i);
+}
+
 function DotIndicators({
   posts,
   activeIndex,
+  indices,
+  compact,
   engaged,
 }: {
   posts: MarketPost[];
   activeIndex: number;
+  indices?: number[];
+  compact?: boolean;
   engaged?: boolean;
 }) {
+  const list = indices ?? posts.map((_, i) => i);
   return (
     <>
-      {posts.map((p, i) => {
+      {list.map((i) => {
+        const p = posts[i];
+        if (!p) return null;
         const active = i === activeIndex;
         return (
           <span
@@ -54,9 +72,13 @@ function DotIndicators({
             data-marquee-dot=""
             className={
               "block rounded-full motion-safe:transition-all motion-safe:duration-200 " +
-              (active
-                ? "h-1 w-4 bg-emerald-600 dark:bg-emerald-400 " + (engaged ? "scale-110" : "")
-                : "h-1 w-1 bg-zinc-300/90 dark:bg-zinc-600")
+              (compact
+                ? active
+                  ? "h-1 w-2.5 bg-emerald-600 dark:bg-emerald-400 " + (engaged ? "scale-110" : "")
+                  : "h-0.5 w-1 bg-zinc-300/90 dark:bg-zinc-600"
+                : active
+                  ? "h-1 w-4 bg-emerald-600 dark:bg-emerald-400 " + (engaged ? "scale-110" : "")
+                  : "h-1 w-1 bg-zinc-300/90 dark:bg-zinc-600")
             }
             aria-hidden
           />
@@ -68,7 +90,7 @@ function DotIndicators({
 
 /**
  * Compact dots in a transparent pill under the card.
- * Mobile: tap + horizontal drag engages scrub; pill glassifies while active.
+ * Mobile: small transparent pill with a few dots; outline on tap + drag to scrub.
  */
 export function FeedMarqueeDotScrub({
   posts,
@@ -261,14 +283,19 @@ export function FeedMarqueeDotScrub({
     viewportRef,
   ]);
 
+  const mobileDotIndices = visibleDotIndices(
+    posts.length,
+    activeIndex,
+    MOBILE_VISIBLE_DOTS,
+  );
+
+  const showOutline = isMobile && (isTouched || isScrubbing);
+
   const pillClass =
-    "feed-marquee-scrub-pill flex items-center justify-center gap-1.5 rounded-full px-3.5 py-2 " +
-    (isHero ? "min-h-9" : "min-h-8") +
-    (isScrubbing
-      ? " feed-marquee-scrub-pill--engaged"
-      : isTouched
-        ? " feed-marquee-scrub-pill--touched"
-        : "");
+    "feed-marquee-scrub-pill flex items-center justify-center rounded-full " +
+    (isMobile
+      ? "gap-1 px-2 py-1 min-h-7 " + (showOutline ? "feed-marquee-scrub-pill--outline" : "")
+      : "gap-1.5 px-3 py-1.5 pointer-events-none ");
 
   if (posts.length < 2) return null;
 
@@ -287,11 +314,13 @@ export function FeedMarqueeDotScrub({
         aria-valuemin={isMobile ? 1 : undefined}
         aria-valuemax={isMobile ? posts.length : undefined}
         aria-valuenow={isMobile ? activeIndex + 1 : undefined}
-        className={pillClass + (isMobile ? "" : " pointer-events-none")}
+        className={pillClass}
       >
         <DotIndicators
           posts={posts}
           activeIndex={activeIndex}
+          indices={isMobile ? mobileDotIndices : undefined}
+          compact={isMobile}
           engaged={isMobile ? engaged : false}
         />
       </div>
