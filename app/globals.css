@@ -92,14 +92,23 @@ body {
 /* Mobile scrub pill: no white fade behind the control */
 .feed-marquee-dots--mobile {
   background: none;
+  isolation: isolate;
 }
 
-/* Invisible tap target along bottom of carousel (pill hidden until tap) */
+/* Full-width bottom tap target (pill hidden until tap); sits above cards */
 .feed-marquee-scrub-hit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 4.5rem;
+  padding: 0 1rem 0.5rem;
   touch-action: none;
   -webkit-touch-callout: none;
-  min-height: 2.75rem;
-  padding-bottom: 0.25rem;
 }
 
 .feed-marquee-scrub-pill {
@@ -117,40 +126,45 @@ body {
 }
 
 .feed-marquee-scrub-pill--hidden {
+  visibility: hidden;
   opacity: 0;
-  transform: scale(0.88);
+  transform: scale(0.9);
   pointer-events: none;
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
 }
 
-/* Visible after tap: Instagram-style glass capsule + transparent outline ring */
+/* Visible after tap: glass capsule + clear transparent outline ring */
 .feed-marquee-scrub-pill--visible {
+  visibility: visible;
   opacity: 1;
   transform: scale(1);
   pointer-events: none;
-  background: rgb(0 0 0 / 0.38);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  min-width: 5.5rem;
+  background: rgb(15 15 18 / 0.72) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
 }
 
 .dark .feed-marquee-scrub-pill--visible {
-  background: rgb(0 0 0 / 0.48);
+  background: rgb(0 0 0 / 0.62) !important;
 }
 
 .feed-marquee-scrub-pill--engaged {
-  border-color: rgb(113 113 122 / 0.55) !important;
+  border: 1.5px solid rgb(113 113 122 / 0.85) !important;
+  outline: 1px solid rgb(255 255 255 / 0.12);
   box-shadow:
-    0 0 0 1px rgb(113 113 122 / 0.45),
-    0 0 14px rgb(0 0 0 / 0.12);
+    0 0 0 1px rgb(0 0 0 / 0.25),
+    0 2px 16px rgb(0 0 0 / 0.2);
 }
 
 .dark .feed-marquee-scrub-pill--engaged {
-  border-color: rgb(161 161 170 / 0.5) !important;
+  border: 1.5px solid rgb(212 212 216 / 0.75) !important;
+  outline: 1px solid rgb(255 255 255 / 0.08);
   box-shadow:
-    0 0 0 1px rgb(161 161 170 / 0.4),
-    0 0 14px rgb(0 0 0 / 0.4);
+    0 0 0 1px rgb(255 255 255 / 0.1),
+    0 2px 18px rgb(0 0 0 / 0.45);
 }
 
 .feed-marquee-scrub-pill [data-marquee-dot] {

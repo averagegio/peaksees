@@ -623,6 +623,7 @@ export function FeedMarketMarquee({
           clearScrubScrollStyles={clearScrubScrollStyles}
           onScrubIndex={handleScrubIndex}
           onScrubbingChange={handleScrubbingChange}
+          viewportReady={slideWidth > 0}
         />
       ) : null}
     </div>

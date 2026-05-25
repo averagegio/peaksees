@@ -31,7 +31,7 @@ function detectTouchScrubUi() {
 }
 
 function useTouchScrubUi() {
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState(detectTouchScrubUi);
 
   useLayoutEffect(() => {
     const coarse = window.matchMedia("(pointer: coarse)");
@@ -134,6 +134,7 @@ export function FeedMarqueeDotScrub({
   clearScrubScrollStyles,
   onScrubIndex,
   onScrubbingChange,
+  viewportReady = false,
 }: {
   posts: MarketPost[];
   activeIndex: number;
@@ -147,6 +148,8 @@ export function FeedMarqueeDotScrub({
   clearScrubScrollStyles: () => void;
   onScrubIndex?: (index: number) => void;
   onScrubbingChange?: (scrubbing: boolean) => void;
+  /** Re-bind listeners once marquee viewport has measured width. */
+  viewportReady?: boolean;
 }) {
   const isHero = variant === "hero";
   const isMobileUi = useTouchScrubUi();
@@ -163,9 +166,17 @@ export function FeedMarqueeDotScrub({
   });
 
   const railClass =
-    "feed-marquee-dots pointer-events-none absolute inset-x-0 z-40 flex items-end justify-center px-3 " +
-    (isHero ? "bottom-0 pb-2 pt-10" : "bottom-0 pb-1 pt-8") +
+    "feed-marquee-dots pointer-events-none absolute inset-x-0 bottom-0 z-[100] flex items-end justify-center " +
+    (isHero ? "pb-1" : "pb-0") +
     (isMobileUi ? " feed-marquee-dots--mobile" : "");
+
+  const setPillVisibleDom = useCallback((visible: boolean) => {
+    const pill = pillRef.current;
+    if (!pill) return;
+    pill.classList.toggle("feed-marquee-scrub-pill--visible", visible);
+    pill.classList.toggle("feed-marquee-scrub-pill--engaged", visible);
+    pill.classList.toggle("feed-marquee-scrub-pill--hidden", !visible);
+  }, []);
 
   const setCarouselPaused = useCallback(
     (paused: boolean) => {
@@ -178,9 +189,10 @@ export function FeedMarqueeDotScrub({
     scrubRef.current = { active: false, touchId: -1, pointerId: -1 };
     lastHapticIndexRef.current = -1;
     setPillVisible(false);
+    setPillVisibleDom(false);
     setCarouselPaused(false);
     clearScrubScrollStyles();
-  }, [clearScrubScrollStyles, setCarouselPaused]);
+  }, [clearScrubScrollStyles, setCarouselPaused, setPillVisibleDom]);
 
   const pulseScrubIndex = useCallback((ix: number) => {
     if (ix !== lastHapticIndexRef.current) {
@@ -218,6 +230,7 @@ export function FeedMarqueeDotScrub({
       pauseForUser();
       setCarouselPaused(true);
       setPillVisible(true);
+      setPillVisibleDom(true);
       marketCardHaptic("press");
 
       scrubRef.current = { active: true, touchId, pointerId };
@@ -234,6 +247,7 @@ export function FeedMarqueeDotScrub({
       posts.length,
       pullRefreshing,
       setCarouselPaused,
+      setPillVisibleDom,
     ],
   );
 
@@ -245,6 +259,7 @@ export function FeedMarqueeDotScrub({
     scrubRef.current = { active: false, touchId: -1, pointerId: -1 };
     lastHapticIndexRef.current = -1;
     setPillVisible(false);
+    setPillVisibleDom(false);
     setCarouselPaused(false);
     clearScrubScrollStyles();
 
@@ -262,6 +277,7 @@ export function FeedMarqueeDotScrub({
     pauseForUser,
     posts.length,
     setCarouselPaused,
+    setPillVisibleDom,
     viewportRef,
   ]);
 
@@ -382,7 +398,7 @@ export function FeedMarqueeDotScrub({
       listenersCleanupRef.current?.();
       resetGesture();
     };
-  }, [bindHitListeners, resetGesture, posts.length]);
+  }, [bindHitListeners, resetGesture, posts.length, viewportReady]);
 
   useEffect(() => {
     if (!isMobileUi) {
@@ -391,7 +407,7 @@ export function FeedMarqueeDotScrub({
       return;
     }
     bindHitListeners();
-  }, [bindHitListeners, isMobileUi, resetGesture]);
+  }, [bindHitListeners, isMobileUi, resetGesture, viewportReady]);
 
   const mobileDotIndices = visibleDotIndices(
     posts.length,
@@ -415,7 +431,9 @@ export function FeedMarqueeDotScrub({
     <div className={railClass}>
       <div
         ref={hitRef}
-        className="feed-marquee-scrub-hit pointer-events-auto flex w-full max-w-sm items-center justify-center"
+        data-marquee-dot-scrub=""
+        data-no-marquee-gesture="true"
+        className="feed-marquee-scrub-hit pointer-events-auto"
         aria-label="Tap to scrub markets"
       >
         <div
@@ -428,10 +446,8 @@ export function FeedMarqueeDotScrub({
           aria-valuemax={posts.length}
           aria-valuenow={activeIndex + 1}
           className={
-            "feed-marquee-scrub-pill flex items-center justify-center gap-2 rounded-full px-5 py-2.5 " +
-            (pillVisible
-              ? "feed-marquee-scrub-pill--visible feed-marquee-scrub-pill--engaged"
-              : "feed-marquee-scrub-pill--hidden")
+            "feed-marquee-scrub-pill feed-marquee-scrub-pill--hidden flex items-center justify-center gap-2 rounded-full px-5 py-2.5 " +
+            (pillVisible ? "feed-marquee-scrub-pill--visible feed-marquee-scrub-pill--engaged" : "")
           }
         >
           <DotIndicators
