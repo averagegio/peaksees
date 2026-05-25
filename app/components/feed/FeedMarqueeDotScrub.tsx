@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type RefObject,
@@ -23,11 +24,19 @@ type ScrubGesture = {
   startScroll: number;
 };
 
-/** Touch / coarse-pointer UI (avoids missing scrub on phones that report fine pointer). */
-function useTouchScrubUi() {
-  const [enabled, setEnabled] = useState(false);
+function detectTouchScrubUi() {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(pointer: coarse)").matches ||
+    window.matchMedia("(max-width: 768px)").matches
+  );
+}
 
-  useEffect(() => {
+/** Touch / narrow viewport — scrub pill (sync on first paint to avoid missing mobile UI). */
+function useTouchScrubUi() {
+  const [enabled, setEnabled] = useState(detectTouchScrubUi);
+
+  useLayoutEffect(() => {
     const coarse = window.matchMedia("(pointer: coarse)");
     const narrow = window.matchMedia("(max-width: 768px)");
     const update = () => setEnabled(coarse.matches || narrow.matches);
@@ -41,10 +50,6 @@ function useTouchScrubUi() {
   }, []);
 
   return enabled;
-}
-
-function isTouchPointer(e: PointerEvent) {
-  return e.pointerType === "touch";
 }
 
 function visibleDotIndices(count: number, active: number, maxVisible: number) {
@@ -90,9 +95,9 @@ function DotIndicators({
               "block rounded-full motion-safe:transition-all motion-safe:duration-200 " +
               (compact
                 ? active
-                  ? "h-1 w-2.5 bg-emerald-600 dark:bg-emerald-400 " +
+                  ? "h-1.5 w-3 bg-emerald-600 dark:bg-emerald-400 " +
                     (engaged ? "scale-105" : "")
-                  : "h-0.5 w-1 bg-zinc-400/80 dark:bg-zinc-500"
+                  : "h-1 w-1.5 bg-zinc-400/90 dark:bg-zinc-500"
                 : active
                   ? "h-1 w-4 bg-emerald-600 dark:bg-emerald-400 " + (engaged ? "scale-105" : "")
                   : "h-1 w-1 bg-zinc-300/90 dark:bg-zinc-600")
@@ -136,6 +141,7 @@ export function FeedMarqueeDotScrub({
   const [isTouched, setIsTouched] = useState(false);
 
   const pillRef = useRef<HTMLDivElement | null>(null);
+  const listenersCleanupRef = useRef<(() => void) | null>(null);
   const lastHapticIndexRef = useRef(-1);
   const scrubRef = useRef<ScrubGesture>({
     armed: false,
@@ -146,7 +152,7 @@ export function FeedMarqueeDotScrub({
   });
 
   const railClass =
-    "feed-marquee-dots pointer-events-none absolute inset-x-0 z-10 flex items-center justify-center px-3 " +
+    "feed-marquee-dots pointer-events-none absolute inset-x-0 z-20 flex items-center justify-center px-3 " +
     (isHero ? "bottom-0 pb-3 pt-8" : "bottom-0 pb-2 pt-6") +
     (isMobileUi ? " feed-marquee-dots--mobile" : "");
 
@@ -212,19 +218,22 @@ export function FeedMarqueeDotScrub({
     [goToSlide, pauseForUser, posts.length, setScrubbing, viewportRef],
   );
 
-  useEffect(() => {
+  const bindPillListeners = useCallback(() => {
+    listenersCleanupRef.current?.();
+    listenersCleanupRef.current = null;
+
     if (!isMobileUi) {
       setScrubbing(false);
       setIsTouched(false);
-      return undefined;
+      return;
     }
 
     const el = viewportRef.current;
     const pill = pillRef.current;
-    if (!el || !pill || posts.length < 2) return undefined;
+    if (!el || !pill || posts.length < 2) return;
 
     const onPointerDown = (e: PointerEvent) => {
-      if (pullRefreshing || !isTouchPointer(e)) return;
+      if (pullRefreshing || e.pointerType === "mouse") return;
 
       pauseForUser();
       setIsTouched(true);
@@ -295,7 +304,7 @@ export function FeedMarqueeDotScrub({
     pill.addEventListener("pointerup", onPointerUp);
     pill.addEventListener("pointercancel", onPointerUp);
 
-    return () => {
+    listenersCleanupRef.current = () => {
       pill.removeEventListener("pointerdown", onPointerDown);
       pill.removeEventListener("pointermove", onPointerMove);
       pill.removeEventListener("pointerup", onPointerUp);
@@ -314,6 +323,26 @@ export function FeedMarqueeDotScrub({
     viewportRef,
   ]);
 
+  const setPillRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      pillRef.current = node;
+      if (node) bindPillListeners();
+    },
+    [bindPillListeners],
+  );
+
+  useLayoutEffect(() => {
+    bindPillListeners();
+    return () => listenersCleanupRef.current?.();
+  }, [bindPillListeners]);
+
+  useEffect(() => {
+    if (!isMobileUi) {
+      listenersCleanupRef.current?.();
+      listenersCleanupRef.current = null;
+    }
+  }, [isMobileUi]);
+
   const mobileDotIndices = visibleDotIndices(
     posts.length,
     activeIndex,
@@ -325,15 +354,16 @@ export function FeedMarqueeDotScrub({
   const pillClass =
     "feed-marquee-scrub-pill flex items-center justify-center rounded-full " +
     (isMobileUi
-      ? "gap-1 px-2 py-1 min-h-7 " + (showOutline ? "feed-marquee-scrub-pill--outline" : "")
-      : "gap-1.5 px-3 py-1.5 pointer-events-none ");
+      ? "pointer-events-auto gap-1.5 px-2.5 py-1.5 min-h-8 min-w-[3.25rem] " +
+        (showOutline ? "feed-marquee-scrub-pill--outline" : "")
+      : "pointer-events-none gap-1.5 px-3 py-1.5 ");
 
   if (posts.length < 2) return null;
 
   return (
     <div className={railClass} aria-hidden={!isMobileUi}>
       <div
-        ref={isMobileUi ? pillRef : undefined}
+        ref={isMobileUi ? setPillRef : undefined}
         data-marquee-dot-scrub={isMobileUi ? "" : undefined}
         data-no-marquee-gesture={isMobileUi ? "true" : undefined}
         role={isMobileUi ? "slider" : undefined}

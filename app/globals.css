@@ -103,6 +103,11 @@ body {
   transition: border-color 0.15s ease;
 }
 
+/* Parent rail is pointer-events-none; pill must receive touches on mobile */
+.feed-marquee-scrub-pill.pointer-events-auto {
+  pointer-events: auto;
+}
+
 .feed-marquee-scrub-pill--outline {
   background: transparent;
   box-shadow: none;
