@@ -11,8 +11,8 @@ import {
 import { marketCardHaptic } from "@/app/lib/haptics";
 import type { MarketPost } from "@/app/lib/mock-markets";
 
-const DOT_SCRUB_HOLD_MS = 220;
-const DOT_SCRUB_DRAG_PX = 10;
+const DESKTOP_SCRUB_HOLD_MS = 160;
+const SCRUB_DRAG_PX = 5;
 
 type ScrubGesture = {
   armed: boolean;
@@ -22,11 +22,20 @@ type ScrubGesture = {
   startScroll: number;
 };
 
+function isCoarsePointer() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(pointer: coarse)").matches;
+}
+
+function isTouchPointer(e: PointerEvent) {
+  return e.pointerType === "touch" || (e.pointerType === "pen" && isCoarsePointer());
+}
+
 /**
- * Dot rail for the market carousel — tap to jump, hold or drag horizontally to scrub.
- * Pointer handling is confined to this wrapper so card swipes and pull-to-refresh stay separate.
+ * Instagram-style dot pill: hold and drag horizontally to scrub the marquee.
+ * Gestures are confined to this wrapper; dots stay compact inside the pill.
  */
-export function FeedMarqueeDots({
+export function FeedMarqueeDotScrub({
   posts,
   activeIndex,
   variant = "default",
@@ -50,9 +59,8 @@ export function FeedMarqueeDots({
   const isHero = variant === "hero";
   const [isScrubbing, setIsScrubbing] = useState(false);
 
-  const railRef = useRef<HTMLDivElement | null>(null);
-  const scrubTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const suppressDotClickRef = useRef(false);
+  const pillRef = useRef<HTMLDivElement | null>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrubRef = useRef<ScrubGesture>({
     armed: false,
     pointerId: -1,
@@ -61,10 +69,10 @@ export function FeedMarqueeDots({
     startScroll: 0,
   });
 
-  const clearScrubTimer = useCallback(() => {
-    if (scrubTimerRef.current) {
-      clearTimeout(scrubTimerRef.current);
-      scrubTimerRef.current = null;
+  const clearHoldTimer = useCallback(() => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
     }
   }, []);
 
@@ -121,15 +129,15 @@ export function FeedMarqueeDots({
 
   useEffect(() => {
     const el = viewportRef.current;
-    const rail = railRef.current;
-    if (!el || !rail || posts.length < 2) return undefined;
+    const pill = pillRef.current;
+    if (!el || !pill || posts.length < 2) return undefined;
 
-    const onRailPointerDown = (e: PointerEvent) => {
+    const onPointerDown = (e: PointerEvent) => {
       if (pullRefreshing) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
 
       pauseForUser();
-      clearScrubTimer();
+      clearHoldTimer();
       scrubRef.current = {
         armed: false,
         pointerId: e.pointerId,
@@ -138,30 +146,34 @@ export function FeedMarqueeDots({
         startScroll: el.scrollLeft,
       };
 
-      scrubTimerRef.current = setTimeout(() => {
+      if (isTouchPointer(e)) {
         armScrub(e.pointerId);
-      }, DOT_SCRUB_HOLD_MS);
+      } else {
+        holdTimerRef.current = setTimeout(() => {
+          armScrub(e.pointerId);
+        }, DESKTOP_SCRUB_HOLD_MS);
+      }
 
       try {
-        rail.setPointerCapture(e.pointerId);
+        pill.setPointerCapture(e.pointerId);
       } catch {
         // ignore
       }
     };
 
-    const onRailPointerMove = (e: PointerEvent) => {
+    const onPointerMove = (e: PointerEvent) => {
       if (e.pointerId !== scrubRef.current.pointerId) return;
 
       const dx = e.clientX - scrubRef.current.startX;
       const absDx = Math.abs(dx);
       const absDy = Math.abs(e.clientY - scrubRef.current.startY);
 
-      if (!scrubRef.current.armed && scrubTimerRef.current) {
-        if (absDx >= DOT_SCRUB_DRAG_PX && absDx > absDy) {
-          clearScrubTimer();
+      if (!scrubRef.current.armed && holdTimerRef.current) {
+        if (absDx >= SCRUB_DRAG_PX && absDx > absDy) {
+          clearHoldTimer();
           armScrub(e.pointerId, e.clientX);
-        } else if (absDy > 14) {
-          clearScrubTimer();
+        } else if (absDy > 12) {
+          clearHoldTimer();
         }
       }
 
@@ -176,16 +188,14 @@ export function FeedMarqueeDots({
       }
     };
 
-    const onRailPointerUp = (e: PointerEvent) => {
+    const onPointerUp = (e: PointerEvent) => {
       if (e.pointerId !== scrubRef.current.pointerId) return;
-      clearScrubTimer();
-      const wasScrub = scrubRef.current.armed;
-      if (wasScrub) {
-        suppressDotClickRef.current = true;
+      clearHoldTimer();
+      if (scrubRef.current.armed) {
         endScrub(e.pointerId);
       }
       try {
-        rail.releasePointerCapture(e.pointerId);
+        pill.releasePointerCapture(e.pointerId);
       } catch {
         // ignore
       }
@@ -198,21 +208,21 @@ export function FeedMarqueeDots({
       };
     };
 
-    rail.addEventListener("pointerdown", onRailPointerDown);
-    rail.addEventListener("pointermove", onRailPointerMove, { passive: false });
-    rail.addEventListener("pointerup", onRailPointerUp);
-    rail.addEventListener("pointercancel", onRailPointerUp);
+    pill.addEventListener("pointerdown", onPointerDown);
+    pill.addEventListener("pointermove", onPointerMove, { passive: false });
+    pill.addEventListener("pointerup", onPointerUp);
+    pill.addEventListener("pointercancel", onPointerUp);
 
     return () => {
-      clearScrubTimer();
-      rail.removeEventListener("pointerdown", onRailPointerDown);
-      rail.removeEventListener("pointermove", onRailPointerMove);
-      rail.removeEventListener("pointerup", onRailPointerUp);
-      rail.removeEventListener("pointercancel", onRailPointerUp);
+      clearHoldTimer();
+      pill.removeEventListener("pointerdown", onPointerDown);
+      pill.removeEventListener("pointermove", onPointerMove);
+      pill.removeEventListener("pointerup", onPointerUp);
+      pill.removeEventListener("pointercancel", onPointerUp);
     };
   }, [
     armScrub,
-    clearScrubTimer,
+    clearHoldTimer,
     endScrub,
     pauseForUser,
     posts.length,
@@ -225,45 +235,38 @@ export function FeedMarqueeDots({
 
   return (
     <div
-      ref={railRef}
-      data-marquee-dots=""
+      ref={pillRef}
+      data-marquee-dot-scrub=""
       data-no-marquee-gesture="true"
-      role="tablist"
-      aria-label="Market card positions — tap to jump, hold and drag to scrub"
+      role="slider"
+      aria-label={`Market carousel, ${activeIndex + 1} of ${posts.length}. Hold and drag sideways to scrub.`}
+      aria-valuemin={1}
+      aria-valuemax={posts.length}
+      aria-valuenow={activeIndex + 1}
       className={
-        "feed-marquee-dots absolute inset-x-0 z-10 flex items-center justify-center gap-1 px-3 " +
-        (isHero ? "bottom-0 pb-3 pt-8" : "bottom-0 pb-2 pt-6") +
-        (isScrubbing ? " feed-marquee-dots--scrubbing" : "")
+        "feed-marquee-dot-scrub flex items-center justify-center gap-1.5 rounded-full px-3 py-2 " +
+        (isHero ? "min-h-9" : "min-h-8") +
+        (isScrubbing ? " feed-marquee-dot-scrub--active" : "")
       }
     >
-      {posts.map((p, i) => (
-        <button
-          key={`dot-${p.id}`}
-          type="button"
-          role="tab"
-          aria-selected={i === activeIndex}
-          aria-label={`Market ${i + 1} of ${posts.length}`}
-          data-marquee-dot=""
-          onClick={() => {
-            if (suppressDotClickRef.current) {
-              suppressDotClickRef.current = false;
-              return;
-            }
-            goToSlide(i);
-          }}
-          className="flex h-9 min-w-9 items-center justify-center rounded-full outline-none transition hover:bg-zinc-200/60 focus-visible:ring-2 focus-visible:ring-emerald-500 dark:hover:bg-zinc-800/80"
-        >
+      {posts.map((p, i) => {
+        const active = i === activeIndex;
+        return (
           <span
+            key={`dot-${p.id}`}
+            data-marquee-dot=""
             className={
-              "block h-1.5 rounded-full motion-safe:transition-all motion-safe:duration-300 " +
-              (i === activeIndex
-                ? "w-5 bg-emerald-600 dark:bg-emerald-400"
-                : "w-1.5 bg-zinc-400/90 dark:bg-zinc-500")
+              "block rounded-full motion-safe:transition-all motion-safe:duration-150 " +
+              (active
+                ? "h-1.5 w-4 bg-sky-500 shadow-[0_0_0_2px_rgba(14,165,233,0.35)] dark:bg-sky-400 " +
+                  (isScrubbing ? "scale-125" : "scale-110")
+                : "h-1 w-1 bg-zinc-400/80 dark:bg-zinc-500/90 " +
+                  (isScrubbing ? "opacity-70" : "opacity-90"))
             }
             aria-hidden
           />
-        </button>
-      ))}
+        );
+      })}
     </div>
   );
 }

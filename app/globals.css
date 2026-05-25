@@ -70,30 +70,31 @@ body {
   max-width: 100%;
 }
 
-.feed-marquee-dots {
+/* Instagram-style dot pill: hold + horizontal drag to scrub carousel */
+.feed-marquee-dot-scrub {
   touch-action: none;
-  background: linear-gradient(
-    to top,
-    rgb(244 244 245 / 0.92) 0%,
-    rgb(244 244 245 / 0.55) 55%,
-    transparent 100%
-  );
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: grab;
+  background: rgb(24 24 27 / 0.72);
+  box-shadow: 0 1px 8px rgb(0 0 0 / 0.22);
+  backdrop-filter: blur(8px);
 }
 
-.dark .feed-marquee-dots {
-  background: linear-gradient(
-    to top,
-    rgb(9 9 11 / 0.92) 0%,
-    rgb(9 9 11 / 0.55) 55%,
-    transparent 100%
-  );
+.dark .feed-marquee-dot-scrub {
+  background: rgb(9 9 11 / 0.78);
 }
 
-.feed-marquee-dots--scrubbing {
+.feed-marquee-dot-scrub--active {
   cursor: grabbing;
+  background: rgb(24 24 27 / 0.88);
 }
 
-.feed-marquee-dots--scrubbing [data-marquee-dot] {
+.dark .feed-marquee-dot-scrub--active {
+  background: rgb(9 9 11 / 0.92);
+}
+
+.feed-marquee-dot-scrub--active [data-marquee-dot] {
   pointer-events: none;
 }
 

@@ -10,7 +10,7 @@ import {
 } from "react";
 
 import { MarketPostCard } from "@/app/components/PeakFeed";
-import { FeedMarqueeDots } from "@/app/components/feed/FeedMarqueeDots";
+import { FeedMarqueeDotScrub } from "@/app/components/feed/FeedMarqueeDotScrub";
 import { PullRefreshRail, pullDisplacement } from "@/app/components/feed/pull-refresh-rail";
 import type { MarketPost } from "@/app/lib/mock-markets";
 
@@ -33,7 +33,7 @@ function isMarqueeGestureBlocker(t: EventTarget | null) {
   if (!(t instanceof Element)) return false;
   return Boolean(
     t.closest(
-      'button, a, input, textarea, select, label, [role="button"], [data-marquee-dots], [data-no-marquee-gesture="true"], [data-no-insight-gesture="true"]',
+      'button, a, input, textarea, select, label, [role="button"], [data-marquee-dot-scrub], [data-no-marquee-gesture="true"], [data-no-insight-gesture="true"]',
     ),
   );
 }
@@ -494,6 +494,14 @@ export function FeedMarketMarquee({
           }
           onWheel={pauseForUser}
         >
+          {isScrubbing && posts.length > 1 ? (
+            <div
+              className="pointer-events-none absolute right-3 top-3 z-20 rounded-md bg-black/70 px-2 py-0.5 text-xs font-semibold tabular-nums text-white shadow-sm backdrop-blur-sm"
+              aria-hidden
+            >
+              {activeIndex + 1} / {posts.length}
+            </div>
+          ) : null}
           <div
             className={
               "feed-marquee-track motion-safe:transition-transform motion-safe:duration-75 motion-safe:ease-out " +
@@ -544,17 +552,26 @@ export function FeedMarketMarquee({
         </div>
       </div>
 
-      <FeedMarqueeDots
-        posts={posts}
-        activeIndex={activeIndex}
-        variant={variant}
-        viewportRef={viewportRef}
-        pullRefreshing={pullRefreshing}
-        pauseForUser={pauseForUser}
-        goToSlide={goToSlide}
-        syncIndexFromScroll={syncIndexFromScroll}
-        onScrubbingChange={setIsScrubbing}
-      />
+      {posts.length > 1 ? (
+        <div
+          className={
+            "absolute inset-x-0 z-10 flex justify-center px-3 " +
+            (isHero ? "bottom-4" : "bottom-2")
+          }
+        >
+          <FeedMarqueeDotScrub
+            posts={posts}
+            activeIndex={activeIndex}
+            variant={variant}
+            viewportRef={viewportRef}
+            pullRefreshing={pullRefreshing}
+            pauseForUser={pauseForUser}
+            goToSlide={goToSlide}
+            syncIndexFromScroll={syncIndexFromScroll}
+            onScrubbingChange={setIsScrubbing}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
