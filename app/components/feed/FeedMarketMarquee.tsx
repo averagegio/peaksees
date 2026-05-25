@@ -82,21 +82,12 @@ export function FeedMarketMarquee({
   const [pullOffset, setPullOffset] = useState(0);
   const [pullMode, setPullMode] = useState<PullMode | null>(null);
   const [isScrubbing, setIsScrubbing] = useState(false);
-  const [carouselInteracting, setCarouselInteracting] = useState(false);
-
   const activeIndexRef = useRef(0);
   const isScrubbingRef = useRef(false);
   const pausedUntilRef = useRef(0);
   const scrollingProgrammaticallyRef = useRef(false);
   const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const carouselInteractEndRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewportScrollLeftRef = useRef(0);
-  const viewportTouchRef = useRef({
-    active: false,
-    startX: 0,
-    startY: 0,
-    horizontalLocked: false,
-  });
   const pullRootRef = useRef<HTMLDivElement | null>(null);
   const pullOffsetRef = useRef(0);
   const touchPullRef = useRef<{
@@ -161,6 +152,15 @@ export function FeedMarketMarquee({
     el.style.removeProperty("scroll-snap-type");
   }, [viewportRef]);
 
+  const scrubScrollTo = useCallback((left: number) => {
+    const el = viewportRef.current;
+    if (!el) return;
+    el.classList.add("feed-marquee--scrubbing");
+    el.style.scrollSnapType = "none";
+    const max = Math.max(0, el.scrollWidth - el.clientWidth);
+    el.scrollLeft = Math.max(0, Math.min(max, left));
+  }, [viewportRef]);
+
   const scrubToIndexDuringPill = useCallback(
     (index: number) => {
       const el = viewportRef.current;
@@ -171,22 +171,6 @@ export function FeedMarketMarquee({
     },
     [goToSlide, viewportRef],
   );
-
-  const isMobileCarouselUi = useCallback(() => {
-    if (typeof window === "undefined") return false;
-    return (
-      window.matchMedia("(pointer: coarse)").matches ||
-      window.matchMedia("(max-width: 768px)").matches
-    );
-  }, []);
-
-  const setCarouselTouchOutline = useCallback((active: boolean) => {
-    if (carouselInteractEndRef.current) {
-      clearTimeout(carouselInteractEndRef.current);
-      carouselInteractEndRef.current = null;
-    }
-    setCarouselInteracting(active);
-  }, []);
 
   const resetPull = useCallback(() => {
     touchPullRef.current.active = false;
@@ -281,68 +265,12 @@ export function FeedMarketMarquee({
       scrollEndTimerRef.current = setTimeout(syncIndexFromScroll, 48);
     };
 
-    const onTouchStart = (e: TouchEvent) => {
-      if (!isMobileCarouselUi() || e.touches.length !== 1) return;
-      if (isMarqueeGestureBlocker(e.target)) return;
-      const t = e.touches[0]!;
-      viewportTouchRef.current = {
-        active: true,
-        startX: t.clientX,
-        startY: t.clientY,
-        horizontalLocked: false,
-      };
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      const g = viewportTouchRef.current;
-      if (!g.active || !isMobileCarouselUi() || e.touches.length !== 1) return;
-      const t = e.touches[0]!;
-      const dx = t.clientX - g.startX;
-      const dy = t.clientY - g.startY;
-      const absX = Math.abs(dx);
-      const absY = Math.abs(dy);
-
-      if (!g.horizontalLocked) {
-        if (absY >= 10 && absY > absX * 1.2) {
-          g.active = false;
-          return;
-        }
-        if (absX >= 10 && absX >= absY * 1.2) {
-          g.horizontalLocked = true;
-          setCarouselTouchOutline(true);
-        }
-        return;
-      }
-    };
-
-    const onTouchEnd = () => {
-      viewportTouchRef.current.active = false;
-      viewportTouchRef.current.horizontalLocked = false;
-      setCarouselTouchOutline(false);
-    };
-
     el.addEventListener("scroll", onScroll, { passive: true });
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
-    el.addEventListener("touchmove", onTouchMove, { passive: true });
-    el.addEventListener("touchend", onTouchEnd, { passive: true });
-    el.addEventListener("touchcancel", onTouchEnd, { passive: true });
     return () => {
       el.removeEventListener("scroll", onScroll);
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove", onTouchMove);
-      el.removeEventListener("touchend", onTouchEnd);
-      el.removeEventListener("touchcancel", onTouchEnd);
       if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
-      if (carouselInteractEndRef.current) clearTimeout(carouselInteractEndRef.current);
     };
-  }, [
-    setCarouselTouchOutline,
-    isMobileCarouselUi,
-    posts.length,
-    viewportRef,
-    syncIndexFromScroll,
-    isScrubbing,
-  ]);
+  }, [posts.length, viewportRef, syncIndexFromScroll, isScrubbing]);
 
   useEffect(() => {
     const el = viewportRef.current;
@@ -691,10 +619,10 @@ export function FeedMarketMarquee({
           pauseForUser={pauseForUser}
           goToSlide={(ix) => goToSlide(ix, "smooth")}
           scrubToIndex={scrubToIndexDuringPill}
+          scrubScrollTo={scrubScrollTo}
           clearScrubScrollStyles={clearScrubScrollStyles}
           onScrubIndex={handleScrubIndex}
           onScrubbingChange={handleScrubbingChange}
-          carouselInteracting={carouselInteracting}
         />
       ) : null}
     </div>

@@ -13,16 +13,13 @@ import { marketCardHaptic } from "@/app/lib/haptics";
 import type { MarketPost } from "@/app/lib/mock-markets";
 
 const MOBILE_VISIBLE_DOTS = 5;
-/** Viewport widths dragged to advance one card (higher = slower, clearer snap). */
-const SCRUB_DRAG_PER_CARD = 0.72;
+/** Inner horizontal padding inside pill for Instagram-style X mapping. */
+const PILL_INNER_PAD_PX = 14;
 
 type ScrubGesture = {
   active: boolean;
   touchId: number;
   pointerId: number;
-  startX: number;
-  startIndex: number;
-  pullHapticFired: boolean;
 };
 
 function detectTouchScrubUi() {
@@ -65,9 +62,16 @@ function slideWidthPx(viewport: HTMLElement) {
   return Math.max(1, Math.floor(viewport.clientWidth));
 }
 
-function indexFromScroll(viewport: HTMLElement, count: number) {
-  const w = slideWidthPx(viewport);
-  return Math.max(0, Math.min(count - 1, Math.round(viewport.scrollLeft / w)));
+function scrubFractionFromPillX(pill: HTMLElement, clientX: number) {
+  const rect = pill.getBoundingClientRect();
+  const usable = Math.max(1, rect.width - PILL_INNER_PAD_PX * 2);
+  const localX = clientX - rect.left - PILL_INNER_PAD_PX;
+  return Math.max(0, Math.min(1, localX / usable));
+}
+
+function indexFromFraction(fraction: number, count: number) {
+  if (count <= 1) return 0;
+  return Math.max(0, Math.min(count - 1, Math.round(fraction * (count - 1))));
 }
 
 function DotIndicators({
@@ -95,14 +99,15 @@ function DotIndicators({
             key={`dot-${p.id}`}
             data-marquee-dot=""
             className={
-              "block rounded-full motion-safe:transition-all motion-safe:duration-200 " +
+              "block rounded-full motion-safe:transition-all motion-safe:duration-150 " +
               (compact
                 ? active
-                  ? "h-1.5 w-3 bg-emerald-600 dark:bg-emerald-400 " +
-                    (scrubbing ? "scale-105" : "")
-                  : "h-1 w-1.5 bg-zinc-400/90 dark:bg-zinc-500"
+                  ? `h-2 w-2 bg-emerald-500 shadow-[0_0_6px_rgb(16_185_129/0.55)] ${
+                      scrubbing ? "scale-110" : "scale-100"
+                    }`
+                  : "h-1.5 w-1.5 bg-zinc-400/55 dark:bg-zinc-500/70"
                 : active
-                  ? "h-1 w-4 bg-emerald-600 dark:bg-emerald-400 " + (scrubbing ? "scale-105" : "")
+                  ? `h-1 w-4 bg-emerald-600 dark:bg-emerald-400 ${scrubbing ? "scale-105" : ""}`
                   : "h-1 w-1 bg-zinc-300/90 dark:bg-zinc-600")
             }
             aria-hidden
@@ -114,7 +119,7 @@ function DotIndicators({
 }
 
 /**
- * Mobile: tap the pill and drag horizontally — carousel snaps card-by-card.
+ * Mobile Instagram-style scrub: pill hidden until tap, drag on pill maps X → carousel.
  */
 export function FeedMarqueeDotScrub({
   posts,
@@ -125,10 +130,10 @@ export function FeedMarqueeDotScrub({
   pauseForUser,
   goToSlide,
   scrubToIndex,
+  scrubScrollTo,
   clearScrubScrollStyles,
   onScrubIndex,
   onScrubbingChange,
-  carouselInteracting = false,
 }: {
   posts: MarketPost[];
   activeIndex: number;
@@ -138,31 +143,28 @@ export function FeedMarqueeDotScrub({
   pauseForUser: () => void;
   goToSlide: (index: number) => void;
   scrubToIndex: (index: number) => void;
+  scrubScrollTo: (scrollLeft: number) => void;
   clearScrubScrollStyles: () => void;
   onScrubIndex?: (index: number) => void;
   onScrubbingChange?: (scrubbing: boolean) => void;
-  carouselInteracting?: boolean;
 }) {
   const isHero = variant === "hero";
   const isMobileUi = useTouchScrubUi();
-  const [pillOutline, setPillOutline] = useState(false);
+  const [pillVisible, setPillVisible] = useState(false);
 
+  const hitRef = useRef<HTMLDivElement | null>(null);
   const pillRef = useRef<HTMLDivElement | null>(null);
   const listenersCleanupRef = useRef<(() => void) | null>(null);
   const lastHapticIndexRef = useRef(-1);
-  const lastScrubIndexRef = useRef(-1);
   const scrubRef = useRef<ScrubGesture>({
     active: false,
     touchId: -1,
     pointerId: -1,
-    startX: 0,
-    startIndex: 0,
-    pullHapticFired: false,
   });
 
   const railClass =
-    "feed-marquee-dots pointer-events-none absolute inset-x-0 z-40 flex items-center justify-center px-3 " +
-    (isHero ? "bottom-0 pb-3 pt-8" : "bottom-0 pb-2 pt-6") +
+    "feed-marquee-dots pointer-events-none absolute inset-x-0 z-40 flex items-end justify-center px-3 " +
+    (isHero ? "bottom-0 pb-2 pt-10" : "bottom-0 pb-1 pt-8") +
     (isMobileUi ? " feed-marquee-dots--mobile" : "");
 
   const setCarouselPaused = useCallback(
@@ -173,17 +175,9 @@ export function FeedMarqueeDotScrub({
   );
 
   const resetGesture = useCallback(() => {
-    scrubRef.current = {
-      active: false,
-      touchId: -1,
-      pointerId: -1,
-      startX: 0,
-      startIndex: 0,
-      pullHapticFired: false,
-    };
+    scrubRef.current = { active: false, touchId: -1, pointerId: -1 };
     lastHapticIndexRef.current = -1;
-    lastScrubIndexRef.current = -1;
-    setPillOutline(false);
+    setPillVisible(false);
     setCarouselPaused(false);
     clearScrubScrollStyles();
   }, [clearScrubScrollStyles, setCarouselPaused]);
@@ -195,79 +189,71 @@ export function FeedMarqueeDotScrub({
     }
   }, []);
 
-  const applyScrubFromDrag = useCallback(
-    (viewport: HTMLElement, clientX: number) => {
-      const dx = clientX - scrubRef.current.startX;
-      if (!scrubRef.current.pullHapticFired && Math.abs(dx) > 4) {
-        scrubRef.current.pullHapticFired = true;
-        marketCardHaptic("pull");
-      }
-
+  const applyInstagramScrub = useCallback(
+    (viewport: HTMLElement, pill: HTMLElement, clientX: number) => {
+      const fraction = scrubFractionFromPillX(pill, clientX);
       const slideW = slideWidthPx(viewport);
-      const pxPerCard = Math.max(slideW * SCRUB_DRAG_PER_CARD, 56);
-      const ix = Math.max(
-        0,
-        Math.min(
-          posts.length - 1,
-          Math.round(scrubRef.current.startIndex - dx / pxPerCard),
-        ),
-      );
+      const maxLeft = Math.max(0, (posts.length - 1) * slideW);
+      const left = fraction * maxLeft;
+      const ix = indexFromFraction(fraction, posts.length);
 
-      if (ix !== lastScrubIndexRef.current) {
-        lastScrubIndexRef.current = ix;
-        pauseForUser();
-        scrubToIndex(ix);
-        onScrubIndex?.(ix);
-        pulseScrubIndex(ix);
-      }
-
+      scrubScrollTo(left);
+      onScrubIndex?.(ix);
+      pulseScrubIndex(ix);
       return ix;
     },
-    [onScrubIndex, pauseForUser, posts.length, pulseScrubIndex, scrubToIndex],
+    [onScrubIndex, posts.length, pulseScrubIndex, scrubScrollTo],
   );
 
   const startScrub = useCallback(
-    (viewport: HTMLElement, clientX: number, touchId: number, pointerId: number) => {
+    (
+      viewport: HTMLElement,
+      pill: HTMLElement,
+      clientX: number,
+      touchId: number,
+      pointerId: number,
+    ) => {
       if (pullRefreshing || scrubRef.current.active) return;
 
       pauseForUser();
       setCarouselPaused(true);
-
-      const startIx = indexFromScroll(viewport, posts.length);
-      scrubRef.current = {
-        active: true,
-        touchId,
-        pointerId,
-        startX: clientX,
-        startIndex: startIx,
-        pullHapticFired: false,
-      };
-      lastHapticIndexRef.current = startIx;
-      lastScrubIndexRef.current = startIx;
-      setPillOutline(true);
-      scrubToIndex(startIx);
+      setPillVisible(true);
       marketCardHaptic("press");
+
+      scrubRef.current = { active: true, touchId, pointerId };
+      lastHapticIndexRef.current = indexFromFraction(
+        scrubFractionFromPillX(pill, clientX),
+        posts.length,
+      );
+
+      applyInstagramScrub(viewport, pill, clientX);
     },
-    [pauseForUser, posts.length, pullRefreshing, scrubToIndex, setCarouselPaused],
+    [
+      applyInstagramScrub,
+      pauseForUser,
+      posts.length,
+      pullRefreshing,
+      setCarouselPaused,
+    ],
   );
 
   const endScrub = useCallback(() => {
     if (!scrubRef.current.active) return;
     const el = viewportRef.current;
-    scrubRef.current.active = false;
-    scrubRef.current.touchId = -1;
-    scrubRef.current.pointerId = -1;
+    const pill = pillRef.current;
+
+    scrubRef.current = { active: false, touchId: -1, pointerId: -1 };
     lastHapticIndexRef.current = -1;
-    lastScrubIndexRef.current = -1;
-    setPillOutline(false);
+    setPillVisible(false);
     setCarouselPaused(false);
     clearScrubScrollStyles();
 
     if (el) {
       pauseForUser();
-      const ix = indexFromScroll(el, posts.length);
-      goToSlide(ix);
-      onScrubIndex?.(ix);
+      const w = slideWidthPx(el);
+      const finalIx = Math.max(0, Math.min(posts.length - 1, Math.round(el.scrollLeft / w)));
+      goToSlide(finalIx);
+      onScrubIndex?.(finalIx);
     }
   }, [
     clearScrubScrollStyles,
@@ -279,7 +265,7 @@ export function FeedMarqueeDotScrub({
     viewportRef,
   ]);
 
-  const bindPillListeners = useCallback(() => {
+  const bindHitListeners = useCallback(() => {
     listenersCleanupRef.current?.();
     listenersCleanupRef.current = null;
 
@@ -289,8 +275,9 @@ export function FeedMarqueeDotScrub({
     }
 
     const viewport = viewportRef.current;
+    const hit = hitRef.current;
     const pill = pillRef.current;
-    if (!viewport || !pill || posts.length < 2) return;
+    if (!viewport || !hit || !pill || posts.length < 2) return;
 
     const useCoarseTouch =
       typeof window !== "undefined" &&
@@ -300,7 +287,7 @@ export function FeedMarqueeDotScrub({
       if (pullRefreshing || e.touches.length !== 1) return;
       e.stopPropagation();
       const t = e.touches[0]!;
-      startScrub(viewport, t.clientX, t.identifier, -1);
+      startScrub(viewport, pill, t.clientX, t.identifier, -1);
     };
 
     const onTouchMove = (e: TouchEvent) => {
@@ -311,7 +298,7 @@ export function FeedMarqueeDotScrub({
       if (!t) return;
       e.preventDefault();
       e.stopPropagation();
-      applyScrubFromDrag(viewport, t.clientX);
+      applyInstagramScrub(viewport, pill, t.clientX);
     };
 
     const onTouchEnd = (e: TouchEvent) => {
@@ -328,9 +315,9 @@ export function FeedMarqueeDotScrub({
       if (useCoarseTouch) return;
       e.stopPropagation();
       e.preventDefault();
-      startScrub(viewport, e.clientX, -1, e.pointerId);
+      startScrub(viewport, pill, e.clientX, -1, e.pointerId);
       try {
-        pill.setPointerCapture(e.pointerId);
+        hit.setPointerCapture(e.pointerId);
       } catch {
         // ignore
       }
@@ -339,43 +326,43 @@ export function FeedMarqueeDotScrub({
     const onPointerMove = (e: PointerEvent) => {
       if (!scrubRef.current.active || scrubRef.current.pointerId !== e.pointerId) return;
       e.preventDefault();
-      applyScrubFromDrag(viewport, e.clientX);
+      applyInstagramScrub(viewport, pill, e.clientX);
     };
 
     const onPointerUp = (e: PointerEvent) => {
       if (!scrubRef.current.active || scrubRef.current.pointerId !== e.pointerId) return;
       endScrub();
       try {
-        pill.releasePointerCapture(e.pointerId);
+        hit.releasePointerCapture(e.pointerId);
       } catch {
         // ignore
       }
     };
 
-    pill.addEventListener("touchstart", onTouchStart, { passive: false });
-    pill.addEventListener("touchmove", onTouchMove, { passive: false });
-    pill.addEventListener("touchend", onTouchEnd, { passive: true });
-    pill.addEventListener("touchcancel", onTouchEnd, { passive: true });
+    hit.addEventListener("touchstart", onTouchStart, { passive: false });
+    hit.addEventListener("touchmove", onTouchMove, { passive: false });
+    hit.addEventListener("touchend", onTouchEnd, { passive: true });
+    hit.addEventListener("touchcancel", onTouchEnd, { passive: true });
 
     if (!useCoarseTouch) {
-      pill.addEventListener("pointerdown", onPointerDown);
-      pill.addEventListener("pointermove", onPointerMove);
-      pill.addEventListener("pointerup", onPointerUp);
-      pill.addEventListener("pointercancel", onPointerUp);
+      hit.addEventListener("pointerdown", onPointerDown);
+      hit.addEventListener("pointermove", onPointerMove);
+      hit.addEventListener("pointerup", onPointerUp);
+      hit.addEventListener("pointercancel", onPointerUp);
     }
 
     listenersCleanupRef.current = () => {
-      pill.removeEventListener("touchstart", onTouchStart);
-      pill.removeEventListener("touchmove", onTouchMove);
-      pill.removeEventListener("touchend", onTouchEnd);
-      pill.removeEventListener("touchcancel", onTouchEnd);
-      pill.removeEventListener("pointerdown", onPointerDown);
-      pill.removeEventListener("pointermove", onPointerMove);
-      pill.removeEventListener("pointerup", onPointerUp);
-      pill.removeEventListener("pointercancel", onPointerUp);
+      hit.removeEventListener("touchstart", onTouchStart);
+      hit.removeEventListener("touchmove", onTouchMove);
+      hit.removeEventListener("touchend", onTouchEnd);
+      hit.removeEventListener("touchcancel", onTouchEnd);
+      hit.removeEventListener("pointerdown", onPointerDown);
+      hit.removeEventListener("pointermove", onPointerMove);
+      hit.removeEventListener("pointerup", onPointerUp);
+      hit.removeEventListener("pointercancel", onPointerUp);
     };
   }, [
-    applyScrubFromDrag,
+    applyInstagramScrub,
     endScrub,
     isMobileUi,
     posts.length,
@@ -385,25 +372,17 @@ export function FeedMarqueeDotScrub({
     viewportRef,
   ]);
 
-  const setPillRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      pillRef.current = node;
-      if (node) bindPillListeners();
-    },
-    [bindPillListeners],
-  );
-
   useLayoutEffect(() => {
-    bindPillListeners();
-    const t1 = requestAnimationFrame(() => bindPillListeners());
-    const t2 = window.setTimeout(() => bindPillListeners(), 120);
+    bindHitListeners();
+    const t1 = requestAnimationFrame(() => bindHitListeners());
+    const t2 = window.setTimeout(() => bindHitListeners(), 120);
     return () => {
       cancelAnimationFrame(t1);
       window.clearTimeout(t2);
       listenersCleanupRef.current?.();
       resetGesture();
     };
-  }, [bindPillListeners, resetGesture, posts.length]);
+  }, [bindHitListeners, resetGesture, posts.length]);
 
   useEffect(() => {
     if (!isMobileUi) {
@@ -411,8 +390,8 @@ export function FeedMarqueeDotScrub({
       resetGesture();
       return;
     }
-    bindPillListeners();
-  }, [bindPillListeners, isMobileUi, resetGesture]);
+    bindHitListeners();
+  }, [bindHitListeners, isMobileUi, resetGesture]);
 
   const mobileDotIndices = visibleDotIndices(
     posts.length,
@@ -420,37 +399,49 @@ export function FeedMarqueeDotScrub({
     MOBILE_VISIBLE_DOTS,
   );
 
-  const showOutline = isMobileUi && (pillOutline || carouselInteracting);
-
-  const pillClass =
-    "feed-marquee-scrub-pill relative z-10 flex items-center justify-center rounded-full " +
-    (isMobileUi
-      ? "pointer-events-auto touch-manipulation gap-1.5 px-4 py-2.5 min-h-10 min-w-[4rem] " +
-        (showOutline ? "feed-marquee-scrub-pill--engaged " : "")
-      : "pointer-events-none gap-1.5 px-3 py-1.5 ");
-
   if (posts.length < 2) return null;
+
+  if (!isMobileUi) {
+    return (
+      <div className={railClass}>
+        <div className="feed-marquee-scrub-pill pointer-events-none flex items-center justify-center gap-1.5 px-3 py-1.5">
+          <DotIndicators posts={posts} activeIndex={activeIndex} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={railClass}>
       <div
-        ref={setPillRef}
-        data-marquee-dot-scrub=""
-        data-no-marquee-gesture="true"
-        role="slider"
-        aria-label={`Market carousel scrub, ${activeIndex + 1} of ${posts.length}`}
-        aria-valuemin={1}
-        aria-valuemax={posts.length}
-        aria-valuenow={activeIndex + 1}
-        className={pillClass}
+        ref={hitRef}
+        className="feed-marquee-scrub-hit pointer-events-auto flex w-full max-w-sm items-center justify-center"
+        aria-label="Tap to scrub markets"
       >
-        <DotIndicators
-          posts={posts}
-          activeIndex={activeIndex}
-          indices={isMobileUi ? mobileDotIndices : undefined}
-          compact={isMobileUi}
-          scrubbing={showOutline}
-        />
+        <div
+          ref={pillRef}
+          data-marquee-dot-scrub=""
+          data-no-marquee-gesture="true"
+          role="slider"
+          aria-label={`Market carousel, ${activeIndex + 1} of ${posts.length}`}
+          aria-valuemin={1}
+          aria-valuemax={posts.length}
+          aria-valuenow={activeIndex + 1}
+          className={
+            "feed-marquee-scrub-pill flex items-center justify-center gap-2 rounded-full px-5 py-2.5 " +
+            (pillVisible
+              ? "feed-marquee-scrub-pill--visible feed-marquee-scrub-pill--engaged"
+              : "feed-marquee-scrub-pill--hidden")
+          }
+        >
+          <DotIndicators
+            posts={posts}
+            activeIndex={activeIndex}
+            indices={mobileDotIndices}
+            compact
+            scrubbing={pillVisible}
+          />
+        </div>
       </div>
     </div>
   );
