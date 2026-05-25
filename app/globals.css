@@ -70,6 +70,33 @@ body {
   max-width: 100%;
 }
 
+.feed-marquee-dots {
+  touch-action: none;
+  background: linear-gradient(
+    to top,
+    rgb(244 244 245 / 0.92) 0%,
+    rgb(244 244 245 / 0.55) 55%,
+    transparent 100%
+  );
+}
+
+.dark .feed-marquee-dots {
+  background: linear-gradient(
+    to top,
+    rgb(9 9 11 / 0.92) 0%,
+    rgb(9 9 11 / 0.55) 55%,
+    transparent 100%
+  );
+}
+
+.feed-marquee-dots--scrubbing {
+  cursor: grabbing;
+}
+
+.feed-marquee-dots--scrubbing [data-marquee-dot] {
+  pointer-events: none;
+}
+
 /* Feed page: normal vertical scroll (scrollbar hidden); marquee is horizontal-only inside its stage */
 .feed-page-scroll {
   scrollbar-width: none;
@@ -91,6 +118,10 @@ body {
 
 .feed-hero__stage {
   width: 100%;
+}
+
+.feed-marquee--scrubbing {
+  scroll-snap-type: none;
 }
 
 .feed-marquee--pulling {

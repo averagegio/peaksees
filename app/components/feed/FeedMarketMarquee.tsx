@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { MarketPostCard } from "@/app/components/PeakFeed";
+import { FeedMarqueeDots } from "@/app/components/feed/FeedMarqueeDots";
 import { PullRefreshRail, pullDisplacement } from "@/app/components/feed/pull-refresh-rail";
 import type { MarketPost } from "@/app/lib/mock-markets";
 
@@ -32,7 +33,7 @@ function isMarqueeGestureBlocker(t: EventTarget | null) {
   if (!(t instanceof Element)) return false;
   return Boolean(
     t.closest(
-      'button, a, input, textarea, select, label, [role="button"], [data-no-marquee-gesture="true"], [data-no-insight-gesture="true"]',
+      'button, a, input, textarea, select, label, [role="button"], [data-marquee-dots], [data-no-marquee-gesture="true"], [data-no-insight-gesture="true"]',
     ),
   );
 }
@@ -80,6 +81,7 @@ export function FeedMarketMarquee({
   const [activeIndex, setActiveIndex] = useState(0);
   const [pullOffset, setPullOffset] = useState(0);
   const [pullMode, setPullMode] = useState<PullMode | null>(null);
+  const [isScrubbing, setIsScrubbing] = useState(false);
 
   const activeIndexRef = useRef(0);
   const pausedUntilRef = useRef(0);
@@ -116,6 +118,23 @@ export function FeedMarketMarquee({
   const pauseForUser = useCallback(() => {
     pausedUntilRef.current = Date.now() + USER_IDLE_MS;
   }, []);
+
+  const goToSlide = useCallback(
+    (index: number) => {
+      const el = viewportRef.current;
+      if (!el || posts.length === 0) return;
+      const ix = Math.max(0, Math.min(posts.length - 1, index));
+      pauseForUser();
+      scrollingProgrammaticallyRef.current = true;
+      scrollToSlide(el, ix, "smooth");
+      activeIndexRef.current = ix;
+      setActiveIndex(ix);
+      window.setTimeout(() => {
+        scrollingProgrammaticallyRef.current = false;
+      }, MARQUEE_TRANSITION_MS + 80);
+    },
+    [pauseForUser, posts.length, viewportRef],
+  );
 
   const resetPull = useCallback(() => {
     touchPullRef.current.active = false;
@@ -184,7 +203,7 @@ export function FeedMarketMarquee({
     if (!el || posts.length < 2) return undefined;
 
     const onScroll = () => {
-      if (!scrollingProgrammaticallyRef.current) {
+      if (!scrollingProgrammaticallyRef.current && !isScrubbing) {
         pausedUntilRef.current = Date.now() + USER_IDLE_MS;
       }
       if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
@@ -196,16 +215,16 @@ export function FeedMarketMarquee({
       el.removeEventListener("scroll", onScroll);
       if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
     };
-  }, [posts.length, viewportRef, syncIndexFromScroll]);
+  }, [posts.length, viewportRef, syncIndexFromScroll, isScrubbing]);
 
   useEffect(() => {
     const el = viewportRef.current;
-    if (!el || posts.length < 2 || prefersReducedMotion()) {
+    if (!el || posts.length < 2 || prefersReducedMotion() || isScrubbing) {
       return undefined;
     }
 
     const tick = () => {
-      if (Date.now() < pausedUntilRef.current) return;
+      if (Date.now() < pausedUntilRef.current || isScrubbing) return;
       const w = el.clientWidth;
       if (w <= 0) return;
       const next = (activeIndexRef.current + 1) % posts.length;
@@ -220,7 +239,7 @@ export function FeedMarketMarquee({
 
     const id = window.setInterval(tick, MARQUEE_PAUSE_MS);
     return () => window.clearInterval(id);
-  }, [posts.length, viewportRef, slideWidth]);
+  }, [posts.length, viewportRef, slideWidth, isScrubbing]);
 
   useEffect(() => {
     const root = pullRootRef.current;
@@ -470,12 +489,16 @@ export function FeedMarketMarquee({
           ref={viewportRef}
           className={
             "feed-marquee-viewport feed-scroll feed-scroll-x relative min-h-0 w-full flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-none snap-x snap-mandatory " +
+            (isScrubbing ? "feed-marquee--scrubbing cursor-grabbing snap-none " : "") +
             (pullOffset > 0 ? "feed-marquee--pulling" : "")
           }
           onWheel={pauseForUser}
         >
           <div
-            className="feed-marquee-track motion-safe:transition-transform motion-safe:duration-75 motion-safe:ease-out"
+            className={
+              "feed-marquee-track motion-safe:transition-transform motion-safe:duration-75 motion-safe:ease-out " +
+              (isScrubbing ? "motion-safe:transition-none" : "")
+            }
             style={trackTransform ? { transform: trackTransform } : undefined}
           >
             {posts.map((post, i) => (
@@ -521,27 +544,17 @@ export function FeedMarketMarquee({
         </div>
       </div>
 
-      {posts.length > 1 ? (
-        <div
-          className={
-            "pointer-events-none absolute left-0 right-14 flex justify-center gap-1.5 " +
-            (isHero ? "bottom-5" : "bottom-2")
-          }
-          aria-hidden
-        >
-          {posts.map((p, i) => (
-            <span
-              key={`dot-${p.id}`}
-              className={
-                "h-1 rounded-full motion-safe:transition-all motion-safe:duration-300 " +
-                (i === activeIndex
-                  ? "w-4 bg-emerald-600 dark:bg-emerald-400"
-                  : "w-1 bg-zinc-300/90 dark:bg-zinc-600")
-              }
-            />
-          ))}
-        </div>
-      ) : null}
+      <FeedMarqueeDots
+        posts={posts}
+        activeIndex={activeIndex}
+        variant={variant}
+        viewportRef={viewportRef}
+        pullRefreshing={pullRefreshing}
+        pauseForUser={pauseForUser}
+        goToSlide={goToSlide}
+        syncIndexFromScroll={syncIndexFromScroll}
+        onScrubbingChange={setIsScrubbing}
+      />
     </div>
   );
 }
