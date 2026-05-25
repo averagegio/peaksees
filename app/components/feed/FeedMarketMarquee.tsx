@@ -89,6 +89,13 @@ export function FeedMarketMarquee({
   const scrollingProgrammaticallyRef = useRef(false);
   const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const carouselInteractEndRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewportScrollLeftRef = useRef(0);
+  const viewportTouchRef = useRef({
+    active: false,
+    startX: 0,
+    startY: 0,
+    horizontalLocked: false,
+  });
   const pullRootRef = useRef<HTMLDivElement | null>(null);
   const pullOffsetRef = useRef(0);
   const touchPullRef = useRef<{
@@ -247,10 +254,19 @@ export function FeedMarketMarquee({
     const el = viewportRef.current;
     if (!el || posts.length < 2) return undefined;
 
+    viewportScrollLeftRef.current = el.scrollLeft;
+
     const onScroll = () => {
+      const prevLeft = viewportScrollLeftRef.current;
+      const nextLeft = el.scrollLeft;
+      const horizontalMoved = Math.abs(nextLeft - prevLeft) > 1;
+      viewportScrollLeftRef.current = nextLeft;
+
       if (!scrollingProgrammaticallyRef.current && !isScrubbing) {
         pausedUntilRef.current = Date.now() + USER_IDLE_MS;
-        if (isMobileCarouselUi()) bumpCarouselInteracting();
+        if (isMobileCarouselUi() && horizontalMoved) {
+          bumpCarouselInteracting();
+        }
       }
       if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
       scrollEndTimerRef.current = setTimeout(syncIndexFromScroll, 48);
@@ -259,21 +275,53 @@ export function FeedMarketMarquee({
     const onTouchStart = (e: TouchEvent) => {
       if (!isMobileCarouselUi() || e.touches.length !== 1) return;
       if (isMarqueeGestureBlocker(e.target)) return;
+      const t = e.touches[0]!;
+      viewportTouchRef.current = {
+        active: true,
+        startX: t.clientX,
+        startY: t.clientY,
+        horizontalLocked: false,
+      };
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      const g = viewportTouchRef.current;
+      if (!g.active || !isMobileCarouselUi() || e.touches.length !== 1) return;
+      const t = e.touches[0]!;
+      const dx = t.clientX - g.startX;
+      const dy = t.clientY - g.startY;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+
+      if (!g.horizontalLocked) {
+        if (absY >= 10 && absY > absX * 1.2) {
+          g.active = false;
+          return;
+        }
+        if (absX >= 10 && absX >= absY * 1.2) {
+          g.horizontalLocked = true;
+          bumpCarouselInteracting();
+        }
+        return;
+      }
+
       bumpCarouselInteracting();
     };
 
     const onTouchEnd = () => {
-      if (!isMobileCarouselUi()) return;
-      bumpCarouselInteracting();
+      viewportTouchRef.current.active = false;
+      viewportTouchRef.current.horizontalLocked = false;
     };
 
     el.addEventListener("scroll", onScroll, { passive: true });
     el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: true });
     el.addEventListener("touchend", onTouchEnd, { passive: true });
     el.addEventListener("touchcancel", onTouchEnd, { passive: true });
     return () => {
       el.removeEventListener("scroll", onScroll);
       el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
       el.removeEventListener("touchcancel", onTouchEnd);
       if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
