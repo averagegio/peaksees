@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type RefObject,
@@ -17,7 +18,8 @@ const MARQUEE_PAUSE_MS = 4_200;
 const MARQUEE_TRANSITION_MS = 520;
 const USER_IDLE_MS = 9_000;
 const PULL_THRESHOLD_PX = 48;
-const SCRUB_HOLD_MS = 300;
+const DOT_SCRUB_HOLD_MS = 220;
+const DOT_SCRUB_DRAG_PX = 10;
 
 function prefersReducedMotion() {
   if (typeof window === "undefined") return false;
@@ -100,9 +102,12 @@ export function FeedMarketMarquee({
     armed: false,
     pointerId: -1,
     startX: 0,
+    startY: 0,
     startScroll: 0,
   });
   const pullOffsetRef = useRef(0);
+  const dotRailRef = useRef<HTMLDivElement | null>(null);
+  const suppressDotClickRef = useRef(false);
 
   const measure = useCallback(() => {
     const el = viewportRef.current;
@@ -134,6 +139,27 @@ export function FeedMarketMarquee({
     }
   }, []);
 
+  const armScrub = useCallback(
+    (pointerId: number, clientX?: number) => {
+      const el = viewportRef.current;
+      if (!el || scrubRef.current.armed) return;
+      if (clientX != null) {
+        scrubRef.current.startX = clientX;
+        scrubRef.current.startScroll = el.scrollLeft;
+      }
+      scrubRef.current.armed = true;
+      setIsScrubbing(true);
+      pausedUntilRef.current = Date.now() + 86_400_000;
+      try {
+        el.setPointerCapture(pointerId);
+      } catch {
+        // ignore
+      }
+      marketCardHaptic("press");
+    },
+    [],
+  );
+
   const endScrub = useCallback(
     (pointerId: number) => {
       const el = viewportRef.current;
@@ -163,6 +189,23 @@ export function FeedMarketMarquee({
     [pauseForUser, posts.length, viewportRef],
   );
 
+  const goToSlide = useCallback(
+    (index: number) => {
+      const el = viewportRef.current;
+      if (!el || posts.length === 0) return;
+      const ix = Math.max(0, Math.min(posts.length - 1, index));
+      pauseForUser();
+      scrollingProgrammaticallyRef.current = true;
+      scrollToSlide(el, ix, "smooth");
+      activeIndexRef.current = ix;
+      setActiveIndex(ix);
+      window.setTimeout(() => {
+        scrollingProgrammaticallyRef.current = false;
+      }, MARQUEE_TRANSITION_MS + 80);
+    },
+    [pauseForUser, posts.length, viewportRef],
+  );
+
   const resetPull = useCallback(() => {
     pullGestureRef.current.active = false;
     pullGestureRef.current.mode = null;
@@ -176,14 +219,21 @@ export function FeedMarketMarquee({
     setPullOffset(v);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = viewportRef.current;
     if (!el) return undefined;
-    measure();
-    const ro = new ResizeObserver(() => measure());
+    const run = () => measure();
+    run();
+    const ro = new ResizeObserver(run);
     ro.observe(el);
-    return () => ro.disconnect();
-  }, [measure, viewportRef]);
+    const raf1 = requestAnimationFrame(run);
+    const raf2 = requestAnimationFrame(() => requestAnimationFrame(run));
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [measure, viewportRef, posts.length]);
 
   useEffect(() => {
     activeIndexRef.current = activeIndex;
@@ -266,29 +316,9 @@ export function FeedMarketMarquee({
     const onPointerDown = (e: PointerEvent) => {
       if (pullRefreshing || isMarqueeGestureBlocker(e.target)) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
+      if ((e.target as Element).closest("[data-marquee-dots]")) return;
 
       pauseForUser();
-      clearScrubTimer();
-      scrubRef.current = {
-        armed: false,
-        pointerId: e.pointerId,
-        startX: e.clientX,
-        startScroll: el.scrollLeft,
-      };
-
-      scrubTimerRef.current = setTimeout(() => {
-        if (pullGestureRef.current.active && pullGestureRef.current.mode) return;
-        scrubRef.current.armed = true;
-        setIsScrubbing(true);
-        pausedUntilRef.current = Date.now() + 86_400_000;
-        try {
-          el.setPointerCapture(e.pointerId);
-        } catch {
-          // ignore
-        }
-        marketCardHaptic("press");
-      }, SCRUB_HOLD_MS);
-
       pullGestureRef.current = {
         active: true,
         pointerId: e.pointerId,
@@ -300,21 +330,6 @@ export function FeedMarketMarquee({
 
     const onPointerMove = (e: PointerEvent) => {
       const g = pullGestureRef.current;
-
-      if (scrubRef.current.armed && e.pointerId === scrubRef.current.pointerId) {
-        e.preventDefault();
-        const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
-        const dx = e.clientX - scrubRef.current.startX;
-        el.scrollLeft = Math.max(0, Math.min(maxScroll, scrubRef.current.startScroll - dx));
-        syncIndexFromScroll();
-        return;
-      }
-
-      if (scrubTimerRef.current && e.pointerId === scrubRef.current.pointerId) {
-        const jx = Math.abs(e.clientX - scrubRef.current.startX);
-        const jy = Math.abs(e.clientY - g.startY);
-        if (jx > 10 || jy > 10) clearScrubTimer();
-      }
 
       if (!g.active || e.pointerId !== g.pointerId || pullRefreshing) return;
 
@@ -333,7 +348,6 @@ export function FeedMarketMarquee({
           absX > absY * 1.15
         ) {
           g.mode = "horizontal";
-          clearScrubTimer();
           setPullMode("horizontal");
         } else if (
           pullEnabled &&
@@ -343,10 +357,8 @@ export function FeedMarketMarquee({
           absY > absX * 1.15
         ) {
           g.mode = "vertical";
-          clearScrubTimer();
           setPullMode("vertical");
         } else if (absX > 10 || absY > 10) {
-          clearScrubTimer();
           g.active = false;
           return;
         } else {
@@ -366,12 +378,6 @@ export function FeedMarketMarquee({
     };
 
     const onPointerUp = (e: PointerEvent) => {
-      clearScrubTimer();
-
-      if (scrubRef.current.armed && e.pointerId === scrubRef.current.pointerId) {
-        endScrub(e.pointerId);
-      }
-
       const g = pullGestureRef.current;
       if (!g.active || e.pointerId !== g.pointerId) return;
 
@@ -402,10 +408,109 @@ export function FeedMarketMarquee({
     pageScrollAtTop,
     onPullRefresh,
     pauseForUser,
-    clearScrubTimer,
-    endScrub,
     resetPull,
     setPullOffsetPx,
+    viewportRef,
+  ]);
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    const rail = dotRailRef.current;
+    if (!el || !rail || posts.length < 2) return undefined;
+
+    const onRailPointerDown = (e: PointerEvent) => {
+      if (pullRefreshing) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+
+      pauseForUser();
+      clearScrubTimer();
+      scrubRef.current = {
+        armed: false,
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        startScroll: el.scrollLeft,
+      };
+
+      scrubTimerRef.current = setTimeout(() => {
+        armScrub(e.pointerId);
+      }, DOT_SCRUB_HOLD_MS);
+
+      try {
+        rail.setPointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
+    };
+
+    const onRailPointerMove = (e: PointerEvent) => {
+      if (e.pointerId !== scrubRef.current.pointerId) return;
+
+      const dx = e.clientX - scrubRef.current.startX;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(e.clientY - scrubRef.current.startY);
+
+      if (!scrubRef.current.armed && scrubTimerRef.current) {
+        if (absDx >= DOT_SCRUB_DRAG_PX && absDx > absDy) {
+          clearScrubTimer();
+          armScrub(e.pointerId, e.clientX);
+        } else if (absDy > 14) {
+          clearScrubTimer();
+        }
+      }
+
+      if (scrubRef.current.armed) {
+        e.preventDefault();
+        const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+        el.scrollLeft = Math.max(
+          0,
+          Math.min(maxScroll, scrubRef.current.startScroll - dx),
+        );
+        syncIndexFromScroll();
+      }
+    };
+
+    const onRailPointerUp = (e: PointerEvent) => {
+      if (e.pointerId !== scrubRef.current.pointerId) return;
+      clearScrubTimer();
+      const wasScrub = scrubRef.current.armed;
+      if (wasScrub) {
+        suppressDotClickRef.current = true;
+        endScrub(e.pointerId);
+      }
+      try {
+        rail.releasePointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
+      scrubRef.current = {
+        armed: false,
+        pointerId: -1,
+        startX: 0,
+        startY: 0,
+        startScroll: 0,
+      };
+    };
+
+    rail.addEventListener("pointerdown", onRailPointerDown);
+    rail.addEventListener("pointermove", onRailPointerMove, { passive: false });
+    rail.addEventListener("pointerup", onRailPointerUp);
+    rail.addEventListener("pointercancel", onRailPointerUp);
+
+    return () => {
+      clearScrubTimer();
+      rail.removeEventListener("pointerdown", onRailPointerDown);
+      rail.removeEventListener("pointermove", onRailPointerMove);
+      rail.removeEventListener("pointerup", onRailPointerUp);
+      rail.removeEventListener("pointercancel", onRailPointerUp);
+    };
+  }, [
+    posts.length,
+    pullRefreshing,
+    pauseForUser,
+    clearScrubTimer,
+    armScrub,
+    endScrub,
     syncIndexFromScroll,
     viewportRef,
   ]);
@@ -467,7 +572,7 @@ export function FeedMarketMarquee({
         >
           <div
             className={
-              "flex h-full min-h-0 flex-row items-stretch motion-safe:transition-transform motion-safe:duration-75 motion-safe:ease-out " +
+              "feed-marquee-track motion-safe:transition-transform motion-safe:duration-75 motion-safe:ease-out " +
               (isScrubbing ? "motion-safe:transition-none" : "")
             }
             style={trackTransform ? { transform: trackTransform } : undefined}
@@ -476,8 +581,12 @@ export function FeedMarketMarquee({
               <div
                 key={post.id}
                 data-market-slide={post.id}
-                className="feed-marquee-slide box-border h-full shrink-0 snap-start snap-always"
-                style={slideWidth > 0 ? { width: slideWidth } : undefined}
+                className="feed-marquee-slide h-full shrink-0 snap-start snap-always"
+                style={
+                  slideWidth > 0
+                    ? { width: slideWidth, minWidth: slideWidth, maxWidth: slideWidth, flexBasis: slideWidth }
+                    : undefined
+                }
               >
                 <div
                   className={
@@ -508,30 +617,45 @@ export function FeedMarketMarquee({
 
       {posts.length > 1 ? (
         <div
+          ref={dotRailRef}
+          data-marquee-dots=""
+          role="tablist"
+          aria-label="Market card positions — tap to jump, hold and drag to scrub"
           className={
-            "pointer-events-none absolute left-0 right-14 flex justify-center gap-1.5 " +
-            (isHero ? "bottom-5" : "bottom-2")
+            "feed-marquee-dots absolute inset-x-0 z-10 flex items-center justify-center gap-1 px-3 " +
+            (isHero ? "bottom-0 pb-3 pt-8" : "bottom-0 pb-2 pt-6") +
+            (isScrubbing ? " feed-marquee-dots--scrubbing" : "")
           }
-          aria-hidden
         >
           {posts.map((p, i) => (
-            <span
+            <button
               key={`dot-${p.id}`}
-              className={
-                "h-1 rounded-full motion-safe:transition-all motion-safe:duration-300 " +
-                (i === activeIndex
-                  ? "w-4 bg-emerald-600 dark:bg-emerald-400"
-                  : "w-1 bg-zinc-300/90 dark:bg-zinc-600")
-              }
-            />
+              type="button"
+              role="tab"
+              aria-selected={i === activeIndex}
+              aria-label={`Market ${i + 1} of ${posts.length}`}
+              data-marquee-dot=""
+              onClick={() => {
+                if (suppressDotClickRef.current) {
+                  suppressDotClickRef.current = false;
+                  return;
+                }
+                goToSlide(i);
+              }}
+              className="flex h-9 min-w-9 items-center justify-center rounded-full outline-none transition hover:bg-zinc-200/60 focus-visible:ring-2 focus-visible:ring-emerald-500 dark:hover:bg-zinc-800/80"
+            >
+              <span
+                className={
+                  "block h-1.5 rounded-full motion-safe:transition-all motion-safe:duration-300 " +
+                  (i === activeIndex
+                    ? "w-5 bg-emerald-600 dark:bg-emerald-400"
+                    : "w-1.5 bg-zinc-400/90 dark:bg-zinc-500")
+                }
+                aria-hidden
+              />
+            </button>
           ))}
         </div>
-      ) : null}
-
-      {isScrubbing ? (
-        <p className="pointer-events-none absolute left-0 right-0 top-2 z-20 text-center text-[10px] font-semibold uppercase tracking-wide text-emerald-700/90 dark:text-emerald-400/90">
-          Scrub carousel
-        </p>
       ) : null}
     </div>
   );

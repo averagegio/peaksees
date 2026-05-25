@@ -857,7 +857,7 @@ export function HomeFeedWithTabs({
           </section>
         ) : (
           <FeedMarketHero
-            key={`${tab}-${explore}`}
+            key={explore}
             posts={feedPosts}
             viewerUserId={viewerUserId}
             tourMarketPostIndex={0}

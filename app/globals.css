@@ -49,9 +49,49 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+.feed-marquee-track {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  min-width: 100%;
+}
+
+/* One card per viewport width even before JS measures (fixes wide cards on first paint). */
 .feed-marquee-slide {
   isolation: isolate;
   contain: layout style;
+  box-sizing: border-box;
+  flex: 0 0 100%;
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
+}
+
+.feed-marquee-dots {
+  touch-action: none;
+  background: linear-gradient(
+    to top,
+    rgb(244 244 245 / 0.92) 0%,
+    rgb(244 244 245 / 0.55) 55%,
+    transparent 100%
+  );
+}
+
+.dark .feed-marquee-dots {
+  background: linear-gradient(
+    to top,
+    rgb(9 9 11 / 0.92) 0%,
+    rgb(9 9 11 / 0.55) 55%,
+    transparent 100%
+  );
+}
+
+.feed-marquee-dots--scrubbing {
+  cursor: grabbing;
+}
+
+.feed-marquee-dots--scrubbing [data-marquee-dot] {
+  pointer-events: none;
 }
 
 /* Feed page: normal vertical scroll (scrollbar hidden); marquee is horizontal-only inside its stage */
