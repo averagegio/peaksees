@@ -23,18 +23,28 @@ type ScrubGesture = {
   startScroll: number;
 };
 
-function useCoarsePointer() {
-  const [coarse, setCoarse] = useState(false);
+/** Touch / coarse-pointer UI (avoids missing scrub on phones that report fine pointer). */
+function useTouchScrubUi() {
+  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
-    const mq = window.matchMedia("(pointer: coarse)");
-    const update = () => setCoarse(mq.matches);
+    const coarse = window.matchMedia("(pointer: coarse)");
+    const narrow = window.matchMedia("(max-width: 768px)");
+    const update = () => setEnabled(coarse.matches || narrow.matches);
     update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
+    coarse.addEventListener("change", update);
+    narrow.addEventListener("change", update);
+    return () => {
+      coarse.removeEventListener("change", update);
+      narrow.removeEventListener("change", update);
+    };
   }, []);
 
-  return coarse;
+  return enabled;
+}
+
+function isTouchPointer(e: PointerEvent) {
+  return e.pointerType === "touch";
 }
 
 function visibleDotIndices(count: number, active: number, maxVisible: number) {
@@ -44,6 +54,12 @@ function visibleDotIndices(count: number, active: number, maxVisible: number) {
   const half = Math.floor(maxVisible / 2);
   const start = Math.max(0, Math.min(active - half, count - maxVisible));
   return Array.from({ length: maxVisible }, (_, i) => start + i);
+}
+
+function scrollIndex(viewport: HTMLElement, count: number) {
+  const w = viewport.clientWidth;
+  if (w <= 0 || count === 0) return 0;
+  return Math.max(0, Math.min(count - 1, Math.round(viewport.scrollLeft / w)));
 }
 
 function DotIndicators({
@@ -74,10 +90,11 @@ function DotIndicators({
               "block rounded-full motion-safe:transition-all motion-safe:duration-200 " +
               (compact
                 ? active
-                  ? "h-1 w-2.5 bg-emerald-600 dark:bg-emerald-400 " + (engaged ? "scale-110" : "")
-                  : "h-0.5 w-1 bg-zinc-300/90 dark:bg-zinc-600"
+                  ? "h-1 w-2.5 bg-emerald-600 dark:bg-emerald-400 " +
+                    (engaged ? "scale-105" : "")
+                  : "h-0.5 w-1 bg-zinc-400/80 dark:bg-zinc-500"
                 : active
-                  ? "h-1 w-4 bg-emerald-600 dark:bg-emerald-400 " + (engaged ? "scale-110" : "")
+                  ? "h-1 w-4 bg-emerald-600 dark:bg-emerald-400 " + (engaged ? "scale-105" : "")
                   : "h-1 w-1 bg-zinc-300/90 dark:bg-zinc-600")
             }
             aria-hidden
@@ -90,7 +107,7 @@ function DotIndicators({
 
 /**
  * Compact dots in a transparent pill under the card.
- * Mobile: small transparent pill with a few dots; outline on tap + drag to scrub.
+ * Mobile: small pill, few dots, outline on tap; tap + drag scrubs with haptics.
  */
 export function FeedMarqueeDotScrub({
   posts,
@@ -114,11 +131,12 @@ export function FeedMarqueeDotScrub({
   onScrubbingChange?: (scrubbing: boolean) => void;
 }) {
   const isHero = variant === "hero";
-  const isMobile = useCoarsePointer();
+  const isMobileUi = useTouchScrubUi();
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [isTouched, setIsTouched] = useState(false);
 
   const pillRef = useRef<HTMLDivElement | null>(null);
+  const lastHapticIndexRef = useRef(-1);
   const scrubRef = useRef<ScrubGesture>({
     armed: false,
     pointerId: -1,
@@ -129,7 +147,8 @@ export function FeedMarqueeDotScrub({
 
   const railClass =
     "feed-marquee-dots pointer-events-none absolute inset-x-0 z-10 flex items-center justify-center px-3 " +
-    (isHero ? "bottom-0 pb-3 pt-8" : "bottom-0 pb-2 pt-6");
+    (isHero ? "bottom-0 pb-3 pt-8" : "bottom-0 pb-2 pt-6") +
+    (isMobileUi ? " feed-marquee-dots--mobile" : "");
 
   const engaged = isScrubbing || isTouched;
 
@@ -141,6 +160,17 @@ export function FeedMarqueeDotScrub({
     [onScrubbingChange],
   );
 
+  const pulseScrubIndex = useCallback(
+    (viewport: HTMLElement) => {
+      const ix = scrollIndex(viewport, posts.length);
+      if (ix !== lastHapticIndexRef.current) {
+        lastHapticIndexRef.current = ix;
+        marketCardHaptic("scrub");
+      }
+    },
+    [posts.length],
+  );
+
   const armScrub = useCallback(
     (pointerId: number, clientX?: number) => {
       const el = viewportRef.current;
@@ -150,6 +180,7 @@ export function FeedMarqueeDotScrub({
         scrubRef.current.startScroll = el.scrollLeft;
       }
       scrubRef.current.armed = true;
+      lastHapticIndexRef.current = scrollIndex(el, posts.length);
       setScrubbing(true);
       try {
         el.setPointerCapture(pointerId);
@@ -158,7 +189,7 @@ export function FeedMarqueeDotScrub({
       }
       marketCardHaptic("pull");
     },
-    [setScrubbing, viewportRef],
+    [posts.length, setScrubbing, viewportRef],
   );
 
   const endScrub = useCallback(
@@ -167,6 +198,7 @@ export function FeedMarqueeDotScrub({
       if (!scrubRef.current.armed) return;
       scrubRef.current.armed = false;
       setScrubbing(false);
+      lastHapticIndexRef.current = -1;
       pauseForUser();
       if (el) {
         try {
@@ -174,18 +206,14 @@ export function FeedMarqueeDotScrub({
         } catch {
           // ignore
         }
-        const w = el.clientWidth;
-        if (w > 0) {
-          const ix = Math.max(0, Math.min(posts.length - 1, Math.round(el.scrollLeft / w)));
-          goToSlide(ix);
-        }
+        goToSlide(scrollIndex(el, posts.length));
       }
     },
     [goToSlide, pauseForUser, posts.length, setScrubbing, viewportRef],
   );
 
   useEffect(() => {
-    if (!isMobile) {
+    if (!isMobileUi) {
       setScrubbing(false);
       setIsTouched(false);
       return undefined;
@@ -196,7 +224,7 @@ export function FeedMarqueeDotScrub({
     if (!el || !pill || posts.length < 2) return undefined;
 
     const onPointerDown = (e: PointerEvent) => {
-      if (pullRefreshing || e.pointerType === "mouse") return;
+      if (pullRefreshing || !isTouchPointer(e)) return;
 
       pauseForUser();
       setIsTouched(true);
@@ -209,6 +237,7 @@ export function FeedMarqueeDotScrub({
         startY: e.clientY,
         startScroll: el.scrollLeft,
       };
+      lastHapticIndexRef.current = scrollIndex(el, posts.length);
 
       try {
         pill.setPointerCapture(e.pointerId);
@@ -237,6 +266,7 @@ export function FeedMarqueeDotScrub({
         0,
         Math.min(maxScroll, scrubRef.current.startScroll - dx),
       );
+      pulseScrubIndex(el);
       syncIndexFromScroll();
     };
 
@@ -274,10 +304,11 @@ export function FeedMarqueeDotScrub({
   }, [
     armScrub,
     endScrub,
-    isMobile,
+    isMobileUi,
     pauseForUser,
     posts.length,
     pullRefreshing,
+    pulseScrubIndex,
     setScrubbing,
     syncIndexFromScroll,
     viewportRef,
@@ -289,39 +320,39 @@ export function FeedMarqueeDotScrub({
     MOBILE_VISIBLE_DOTS,
   );
 
-  const showOutline = isMobile && (isTouched || isScrubbing);
+  const showOutline = isMobileUi && (isTouched || isScrubbing);
 
   const pillClass =
     "feed-marquee-scrub-pill flex items-center justify-center rounded-full " +
-    (isMobile
+    (isMobileUi
       ? "gap-1 px-2 py-1 min-h-7 " + (showOutline ? "feed-marquee-scrub-pill--outline" : "")
       : "gap-1.5 px-3 py-1.5 pointer-events-none ");
 
   if (posts.length < 2) return null;
 
   return (
-    <div className={railClass} aria-hidden={!isMobile}>
+    <div className={railClass} aria-hidden={!isMobileUi}>
       <div
-        ref={isMobile ? pillRef : undefined}
-        data-marquee-dot-scrub={isMobile ? "" : undefined}
-        data-no-marquee-gesture={isMobile ? "true" : undefined}
-        role={isMobile ? "slider" : undefined}
+        ref={isMobileUi ? pillRef : undefined}
+        data-marquee-dot-scrub={isMobileUi ? "" : undefined}
+        data-no-marquee-gesture={isMobileUi ? "true" : undefined}
+        role={isMobileUi ? "slider" : undefined}
         aria-label={
-          isMobile
+          isMobileUi
             ? `Market carousel, ${activeIndex + 1} of ${posts.length}`
             : undefined
         }
-        aria-valuemin={isMobile ? 1 : undefined}
-        aria-valuemax={isMobile ? posts.length : undefined}
-        aria-valuenow={isMobile ? activeIndex + 1 : undefined}
+        aria-valuemin={isMobileUi ? 1 : undefined}
+        aria-valuemax={isMobileUi ? posts.length : undefined}
+        aria-valuenow={isMobileUi ? activeIndex + 1 : undefined}
         className={pillClass}
       >
         <DotIndicators
           posts={posts}
           activeIndex={activeIndex}
-          indices={isMobile ? mobileDotIndices : undefined}
-          compact={isMobile}
-          engaged={isMobile ? engaged : false}
+          indices={isMobileUi ? mobileDotIndices : undefined}
+          compact={isMobileUi}
+          engaged={isMobileUi ? engaged : false}
         />
       </div>
     </div>
