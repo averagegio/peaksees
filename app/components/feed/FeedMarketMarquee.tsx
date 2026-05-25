@@ -496,7 +496,7 @@ export function FeedMarketMarquee({
         >
           {isScrubbing && posts.length > 1 ? (
             <div
-              className="pointer-events-none absolute right-3 top-3 z-20 rounded-md bg-black/70 px-2 py-0.5 text-xs font-semibold tabular-nums text-white shadow-sm backdrop-blur-sm"
+              className="pointer-events-none absolute right-3 top-3 z-20 rounded-md bg-black/55 px-2 py-0.5 text-xs font-semibold tabular-nums text-white/95 md:hidden"
               aria-hidden
             >
               {activeIndex + 1} / {posts.length}
@@ -553,24 +553,17 @@ export function FeedMarketMarquee({
       </div>
 
       {posts.length > 1 ? (
-        <div
-          className={
-            "absolute inset-x-0 z-10 flex justify-center px-3 " +
-            (isHero ? "bottom-4" : "bottom-2")
-          }
-        >
-          <FeedMarqueeDotScrub
-            posts={posts}
-            activeIndex={activeIndex}
-            variant={variant}
-            viewportRef={viewportRef}
-            pullRefreshing={pullRefreshing}
-            pauseForUser={pauseForUser}
-            goToSlide={goToSlide}
-            syncIndexFromScroll={syncIndexFromScroll}
-            onScrubbingChange={setIsScrubbing}
-          />
-        </div>
+        <FeedMarqueeDotScrub
+          posts={posts}
+          activeIndex={activeIndex}
+          variant={variant}
+          viewportRef={viewportRef}
+          pullRefreshing={pullRefreshing}
+          pauseForUser={pauseForUser}
+          goToSlide={goToSlide}
+          syncIndexFromScroll={syncIndexFromScroll}
+          onScrubbingChange={setIsScrubbing}
+        />
       ) : null}
     </div>
   );
