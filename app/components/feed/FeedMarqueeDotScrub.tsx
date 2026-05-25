@@ -168,8 +168,8 @@ export function FeedMarqueeDotScrub({
   });
 
   const railClass =
-    "feed-marquee-dots absolute inset-x-0 bottom-0 z-30 flex items-end justify-center " +
-    (isMobileUi ? "feed-marquee-dots--mobile pointer-events-auto " : "pointer-events-none ") +
+    "feed-marquee-dots absolute inset-x-0 bottom-0 flex items-end justify-center " +
+    (isMobileUi ? "feed-marquee-dots--mobile " : "pointer-events-none z-30 ") +
     (isHero ? "pb-1" : "pb-0");
 
   const setPillScrubbingDom = useCallback((scrubbing: boolean) => {
@@ -403,18 +403,21 @@ export function FeedMarqueeDotScrub({
       cancelAnimationFrame(t1);
       window.clearTimeout(t2);
       listenersCleanupRef.current?.();
-      resetGesture();
+      listenersCleanupRef.current = null;
+      scrubRef.current = { active: false, touchId: -1, pointerId: -1 };
     };
-  }, [bindHitListeners, resetGesture, posts.length, viewportReady]);
+  }, [bindHitListeners, posts.length, viewportReady]);
 
   useEffect(() => {
     if (!isMobileUi) {
       listenersCleanupRef.current?.();
-      resetGesture();
+      listenersCleanupRef.current = null;
+      setPillVisible(false);
+      setPillScrubbingDom(false);
       return;
     }
     bindHitListeners();
-  }, [bindHitListeners, isMobileUi, resetGesture, viewportReady]);
+  }, [bindHitListeners, isMobileUi, setPillScrubbingDom, viewportReady]);
 
   const mobileDotIndices = visibleDotIndices(
     posts.length,
