@@ -17,6 +17,8 @@ const MOBILE_VISIBLE_DOTS = 5;
 const SCRUB_LOCK_PX = 10;
 /** Horizontal must dominate vertical by this ratio to lock scrub. */
 const SCRUB_HORIZONTAL_RATIO = 1.2;
+/** Viewport widths dragged to advance one card (higher = slower, clearer snap). */
+const SCRUB_DRAG_PER_CARD = 0.72;
 
 type ScrubGesture = {
   pending: boolean;
@@ -242,24 +244,25 @@ export function FeedMarqueeDotScrub({
       }
 
       const slideW = slideWidthPx(viewport);
-      const left = scrubRef.current.startScrollLeft - dx;
-      scrubScrollTo(left);
-
+      const pxPerCard = Math.max(slideW * SCRUB_DRAG_PER_CARD, 56);
       const ix = Math.max(
         0,
-        Math.min(posts.length - 1, Math.round(scrubRef.current.startIndex - dx / slideW)),
+        Math.min(
+          posts.length - 1,
+          Math.round(scrubRef.current.startIndex - dx / pxPerCard),
+        ),
       );
 
       if (ix !== lastScrubIndexRef.current) {
         lastScrubIndexRef.current = ix;
         scrubToIndex(ix);
+        onScrubIndex?.(ix);
+        pulseScrubIndex(ix);
       }
 
-      onScrubIndex?.(ix);
-      pulseScrubIndex(ix);
       return ix;
     },
-    [onScrubIndex, posts.length, pulseScrubIndex, scrubScrollTo, scrubToIndex],
+    [onScrubIndex, posts.length, pulseScrubIndex, scrubToIndex],
   );
 
   const lockHorizontalScrub = useCallback(
@@ -279,10 +282,10 @@ export function FeedMarqueeDotScrub({
       lastHapticIndexRef.current = startIx;
       lastScrubIndexRef.current = startIx;
       setMarqueeScrubbing(true);
-      scrubScrollTo(startLeft);
+      scrubToIndex(startIx);
       marketCardHaptic("press");
     },
-    [scrubScrollTo, setMarqueeScrubbing],
+    [scrubToIndex, setMarqueeScrubbing],
   );
 
   const beginGesture = useCallback(

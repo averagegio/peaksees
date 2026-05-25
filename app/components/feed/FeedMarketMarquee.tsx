@@ -178,14 +178,12 @@ export function FeedMarketMarquee({
     );
   }, []);
 
-  const bumpCarouselInteracting = useCallback(() => {
-    setCarouselInteracting(true);
+  const setCarouselTouchOutline = useCallback((active: boolean) => {
     if (carouselInteractEndRef.current) {
       clearTimeout(carouselInteractEndRef.current);
+      carouselInteractEndRef.current = null;
     }
-    carouselInteractEndRef.current = setTimeout(() => {
-      setCarouselInteracting(false);
-    }, 220);
+    setCarouselInteracting(active);
   }, []);
 
   const resetPull = useCallback(() => {
@@ -257,16 +255,10 @@ export function FeedMarketMarquee({
     viewportScrollLeftRef.current = el.scrollLeft;
 
     const onScroll = () => {
-      const prevLeft = viewportScrollLeftRef.current;
-      const nextLeft = el.scrollLeft;
-      const horizontalMoved = Math.abs(nextLeft - prevLeft) > 1;
-      viewportScrollLeftRef.current = nextLeft;
+      viewportScrollLeftRef.current = el.scrollLeft;
 
       if (!scrollingProgrammaticallyRef.current && !isScrubbing) {
         pausedUntilRef.current = Date.now() + USER_IDLE_MS;
-        if (isMobileCarouselUi() && horizontalMoved) {
-          bumpCarouselInteracting();
-        }
       }
       if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
       scrollEndTimerRef.current = setTimeout(syncIndexFromScroll, 48);
@@ -300,17 +292,16 @@ export function FeedMarketMarquee({
         }
         if (absX >= 10 && absX >= absY * 1.2) {
           g.horizontalLocked = true;
-          bumpCarouselInteracting();
+          setCarouselTouchOutline(true);
         }
         return;
       }
-
-      bumpCarouselInteracting();
     };
 
     const onTouchEnd = () => {
       viewportTouchRef.current.active = false;
       viewportTouchRef.current.horizontalLocked = false;
+      setCarouselTouchOutline(false);
     };
 
     el.addEventListener("scroll", onScroll, { passive: true });
@@ -328,7 +319,7 @@ export function FeedMarketMarquee({
       if (carouselInteractEndRef.current) clearTimeout(carouselInteractEndRef.current);
     };
   }, [
-    bumpCarouselInteracting,
+    setCarouselTouchOutline,
     isMobileCarouselUi,
     posts.length,
     viewportRef,
