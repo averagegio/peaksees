@@ -154,22 +154,23 @@ export function FeedMarketMarquee({
     }
   }, [posts.length]);
 
-  /** Imperative horizontal scroll while scrubbing (bypasses snap / React batching). */
-  const scrubScrollTo = useCallback((left: number) => {
-    const el = viewportRef.current;
-    if (!el) return;
-    el.classList.add("feed-marquee--scrubbing");
-    el.style.scrollSnapType = "none";
-    const max = Math.max(0, el.scrollWidth - el.clientWidth);
-    el.scrollLeft = Math.max(0, Math.min(max, left));
-  }, [viewportRef]);
-
   const clearScrubScrollStyles = useCallback(() => {
     const el = viewportRef.current;
     if (!el) return;
     el.classList.remove("feed-marquee--scrubbing");
     el.style.removeProperty("scroll-snap-type");
   }, [viewportRef]);
+
+  const scrubToIndexDuringPill = useCallback(
+    (index: number) => {
+      const el = viewportRef.current;
+      if (!el) return;
+      el.classList.add("feed-marquee--scrubbing");
+      el.style.scrollSnapType = "none";
+      goToSlide(index, "instant");
+    },
+    [goToSlide, viewportRef],
+  );
 
   const isMobileCarouselUi = useCallback(() => {
     if (typeof window === "undefined") return false;
@@ -689,8 +690,7 @@ export function FeedMarketMarquee({
           pullRefreshing={pullRefreshing}
           pauseForUser={pauseForUser}
           goToSlide={(ix) => goToSlide(ix, "smooth")}
-          scrubToIndex={(ix) => goToSlide(ix, "instant")}
-          scrubScrollTo={scrubScrollTo}
+          scrubToIndex={scrubToIndexDuringPill}
           clearScrubScrollStyles={clearScrubScrollStyles}
           onScrubIndex={handleScrubIndex}
           onScrubbingChange={handleScrubbingChange}
