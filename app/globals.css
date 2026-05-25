@@ -151,6 +151,8 @@ body {
 
 .feed-marquee--scrubbing {
   scroll-snap-type: none;
+  scroll-behavior: auto;
+  overscroll-behavior-x: contain;
 }
 
 .feed-marquee--pulling {

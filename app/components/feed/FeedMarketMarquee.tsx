@@ -120,21 +120,29 @@ export function FeedMarketMarquee({
   }, []);
 
   const goToSlide = useCallback(
-    (index: number) => {
+    (index: number, behavior: ScrollBehavior = "smooth") => {
       const el = viewportRef.current;
       if (!el || posts.length === 0) return;
       const ix = Math.max(0, Math.min(posts.length - 1, index));
       pauseForUser();
       scrollingProgrammaticallyRef.current = true;
-      scrollToSlide(el, ix, "smooth");
+      scrollToSlide(el, ix, behavior);
       activeIndexRef.current = ix;
       setActiveIndex(ix);
       window.setTimeout(() => {
         scrollingProgrammaticallyRef.current = false;
-      }, MARQUEE_TRANSITION_MS + 80);
+      }, behavior === "smooth" ? MARQUEE_TRANSITION_MS + 80 : 0);
     },
     [pauseForUser, posts.length, viewportRef],
   );
+
+  const handleScrubIndex = useCallback((index: number) => {
+    const ix = Math.max(0, Math.min(posts.length - 1, index));
+    if (ix !== activeIndexRef.current) {
+      activeIndexRef.current = ix;
+      setActiveIndex(ix);
+    }
+  }, [posts.length]);
 
   const resetPull = useCallback(() => {
     touchPullRef.current.active = false;
@@ -560,8 +568,8 @@ export function FeedMarketMarquee({
           viewportRef={viewportRef}
           pullRefreshing={pullRefreshing}
           pauseForUser={pauseForUser}
-          goToSlide={goToSlide}
-          syncIndexFromScroll={syncIndexFromScroll}
+          goToSlide={(ix) => goToSlide(ix, "smooth")}
+          onScrubIndex={handleScrubIndex}
           onScrubbingChange={setIsScrubbing}
         />
       ) : null}
