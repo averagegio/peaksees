@@ -184,7 +184,7 @@ export function FeedMarqueeDotScrub({
   );
 
   const armScrub = useCallback(
-    (pointerId: number, clientX: number) => {
+    (pointerId: number, clientX: number, pill: HTMLElement) => {
       const el = viewportRef.current;
       if (!el || scrubRef.current.armed) return;
       scrubRef.current.startX = clientX;
@@ -193,7 +193,7 @@ export function FeedMarqueeDotScrub({
       lastHapticIndexRef.current = scrollIndex(el, posts.length);
       setScrubbing(true);
       try {
-        el.setPointerCapture(pointerId);
+        pill.setPointerCapture(pointerId);
       } catch {
         // ignore
       }
@@ -202,24 +202,37 @@ export function FeedMarqueeDotScrub({
     [posts.length, setScrubbing, viewportRef],
   );
 
+  const applyScrubScroll = useCallback(
+    (viewport: HTMLElement, dx: number) => {
+      const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+      viewport.scrollLeft = Math.max(
+        0,
+        Math.min(maxScroll, scrubRef.current.startScroll - dx),
+      );
+      pulseScrubIndex(viewport);
+      syncIndexFromScroll();
+    },
+    [pulseScrubIndex, syncIndexFromScroll],
+  );
+
   const endScrub = useCallback(
-    (pointerId: number) => {
+    (pointerId: number, pill: HTMLElement | null) => {
       const el = viewportRef.current;
       const wasArmed = scrubRef.current.armed;
       scrubRef.current.armed = false;
       setScrubbing(false);
       lastHapticIndexRef.current = -1;
 
-      if (el) {
+      if (pill) {
         try {
-          el.releasePointerCapture(pointerId);
+          pill.releasePointerCapture(pointerId);
         } catch {
           // ignore
         }
-        if (wasArmed) {
-          pauseForUser();
-          goToSlide(scrollIndex(el, posts.length));
-        }
+      }
+      if (el && wasArmed) {
+        pauseForUser();
+        goToSlide(scrollIndex(el, posts.length));
       }
     },
     [goToSlide, pauseForUser, posts.length, setScrubbing, viewportRef],
@@ -272,72 +285,48 @@ export function FeedMarqueeDotScrub({
       const absDy = Math.abs(e.clientY - scrubRef.current.startY);
 
       if (!scrubRef.current.armed) {
-        if (absDx >= SCRUB_DRAG_PX && absDx > absDy) {
-          armScrub(e.pointerId, e.clientX);
+        if (absDx >= SCRUB_DRAG_PX && absDx >= absDy) {
+          armScrub(e.pointerId, e.clientX, pill);
         }
         return;
       }
 
       e.preventDefault();
-      const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
-      el.scrollLeft = Math.max(
-        0,
-        Math.min(maxScroll, scrubRef.current.startScroll - dx),
-      );
-      pulseScrubIndex(el);
-      syncIndexFromScroll();
+      applyScrubScroll(el, dx);
     };
 
     const onPointerUp = (e: PointerEvent) => {
       if (e.pointerId !== scrubRef.current.pointerId) return;
-      endScrub(e.pointerId);
-      try {
-        pill.releasePointerCapture(e.pointerId);
-      } catch {
-        // ignore
-      }
-      scrubRef.current.pointerId = -1;
-    };
-
-    const onLostCapture = (e: PointerEvent) => {
-      if (
-        scrubRef.current.pointerId < 0 ||
-        scrubRef.current.pointerId !== e.pointerId
-      ) {
-        return;
-      }
-      endScrub(e.pointerId);
+      endScrub(e.pointerId, pill);
       scrubRef.current.pointerId = -1;
     };
 
     pill.addEventListener("touchstart", onTouchStart, { passive: true });
     pill.addEventListener("pointerdown", onPointerDown);
-    pill.addEventListener("pointermove", onPointerMove, { passive: false });
-    pill.addEventListener("pointerup", onPointerUp);
-    pill.addEventListener("pointercancel", onPointerUp);
-    document.addEventListener("pointerup", onLostCapture);
-    document.addEventListener("pointercancel", onLostCapture);
+    document.addEventListener("pointermove", onPointerMove, {
+      passive: false,
+      capture: true,
+    });
+    document.addEventListener("pointerup", onPointerUp, { capture: true });
+    document.addEventListener("pointercancel", onPointerUp, { capture: true });
 
     listenersCleanupRef.current = () => {
       pill.removeEventListener("touchstart", onTouchStart);
       pill.removeEventListener("pointerdown", onPointerDown);
-      pill.removeEventListener("pointermove", onPointerMove);
-      pill.removeEventListener("pointerup", onPointerUp);
-      pill.removeEventListener("pointercancel", onPointerUp);
-      document.removeEventListener("pointerup", onLostCapture);
-      document.removeEventListener("pointercancel", onLostCapture);
+      document.removeEventListener("pointermove", onPointerMove, { capture: true });
+      document.removeEventListener("pointerup", onPointerUp, { capture: true });
+      document.removeEventListener("pointercancel", onPointerUp, { capture: true });
     };
   }, [
+    applyScrubScroll,
     armScrub,
     endScrub,
     isMobileUi,
     pauseForUser,
     posts.length,
     pullRefreshing,
-    pulseScrubIndex,
     resetGesture,
     setScrubbing,
-    syncIndexFromScroll,
     viewportRef,
   ]);
 
