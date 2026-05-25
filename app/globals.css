@@ -100,7 +100,11 @@ body {
   user-select: none;
   background: transparent;
   border: 1px solid transparent;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.12s ease;
+}
+
+.feed-marquee-scrub-pill:not(.feed-marquee-scrub-pill--outline) {
+  border-color: transparent !important;
 }
 
 /* Parent rail is pointer-events-none; pill must receive touches on mobile */
