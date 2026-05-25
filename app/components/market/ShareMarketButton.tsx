@@ -142,10 +142,20 @@ export function ShareMarketButton({
     const node = getNode();
     if (!node) throw new Error("Nothing to capture");
 
+    const exportWidth = Math.min(640, Math.max(360, node.offsetWidth || 640));
+    const exportHeight = Math.max(node.offsetHeight, node.scrollHeight);
+
     const blob = await toBlob(node, {
       cacheBust: true,
       pixelRatio: 2,
+      width: exportWidth,
+      height: exportHeight,
       backgroundColor: "#ffffff",
+      style: {
+        width: `${exportWidth}px`,
+        maxWidth: `${exportWidth}px`,
+        boxSizing: "border-box",
+      },
     });
     if (!blob) throw new Error("Image export failed");
 

@@ -49,9 +49,8 @@ export function FeedMarketHero({
             </p>
             <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
               Exploring <span className="font-semibold text-zinc-800 dark:text-zinc-200">{exploreLabel}</span>
-              <span className="md:hidden"> · pull down to refresh</span>
+              <span className="md:hidden"> · swipe cards · pull down to refresh</span>
               <span className="hidden md:inline"> · swipe or wait for the next card</span>
-              <span className="md:hidden"> · hold dots &amp; drag to scrub</span>
             </p>
           </div>
           {loadHint ? (

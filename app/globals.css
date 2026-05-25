@@ -47,6 +47,8 @@ body {
 
 .feed-marquee-viewport {
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  scroll-snap-type: x mandatory;
 }
 
 .feed-marquee-track {
@@ -65,33 +67,6 @@ body {
   width: 100%;
   min-width: 100%;
   max-width: 100%;
-}
-
-.feed-marquee-dots {
-  touch-action: none;
-  background: linear-gradient(
-    to top,
-    rgb(244 244 245 / 0.92) 0%,
-    rgb(244 244 245 / 0.55) 55%,
-    transparent 100%
-  );
-}
-
-.dark .feed-marquee-dots {
-  background: linear-gradient(
-    to top,
-    rgb(9 9 11 / 0.92) 0%,
-    rgb(9 9 11 / 0.55) 55%,
-    transparent 100%
-  );
-}
-
-.feed-marquee-dots--scrubbing {
-  cursor: grabbing;
-}
-
-.feed-marquee-dots--scrubbing [data-marquee-dot] {
-  pointer-events: none;
 }
 
 /* Feed page: normal vertical scroll (scrollbar hidden); marquee is horizontal-only inside its stage */
@@ -115,10 +90,6 @@ body {
 
 .feed-hero__stage {
   width: 100%;
-}
-
-.feed-marquee--scrubbing {
-  scroll-snap-type: none;
 }
 
 .feed-marquee--pulling {

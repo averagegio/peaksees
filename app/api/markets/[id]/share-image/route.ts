@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { appBaseUrl } from "@/lib/app-url";
 import { getSession } from "@/lib/auth/session";
 import { marketOgImageResponse } from "@/lib/markets/market-og-image";
+import { normalizeShareImagePng } from "@/lib/markets/normalize-share-image";
 import { getMarketShareImage, upsertMarketShareImage } from "@/lib/markets/share-image-store";
 import { getMarketById } from "@/lib/markets/store";
 
@@ -22,7 +23,8 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const stored = await getMarketShareImage(marketId);
   if (stored) {
-    return new NextResponse(new Uint8Array(stored), {
+    const png = await normalizeShareImagePng(Buffer.from(stored));
+    return new NextResponse(new Uint8Array(png), {
       headers: {
         "Content-Type": "image/png",
         "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
@@ -80,6 +82,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Image too large" }, { status: 413 });
   }
 
-  await upsertMarketShareImage(marketId, bytes);
+  const normalized = await normalizeShareImagePng(bytes);
+  await upsertMarketShareImage(marketId, normalized);
   return NextResponse.json({ ok: true });
 }
