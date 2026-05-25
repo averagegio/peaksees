@@ -82,11 +82,13 @@ export function FeedMarketMarquee({
   const [pullOffset, setPullOffset] = useState(0);
   const [pullMode, setPullMode] = useState<PullMode | null>(null);
   const [isScrubbing, setIsScrubbing] = useState(false);
+  const [carouselInteracting, setCarouselInteracting] = useState(false);
 
   const activeIndexRef = useRef(0);
   const pausedUntilRef = useRef(0);
   const scrollingProgrammaticallyRef = useRef(false);
   const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const carouselInteractEndRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pullRootRef = useRef<HTMLDivElement | null>(null);
   const pullOffsetRef = useRef(0);
   const touchPullRef = useRef<{
@@ -143,6 +145,41 @@ export function FeedMarketMarquee({
       setActiveIndex(ix);
     }
   }, [posts.length]);
+
+  /** Imperative horizontal scroll while scrubbing (bypasses snap / React batching). */
+  const scrubScrollTo = useCallback((left: number) => {
+    const el = viewportRef.current;
+    if (!el) return;
+    el.classList.add("feed-marquee--scrubbing");
+    el.style.scrollSnapType = "none";
+    const max = Math.max(0, el.scrollWidth - el.clientWidth);
+    el.scrollLeft = Math.max(0, Math.min(max, left));
+  }, [viewportRef]);
+
+  const clearScrubScrollStyles = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    el.classList.remove("feed-marquee--scrubbing");
+    el.style.removeProperty("scroll-snap-type");
+  }, [viewportRef]);
+
+  const isMobileCarouselUi = useCallback(() => {
+    if (typeof window === "undefined") return false;
+    return (
+      window.matchMedia("(pointer: coarse)").matches ||
+      window.matchMedia("(max-width: 768px)").matches
+    );
+  }, []);
+
+  const bumpCarouselInteracting = useCallback(() => {
+    setCarouselInteracting(true);
+    if (carouselInteractEndRef.current) {
+      clearTimeout(carouselInteractEndRef.current);
+    }
+    carouselInteractEndRef.current = setTimeout(() => {
+      setCarouselInteracting(false);
+    }, 220);
+  }, []);
 
   const resetPull = useCallback(() => {
     touchPullRef.current.active = false;
@@ -213,17 +250,43 @@ export function FeedMarketMarquee({
     const onScroll = () => {
       if (!scrollingProgrammaticallyRef.current && !isScrubbing) {
         pausedUntilRef.current = Date.now() + USER_IDLE_MS;
+        if (isMobileCarouselUi()) bumpCarouselInteracting();
       }
       if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
       scrollEndTimerRef.current = setTimeout(syncIndexFromScroll, 48);
     };
 
+    const onTouchStart = (e: TouchEvent) => {
+      if (!isMobileCarouselUi() || e.touches.length !== 1) return;
+      if (isMarqueeGestureBlocker(e.target)) return;
+      bumpCarouselInteracting();
+    };
+
+    const onTouchEnd = () => {
+      if (!isMobileCarouselUi()) return;
+      bumpCarouselInteracting();
+    };
+
     el.addEventListener("scroll", onScroll, { passive: true });
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    el.addEventListener("touchcancel", onTouchEnd, { passive: true });
     return () => {
       el.removeEventListener("scroll", onScroll);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
       if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+      if (carouselInteractEndRef.current) clearTimeout(carouselInteractEndRef.current);
     };
-  }, [posts.length, viewportRef, syncIndexFromScroll, isScrubbing]);
+  }, [
+    bumpCarouselInteracting,
+    isMobileCarouselUi,
+    posts.length,
+    viewportRef,
+    syncIndexFromScroll,
+    isScrubbing,
+  ]);
 
   useEffect(() => {
     const el = viewportRef.current;
@@ -569,8 +632,12 @@ export function FeedMarketMarquee({
           pullRefreshing={pullRefreshing}
           pauseForUser={pauseForUser}
           goToSlide={(ix) => goToSlide(ix, "smooth")}
+          scrubToIndex={(ix) => goToSlide(ix, "instant")}
+          scrubScrollTo={scrubScrollTo}
+          clearScrubScrollStyles={clearScrubScrollStyles}
           onScrubIndex={handleScrubIndex}
           onScrubbingChange={setIsScrubbing}
+          carouselInteracting={carouselInteracting}
         />
       ) : null}
     </div>

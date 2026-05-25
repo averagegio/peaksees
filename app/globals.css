@@ -100,11 +100,9 @@ body {
   user-select: none;
   background: transparent;
   border: 1px solid transparent;
-  transition: border-color 0.12s ease;
-}
-
-.feed-marquee-scrub-pill:not(.feed-marquee-scrub-pill--outline) {
-  border-color: transparent !important;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
 /* Parent rail is pointer-events-none; pill must receive touches on mobile */
@@ -112,19 +110,19 @@ body {
   pointer-events: auto;
 }
 
-.feed-marquee-scrub-pill--outline {
-  background: rgb(255 255 255 / 0.06);
-  box-shadow: 0 0 0 1px rgb(113 113 122 / 0.55);
-  border-color: rgb(82 82 91 / 0.75);
+/* Transparent outline only while user scrolls / scrubs the carousel */
+.feed-marquee-scrub-pill--engaged {
+  background: transparent;
+  border: 1.5px solid rgb(113 113 122 / 0.6);
+  box-shadow: 0 0 0 1px rgb(113 113 122 / 0.45);
 }
 
-.dark .feed-marquee-scrub-pill--outline {
-  background: rgb(255 255 255 / 0.04);
-  box-shadow: 0 0 0 1px rgb(161 161 170 / 0.45);
+.dark .feed-marquee-scrub-pill--engaged {
   border-color: rgb(161 161 170 / 0.55);
+  box-shadow: 0 0 0 1px rgb(161 161 170 / 0.4);
 }
 
-.feed-marquee-scrub-pill--outline [data-marquee-dot] {
+.feed-marquee-scrub-pill.pointer-events-auto [data-marquee-dot] {
   pointer-events: none;
 }
 
@@ -152,9 +150,10 @@ body {
 }
 
 .feed-marquee--scrubbing {
-  scroll-snap-type: none;
+  scroll-snap-type: none !important;
   scroll-behavior: auto;
   overscroll-behavior-x: contain;
+  touch-action: pan-x pinch-zoom;
 }
 
 .feed-marquee--pulling {
