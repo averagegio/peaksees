@@ -14,9 +14,9 @@ import type { MarketPost } from "@/app/lib/mock-markets";
 
 const MOBILE_VISIBLE_DOTS = 5;
 /** Min horizontal movement before pill scrub locks (ignores vertical page scroll). */
-const SCRUB_LOCK_PX = 10;
-/** Horizontal must dominate vertical by this ratio to lock scrub. */
-const SCRUB_HORIZONTAL_RATIO = 1.2;
+const PILL_SCRUB_LOCK_PX = 6;
+/** Horizontal must dominate vertical by this ratio to lock pill scrub. */
+const PILL_SCRUB_HORIZONTAL_RATIO = 1.05;
 /** Viewport widths dragged to advance one card (higher = slower, clearer snap). */
 const SCRUB_DRAG_PER_CARD = 0.72;
 
@@ -36,16 +36,16 @@ type ScrubGesture = {
   pullHapticFired: boolean;
 };
 
-function isHorizontalScrubIntent(dx: number, dy: number) {
+function isPillHorizontalScrubIntent(dx: number, dy: number) {
   const absX = Math.abs(dx);
   const absY = Math.abs(dy);
-  return absX >= SCRUB_LOCK_PX && absX >= absY * SCRUB_HORIZONTAL_RATIO;
+  return absX >= PILL_SCRUB_LOCK_PX && absX >= absY * PILL_SCRUB_HORIZONTAL_RATIO;
 }
 
-function isVerticalScrollIntent(dx: number, dy: number) {
+function isPillVerticalScrollIntent(dx: number, dy: number) {
   const absX = Math.abs(dx);
   const absY = Math.abs(dy);
-  return absY >= SCRUB_LOCK_PX && absY > absX * SCRUB_HORIZONTAL_RATIO;
+  return absY >= PILL_SCRUB_LOCK_PX && absY > absX * PILL_SCRUB_HORIZONTAL_RATIO;
 }
 
 function detectTouchScrubUi() {
@@ -171,7 +171,8 @@ export function FeedMarqueeDotScrub({
 }) {
   const isHero = variant === "hero";
   const isMobileUi = useTouchScrubUi();
-  const [pillEngaged, setPillEngaged] = useState(false);
+  /** Visible ring on the pill (horizontal scrub / carousel swipe only). */
+  const [pillOutline, setPillOutline] = useState(false);
 
   const pillRef = useRef<HTMLDivElement | null>(null);
   const listenersCleanupRef = useRef<(() => void) | null>(null);
@@ -198,10 +199,10 @@ export function FeedMarqueeDotScrub({
     (isHero ? "bottom-0 pb-3 pt-8" : "bottom-0 pb-2 pt-6") +
     (isMobileUi ? " feed-marquee-dots--mobile" : "");
 
-  const setMarqueeScrubbing = useCallback(
-    (scrubbing: boolean) => {
-      setPillEngaged(scrubbing);
-      onScrubbingChange?.(scrubbing);
+  /** Pauses carousel auto-advance for the whole pill touch, not just the outline. */
+  const setCarouselPaused = useCallback(
+    (paused: boolean) => {
+      onScrubbingChange?.(paused);
     },
     [onScrubbingChange],
   );
@@ -224,9 +225,10 @@ export function FeedMarqueeDotScrub({
     };
     lastHapticIndexRef.current = -1;
     lastScrubIndexRef.current = -1;
-    setMarqueeScrubbing(false);
+    setPillOutline(false);
+    setCarouselPaused(false);
     clearScrubScrollStyles();
-  }, [clearScrubScrollStyles, setMarqueeScrubbing]);
+  }, [clearScrubScrollStyles, setCarouselPaused]);
 
   const pulseScrubIndex = useCallback((ix: number) => {
     if (ix !== lastHapticIndexRef.current) {
@@ -255,6 +257,7 @@ export function FeedMarqueeDotScrub({
 
       if (ix !== lastScrubIndexRef.current) {
         lastScrubIndexRef.current = ix;
+        pauseForUser();
         scrubToIndex(ix);
         onScrubIndex?.(ix);
         pulseScrubIndex(ix);
@@ -262,7 +265,7 @@ export function FeedMarqueeDotScrub({
 
       return ix;
     },
-    [onScrubIndex, posts.length, pulseScrubIndex, scrubToIndex],
+    [onScrubIndex, pauseForUser, posts.length, pulseScrubIndex, scrubToIndex],
   );
 
   const lockHorizontalScrub = useCallback(
@@ -281,11 +284,11 @@ export function FeedMarqueeDotScrub({
       scrubRef.current.pullHapticFired = false;
       lastHapticIndexRef.current = startIx;
       lastScrubIndexRef.current = startIx;
-      setMarqueeScrubbing(true);
+      setPillOutline(true);
       scrubToIndex(startIx);
       marketCardHaptic("press");
     },
-    [scrubToIndex, setMarqueeScrubbing],
+    [scrubToIndex],
   );
 
   const beginGesture = useCallback(
@@ -300,6 +303,7 @@ export function FeedMarqueeDotScrub({
       if (pullRefreshing || scrubRef.current.active || scrubRef.current.pending) return;
 
       pauseForUser();
+      setCarouselPaused(true);
 
       scrubRef.current = {
         pending: true,
@@ -317,7 +321,7 @@ export function FeedMarqueeDotScrub({
         pullHapticFired: false,
       };
     },
-    [pauseForUser, posts.length, pullRefreshing],
+    [pauseForUser, posts.length, pullRefreshing, setCarouselPaused],
   );
 
   const resolveGestureAxis = useCallback(
@@ -330,23 +334,24 @@ export function FeedMarqueeDotScrub({
       const dx = clientX - g.startX;
       const dy = clientY - g.startY;
 
-      if (isVerticalScrollIntent(dx, dy)) {
+      if (isPillVerticalScrollIntent(dx, dy)) {
         g.cancelled = true;
         g.pending = false;
         g.active = false;
-        setMarqueeScrubbing(false);
+        setPillOutline(false);
+        setCarouselPaused(false);
         clearScrubScrollStyles();
         return "scroll";
       }
 
-      if (isHorizontalScrubIntent(dx, dy)) {
+      if (isPillHorizontalScrubIntent(dx, dy)) {
         lockHorizontalScrub(viewport, clientX, clientY);
         return "scrub";
       }
 
       return "pending";
     },
-    [clearScrubScrollStyles, lockHorizontalScrub, setMarqueeScrubbing],
+    [clearScrubScrollStyles, lockHorizontalScrub, setCarouselPaused],
   );
 
   const endScrub = useCallback(() => {
@@ -363,7 +368,8 @@ export function FeedMarqueeDotScrub({
     scrubRef.current.pointerId = -1;
     lastHapticIndexRef.current = -1;
     lastScrubIndexRef.current = -1;
-    setMarqueeScrubbing(false);
+    setPillOutline(false);
+    setCarouselPaused(false);
     clearScrubScrollStyles();
 
     if (el && wasScrubbing) {
@@ -378,7 +384,7 @@ export function FeedMarqueeDotScrub({
     onScrubIndex,
     pauseForUser,
     posts.length,
-    setMarqueeScrubbing,
+    setCarouselPaused,
     viewportRef,
   ]);
 
@@ -511,7 +517,7 @@ export function FeedMarqueeDotScrub({
     MOBILE_VISIBLE_DOTS,
   );
 
-  const showOutline = isMobileUi && (pillEngaged || carouselInteracting);
+  const showOutline = isMobileUi && (pillOutline || carouselInteracting);
 
   const pillClass =
     "feed-marquee-scrub-pill relative z-10 flex items-center justify-center rounded-full " +

@@ -85,6 +85,7 @@ export function FeedMarketMarquee({
   const [carouselInteracting, setCarouselInteracting] = useState(false);
 
   const activeIndexRef = useRef(0);
+  const isScrubbingRef = useRef(false);
   const pausedUntilRef = useRef(0);
   const scrollingProgrammaticallyRef = useRef(false);
   const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -216,9 +217,24 @@ export function FeedMarketMarquee({
   }, [measure, viewportRef, posts.length]);
 
   useEffect(() => {
+    isScrubbingRef.current = isScrubbing;
+  }, [isScrubbing]);
+
+  useEffect(() => {
     activeIndexRef.current = activeIndex;
     onActiveIndexChange?.(activeIndex);
   }, [activeIndex, onActiveIndexChange]);
+
+  const handleScrubbingChange = useCallback((scrubbing: boolean) => {
+    isScrubbingRef.current = scrubbing;
+    setIsScrubbing(scrubbing);
+    if (scrubbing) {
+      pausedUntilRef.current = Date.now() + USER_IDLE_MS;
+      scrollingProgrammaticallyRef.current = true;
+    } else {
+      scrollingProgrammaticallyRef.current = false;
+    }
+  }, []);
 
   useEffect(() => {
     if (!highlightMarketId?.trim() || posts.length === 0) return undefined;
@@ -329,12 +345,12 @@ export function FeedMarketMarquee({
 
   useEffect(() => {
     const el = viewportRef.current;
-    if (!el || posts.length < 2 || prefersReducedMotion() || isScrubbing) {
+    if (!el || posts.length < 2 || prefersReducedMotion()) {
       return undefined;
     }
 
     const tick = () => {
-      if (Date.now() < pausedUntilRef.current || isScrubbing) return;
+      if (Date.now() < pausedUntilRef.current || isScrubbingRef.current) return;
       const w = el.clientWidth;
       if (w <= 0) return;
       const next = (activeIndexRef.current + 1) % posts.length;
@@ -343,13 +359,15 @@ export function FeedMarketMarquee({
       activeIndexRef.current = next;
       setActiveIndex(next);
       window.setTimeout(() => {
-        scrollingProgrammaticallyRef.current = false;
+        if (!isScrubbingRef.current) {
+          scrollingProgrammaticallyRef.current = false;
+        }
       }, MARQUEE_TRANSITION_MS + 80);
     };
 
     const id = window.setInterval(tick, MARQUEE_PAUSE_MS);
     return () => window.clearInterval(id);
-  }, [posts.length, viewportRef, slideWidth, isScrubbing]);
+  }, [posts.length, viewportRef, slideWidth]);
 
   useEffect(() => {
     const root = pullRootRef.current;
@@ -675,7 +693,7 @@ export function FeedMarketMarquee({
           scrubScrollTo={scrubScrollTo}
           clearScrubScrollStyles={clearScrubScrollStyles}
           onScrubIndex={handleScrubIndex}
-          onScrubbingChange={setIsScrubbing}
+          onScrubbingChange={handleScrubbingChange}
           carouselInteracting={carouselInteracting}
         />
       ) : null}

@@ -112,14 +112,14 @@ body {
 
 /* Transparent outline only while user scrolls / scrubs the carousel */
 .feed-marquee-scrub-pill--engaged {
-  background: transparent;
-  border: 1.5px solid rgb(113 113 122 / 0.6);
-  box-shadow: 0 0 0 1px rgb(113 113 122 / 0.45);
+  background: transparent !important;
+  border: 1.5px solid rgb(82 82 91 / 0.85) !important;
+  box-shadow: 0 0 0 1px rgb(113 113 122 / 0.7);
 }
 
 .dark .feed-marquee-scrub-pill--engaged {
-  border-color: rgb(161 161 170 / 0.55);
-  box-shadow: 0 0 0 1px rgb(161 161 170 / 0.4);
+  border-color: rgb(212 212 216 / 0.75) !important;
+  box-shadow: 0 0 0 1px rgb(161 161 170 / 0.65);
 }
 
 .feed-marquee-scrub-pill.pointer-events-auto [data-marquee-dot] {
