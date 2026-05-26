@@ -168,9 +168,10 @@ export function FeedMarqueeDotScrub({
   });
 
   const railClass =
-    "feed-marquee-dots absolute inset-x-0 bottom-0 flex items-end justify-center " +
-    (isMobileUi ? "feed-marquee-dots--mobile " : "pointer-events-none z-30 ") +
-    (isHero ? "pb-1" : "pb-0");
+    isMobileUi
+      ? "feed-marquee-scrub-strip feed-marquee-dots feed-marquee-dots--mobile feed-marquee-dots--below flex w-full shrink-0 items-center justify-center"
+      : "feed-marquee-dots pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-end justify-center " +
+        (isHero ? "pb-1" : "pb-0");
 
   const setPillScrubbingDom = useCallback((scrubbing: boolean) => {
     const pill = pillRef.current;
@@ -443,7 +444,10 @@ export function FeedMarqueeDotScrub({
         ref={hitRef}
         data-marquee-dot-scrub=""
         data-no-marquee-gesture="true"
-        className="feed-marquee-scrub-hit pointer-events-auto"
+        className={
+          "feed-marquee-scrub-hit pointer-events-auto " +
+          (isMobileUi ? "feed-marquee-scrub-hit--below" : "")
+        }
         aria-label="Tap to scrub markets"
       >
         <div

@@ -89,15 +89,26 @@ body {
   );
 }
 
-/* Mobile scrub pill: transparent control over cards (no opaque rail fade) */
+/* Mobile scrub pill: transparent control (no opaque rail fade) */
 .feed-marquee-dots--mobile {
   background: none;
   isolation: isolate;
-  pointer-events: none;
-  z-index: 50;
 }
 
-/* Full-width bottom tap target; sits above carousel cards */
+/* Fixed strip under the scrolling marquee (mobile) */
+.feed-marquee-scrub-strip {
+  position: relative;
+  z-index: 20;
+  min-height: 3.25rem;
+  padding: 0.35rem 1rem 0.5rem;
+  pointer-events: auto;
+}
+
+.feed-marquee-dots--below {
+  background: none;
+}
+
+/* Overlay tap target when pill sits on top of cards (desktop) */
 .feed-marquee-scrub-hit {
   position: absolute;
   left: 0;
@@ -112,6 +123,19 @@ body {
   touch-action: none;
   -webkit-touch-callout: none;
   pointer-events: auto;
+}
+
+/* Below-marquee: full-width drag lane under cards */
+.feed-marquee-scrub-hit--below {
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  width: 100%;
+  max-width: 100%;
+  min-height: 2.75rem;
+  align-items: center;
+  padding: 0;
 }
 
 .feed-marquee-scrub-pill {
