@@ -1,5 +1,10 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
 import { AuthPageHeader } from "@/app/components/AuthPageHeader";
 import { LoginForm } from "@/app/components/AuthForm";
+import { SESSION_COOKIE } from "@/lib/auth/constants";
+import { getSession } from "@/lib/auth/session";
 
 export default async function LoginPage({
   searchParams,
@@ -7,6 +12,13 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const sp = await searchParams;
+  const session = await getSession();
+  if (session) redirect("/feed");
+
+  const jar = await cookies();
+  if (jar.get(SESSION_COOKIE)?.value) {
+    redirect("/api/auth/logout");
+  }
 
   return (
     <div className="flex min-h-dvh flex-col bg-gradient-to-b from-zinc-100 to-zinc-200 dark:from-zinc-950 dark:to-zinc-900">

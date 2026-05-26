@@ -10,6 +10,7 @@ import { BackButton } from "@/app/components/BackButton";
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { PeakpointsWalletBadge } from "@/app/components/peakpoints/PeakpointsWalletBadge";
 import { SidebarNav } from "@/app/components/sidebar/SidebarNav";
+import { ThemeToggle } from "@/app/components/ThemeToggle";
 import { FEED_MISSION } from "@/lib/brand";
 import type { PublicUser } from "@/lib/auth/users-store";
 
@@ -268,6 +269,16 @@ export function NavShell({
               Feed
             </p>
             <SidebarNav onNavigate={close} />
+
+            <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-700 dark:bg-zinc-900/70">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">Appearance</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Toggle light/dark mode</p>
+                </div>
+                <ThemeToggle />
+              </div>
+            </div>
 
             <div className="mt-8 border-t border-zinc-100 pt-4 dark:border-zinc-800">
               {session ? (

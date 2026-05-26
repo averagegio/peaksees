@@ -24,15 +24,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname === "/login" || pathname === "/signup") {
-    if (authed) {
-      const u = req.nextUrl.clone();
-      u.pathname = "/feed";
-      u.search = "";
-      return NextResponse.redirect(u);
-    }
-  }
-
+  // Login/signup: do not redirect here (Edge cannot read SQLite). Pages use getSession().
   return NextResponse.next();
 }
 

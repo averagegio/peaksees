@@ -51,7 +51,7 @@ function scrollToSlide(
 type PullMode = "horizontal" | "vertical";
 
 export function FeedMarketMarquee({
-  posts,
+  posts = [],
   viewerUserId,
   tourMarketPostIndex = 0,
   viewportRef,
@@ -63,7 +63,7 @@ export function FeedMarketMarquee({
   pullRefreshing = false,
   pageScrollAtTop = true,
 }: {
-  posts: MarketPost[];
+  posts?: MarketPost[];
   viewerUserId?: string;
   tourMarketPostIndex?: number;
   viewportRef: RefObject<HTMLDivElement | null>;
@@ -98,14 +98,14 @@ export function FeedMarketMarquee({
   }>({ active: false, startX: 0, startY: 0, mode: null });
 
   const measure = useCallback(() => {
-    const el = viewportRef.current;
+    const el = viewportRef?.current;
     if (!el) return;
     const w = Math.floor(el.clientWidth);
     if (w > 0) setSlideWidth(w);
   }, [viewportRef]);
 
   const syncIndexFromScroll = useCallback(() => {
-    const el = viewportRef.current;
+    const el = viewportRef?.current;
     if (!el || posts.length === 0) return;
     const w = el.clientWidth;
     if (w <= 0) return;
@@ -122,7 +122,7 @@ export function FeedMarketMarquee({
 
   const goToSlide = useCallback(
     (index: number, behavior: ScrollBehavior = "smooth") => {
-      const el = viewportRef.current;
+      const el = viewportRef?.current;
       if (!el || posts.length === 0) return;
       const ix = Math.max(0, Math.min(posts.length - 1, index));
       pauseForUser();
@@ -146,14 +146,14 @@ export function FeedMarketMarquee({
   }, [posts.length]);
 
   const clearScrubScrollStyles = useCallback(() => {
-    const el = viewportRef.current;
+    const el = viewportRef?.current;
     if (!el) return;
     el.classList.remove("feed-marquee--scrubbing");
     el.style.removeProperty("scroll-snap-type");
   }, [viewportRef]);
 
   const scrubScrollTo = useCallback((left: number) => {
-    const el = viewportRef.current;
+    const el = viewportRef?.current;
     if (!el) return;
     el.classList.add("feed-marquee--scrubbing");
     el.style.scrollSnapType = "none";
@@ -163,7 +163,7 @@ export function FeedMarketMarquee({
 
   const scrubToIndexDuringPill = useCallback(
     (index: number) => {
-      const el = viewportRef.current;
+      const el = viewportRef?.current;
       if (!el) return;
       el.classList.add("feed-marquee--scrubbing");
       el.style.scrollSnapType = "none";
@@ -186,7 +186,7 @@ export function FeedMarketMarquee({
   }, []);
 
   useLayoutEffect(() => {
-    const el = viewportRef.current;
+    const el = viewportRef?.current;
     if (!el) return undefined;
     const run = () => measure();
     run();
@@ -225,7 +225,7 @@ export function FeedMarketMarquee({
     if (!highlightMarketId?.trim() || posts.length === 0) return undefined;
     const ix = posts.findIndex((p) => p.id === highlightMarketId.trim());
     if (ix < 0) return undefined;
-    const el = viewportRef.current;
+    const el = viewportRef?.current;
     if (!el) return undefined;
     const t = window.setTimeout(() => {
       scrollingProgrammaticallyRef.current = true;
@@ -244,13 +244,13 @@ export function FeedMarketMarquee({
     if (activeIndex >= posts.length && posts.length > 0) {
       setActiveIndex(0);
       activeIndexRef.current = 0;
-      const el = viewportRef.current;
+      const el = viewportRef?.current;
       if (el) scrollToSlide(el, 0, "instant");
     }
   }, [posts.length, activeIndex, viewportRef]);
 
   useEffect(() => {
-    const el = viewportRef.current;
+    const el = viewportRef?.current;
     if (!el || posts.length < 2) return undefined;
 
     viewportScrollLeftRef.current = el.scrollLeft;
@@ -273,7 +273,7 @@ export function FeedMarketMarquee({
   }, [posts.length, viewportRef, syncIndexFromScroll, isScrubbing]);
 
   useEffect(() => {
-    const el = viewportRef.current;
+    const el = viewportRef?.current;
     if (!el || posts.length < 2 || prefersReducedMotion()) {
       return undefined;
     }
@@ -300,7 +300,7 @@ export function FeedMarketMarquee({
 
   useEffect(() => {
     const root = pullRootRef.current;
-    const viewport = viewportRef.current;
+    const viewport = viewportRef?.current;
     if (!root || !viewport || !pullEnabled) return undefined;
 
     const onTouchStart = (e: TouchEvent) => {
@@ -428,7 +428,7 @@ export function FeedMarketMarquee({
 
     const onPointerMove = (e: PointerEvent) => {
       const g = touchPullRef.current;
-      const viewport = viewportRef.current;
+      const viewport = viewportRef?.current;
       if (!g.active || !viewport || pullRefreshing || e.pointerType === "touch") return;
 
       const dx = e.clientX - g.startX;
