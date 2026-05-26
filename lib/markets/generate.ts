@@ -59,7 +59,7 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   if (!openaiKey) return { generated: 0 };
   const model = (process.env.OPENAI_MODEL ?? "gpt-4o-mini").trim();
   const tavilyKey = (process.env.TAVILY_API_KEY ?? "").trim();
-  const category =
+  let category =
     typeof input.category === "string" && input.category.trim()
       ? input.category.trim().slice(0, 24)
       : "";
