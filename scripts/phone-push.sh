@@ -15,5 +15,9 @@ fi
 MSG="${1:-chore: push from phone}"
 git add -A
 git commit -m "$MSG"
+
+echo "Syncing with origin/main..."
+git pull --rebase origin main
+
 git push origin main
 echo "Pushed to main — production will update when Vercel finishes."

@@ -284,6 +284,23 @@ export async function listMarkets(input: {
       const result = await postgresPool.query<MarketDbRow>(sql, params);
       return result.rows.map(rowToMarket);
     }
+    if (subcategory) {
+      const sql = !hasCur
+        ? `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
+         FROM markets
+         WHERE subcategory = $2
+         ORDER BY created_at DESC, id DESC
+         LIMIT $1`
+        : `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
+         FROM markets
+         WHERE subcategory = $2
+         AND (created_at < $3::text OR (created_at = $3::text AND id < $4::text))
+         ORDER BY created_at DESC, id DESC
+         LIMIT $1`;
+      const params = hasCur ? [limit, subcategory, cur!.createdAt, cur!.id] : [limit, subcategory];
+      const result = await postgresPool.query<MarketDbRow>(sql, params);
+      return result.rows.map(rowToMarket);
+    }
     const sql = !hasCur
       ? `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
        FROM markets
@@ -325,6 +342,16 @@ export async function listMarkets(input: {
              LIMIT ?`,
       )
       .all(...(hasCur ? [category, ...cursorBind(cur!), limit] : [category, limit])) as MarketDbRow[];
+  } else if (subcategory) {
+    rowsRaw = db
+      .prepare(
+        `SELECT id, question, category, subcategory, hashtags_json, ends_at, resolved_side, resolved_at, created_at, source, yes_probability, no_probability, volume_cents
+             FROM markets
+             WHERE subcategory = ? ${hasCur ? cursorTailSqlite : ""}
+             ORDER BY created_at DESC, id DESC
+             LIMIT ?`,
+      )
+      .all(...(hasCur ? [subcategory, ...cursorBind(cur!), limit] : [subcategory, limit])) as MarketDbRow[];
   } else {
     rowsRaw = db
       .prepare(

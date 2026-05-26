@@ -53,7 +53,8 @@ function buildMarketsHref(opts: {
   limit: number;
   autogen: boolean;
   count?: number;
-  marketCategory: string;
+  /** Optional slice within Anime (manga, releases, …). */
+  marketSubcategory?: string;
   tz: string;
   cursor?: { createdAt: string; id: string };
 }) {
@@ -63,8 +64,8 @@ function buildMarketsHref(opts: {
     q.set("autogen", "1");
     q.set("count", String(opts.count ?? 5));
   }
-  if (opts.marketCategory) q.set("category", opts.marketCategory);
-  q.set("subcategory", "anime");
+  q.set("category", "Anime");
+  if (opts.marketSubcategory) q.set("subcategory", opts.marketSubcategory);
   if (opts.tz) q.set("tz", opts.tz);
   if (opts.cursor) {
     q.set("cursorCreatedAt", opts.cursor.createdAt);
@@ -124,6 +125,15 @@ export function AnimeFeedWithTabs({
   const marketsAtEndRef = useRef(false);
   const categoryRef = useRef(category);
   const lastPullRefreshAtRef = useRef(0);
+  const autogenPollRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (autogenPollRef.current != null) {
+        window.clearTimeout(autogenPollRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     categoryRef.current = category;
@@ -164,15 +174,72 @@ export function AnimeFeedWithTabs({
     };
   });
 
-  const marketCategory =
-    category === "Trending" ? "" : category === "News" ? "News" : category === "Sports" ? "Sports" : "Culture";
+  /** Map UI tabs to Anime subcategories in the DB (see allowedSubcategories in generate.ts). */
+  const marketSubcategory =
+    category === "Trending"
+      ? ""
+      : category === "News"
+        ? "industry"
+        : category === "Sports"
+          ? "events"
+          : category === "Culture"
+            ? "fandoms"
+            : "";
   const tz =
     typeof Intl !== "undefined"
       ? Intl.DateTimeFormat().resolvedOptions().timeZone ?? ""
       : "";
-  const filtersKey = `anime:${category}:${marketCategory}:${tz}`;
+  const filtersKey = `anime:${category}:${marketSubcategory}:${tz}`;
 
   const runPullRefreshRef = useRef<() => Promise<void>>(async () => {});
+
+  const scheduleAutogenFollowUpRef = useRef<(session: number) => void>(() => {});
+
+  scheduleAutogenFollowUpRef.current = (session: number) => {
+    if (autogenPollRef.current != null) {
+      window.clearTimeout(autogenPollRef.current);
+    }
+
+    const pollMs = [1200, 2800];
+    let step = 0;
+
+    const pollOnce = () => {
+      void (async () => {
+        try {
+          const href = buildMarketsHref({
+            limit: 24,
+            autogen: false,
+            marketSubcategory,
+            tz,
+          });
+          const res = await fetch(href, { cache: "no-store" });
+          const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
+          if (session !== feedSessionRef.current) return;
+          const incoming = Array.isArray(data.markets) ? data.markets : [];
+          let didPrepend = false;
+          setMarkets((prev) => {
+            const merged = mergeNovelMarkets(prev, incoming);
+            didPrepend = merged !== prev;
+            return merged;
+          });
+          if (didPrepend) {
+            marketsAtEndRef.current = false;
+            setMarketsAtEnd(false);
+          }
+        } catch {
+          // ignore
+        }
+        step += 1;
+        if (step < pollMs.length && session === feedSessionRef.current) {
+          autogenPollRef.current = window.setTimeout(pollOnce, pollMs[step]! - pollMs[step - 1]!);
+        } else {
+          autogenPollRef.current = null;
+        }
+      })();
+    };
+
+    autogenPollRef.current = window.setTimeout(pollOnce, pollMs[0]!);
+  };
 
   runPullRefreshRef.current = async () => {
     const nowTick = Date.now();
@@ -185,7 +252,7 @@ export function AnimeFeedWithTabs({
         limit: 24,
         autogen: true,
         count: 4,
-        marketCategory,
+        marketSubcategory,
         tz,
       });
       const res = await fetch(href, { cache: "no-store" });
@@ -229,7 +296,7 @@ export function AnimeFeedWithTabs({
         const href = buildMarketsHref({
           limit: 14,
           autogen: false,
-          marketCategory,
+          marketSubcategory,
           tz,
           cursor: { createdAt: last.createdAt, id: last.id },
         });
@@ -274,6 +341,10 @@ export function AnimeFeedWithTabs({
     setLoadMoreBusy(false);
     setPullRefreshing(false);
     lastPullRefreshAtRef.current = 0;
+    if (autogenPollRef.current != null) {
+      window.clearTimeout(autogenPollRef.current);
+      autogenPollRef.current = null;
+    }
 
     void (async () => {
       try {
@@ -281,7 +352,7 @@ export function AnimeFeedWithTabs({
           limit: 24,
           autogen: true,
           count: 6,
-          marketCategory,
+          marketSubcategory,
           tz,
         });
         const res = await fetch(href, { cache: "no-store" });
@@ -289,11 +360,12 @@ export function AnimeFeedWithTabs({
         if (session !== feedSessionRef.current) return;
         const incoming = Array.isArray(data.markets) ? data.markets : [];
         setMarkets(incoming);
+        scheduleAutogenFollowUpRef.current(session);
       } catch {
         // ignore
       }
     })();
-  }, [filtersKey]);
+  }, [filtersKey, marketSubcategory, tz]);
 
   const onPageScroll = useCallback((e: Event) => {
     const el = e.currentTarget as HTMLElement;

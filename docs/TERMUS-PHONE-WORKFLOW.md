@@ -60,7 +60,9 @@ Or with default message:
 bash scripts/phone-push.sh
 ```
 
-That runs `git add -A`, `git commit`, `git push origin main`. Vercel deploys from `main` like always.
+That runs `git add -A`, `git commit`, `git pull --rebase origin main`, then `git push origin main`. Vercel deploys from `main` like always.
+
+If push says **rejected (fetch first)**, someone merged a PR on GitHub while you had local commits — run `git pull --rebase origin main` then `git push origin main` (or run `phone-push.sh` again after the script update).
 
 **First time in WSL:** configure git if prompted:
 

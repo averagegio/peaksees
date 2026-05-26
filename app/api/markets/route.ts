@@ -14,8 +14,13 @@ export async function GET(request: Request) {
   const limit = Math.floor(Number(url.searchParams.get("limit") ?? "50"));
   const autogen = url.searchParams.get("autogen") === "1";
   const count = Math.floor(Number(url.searchParams.get("count") ?? "4"));
-  const category = (url.searchParams.get("category") ?? "").trim();
-  const subcategory = (url.searchParams.get("subcategory") ?? "").trim();
+  let category = (url.searchParams.get("category") ?? "").trim();
+  let subcategory = (url.searchParams.get("subcategory") ?? "").trim();
+  // Legacy clients sent subcategory=anime; DB uses category=Anime + subcats like manga/releases.
+  if (subcategory.toLowerCase() === "anime" && !category) {
+    category = "Anime";
+    subcategory = "";
+  }
   const tz = (url.searchParams.get("tz") ?? "").trim();
   const cursorCreatedAt = (url.searchParams.get("cursorCreatedAt") ?? "").trim();
   const cursorId = (url.searchParams.get("cursorId") ?? "").trim();

@@ -217,7 +217,7 @@ export function HomeFeedWithTabs({
       : explore === "Anime"
       ? "Anime"
       : "Culture";
-  const marketSubcategory = explore === "Anime" ? "anime" : "";
+  const marketSubcategory = "";
   const tz =
     typeof Intl !== "undefined"
       ? Intl.DateTimeFormat().resolvedOptions().timeZone ?? ""

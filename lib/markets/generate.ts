@@ -63,10 +63,14 @@ export async function maybeGenerateMarketsOnRefresh(input: {
     typeof input.category === "string" && input.category.trim()
       ? input.category.trim().slice(0, 24)
       : "";
-  const requestedSubcategory =
+  let requestedSubcategory =
     typeof input.subcategory === "string" && input.subcategory.trim()
       ? input.subcategory.trim().slice(0, 32)
       : "";
+  if (requestedSubcategory.toLowerCase() === "anime") {
+    if (!category) category = "Anime";
+    requestedSubcategory = "";
+  }
   const tz =
     typeof input.tz === "string" && input.tz.trim()
       ? input.tz.trim().slice(0, 64)
