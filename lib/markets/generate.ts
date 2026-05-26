@@ -325,7 +325,9 @@ export async function fetchTrendSignals(input: { tavilyKey: string; category?: s
         ? [`sports matchups injuries today ${now}`]
         : category === "Culture"
           ? [`pop culture trending music movies creators today ${now}`]
-          : [];
+          : category === "Anime"
+            ? [`anime releases episodes seasonal trends announcements ${now}`, `manga adaptations anime industry news ${now}`]
+            : [];
 
   const queries = [...baseQueries, ...categoryQueries];
   const chunks = await Promise.all(
@@ -345,6 +347,9 @@ function allowedSubcategories(category: string): string[] {
   }
   if (category === "Culture") {
     return ["celebs", "fashion", "music", "events", "local", "tv", "streaming", "netflix", "art"];
+  }
+  if (category === "Anime") {
+    return ["manga", "animation", "industry", "releases", "fandoms", "streaming", "adaptations", "events"];
   }
   return [];
 }

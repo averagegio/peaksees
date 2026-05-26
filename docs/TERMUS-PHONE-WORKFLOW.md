@@ -71,6 +71,23 @@ git config --global user.name "Your Name"
 
 **GitHub auth in WSL:** use a [Personal Access Token](https://github.com/settings/tokens) over HTTPS, or add an SSH key to GitHub and use `git remote -v` (SSH URL).
 
+**GitHub CLI (`gh`) in WSL** (for `gh pr create` from Termius):
+
+```bash
+# One-time on PC in Ubuntu (installs to ~/.local/bin, no apt/sudo):
+bash /mnt/c/Users/Owner/peaksees/scripts/setup-gh-wsl.sh
+```
+
+Then from the repo (feature branch, not `main`):
+
+```bash
+cd /mnt/c/Users/Owner/peaksees
+git checkout -b my-feature    # or push an existing branch
+git push -u origin HEAD
+export PATH="$HOME/.local/bin:$PATH"
+gh pr create --base main --head my-feature --fill-first
+```
+
 ---
 
 ## 3. See the local site on your phone
