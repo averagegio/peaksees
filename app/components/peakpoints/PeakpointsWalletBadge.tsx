@@ -77,7 +77,7 @@ export function PeakpointsWalletBadge({
       title="Open Peakpoints wallet"
     >
       <PeakpointsWalletIcon className={compact ? "h-4 w-4 shrink-0" : "h-[1.1rem] w-[1.1rem] shrink-0"} />
-      <span className="tabular-nums">{label}</span>
+      <span className="tabular-nums" suppressHydrationWarning>{label}</span>
     </Link>
   );
 }

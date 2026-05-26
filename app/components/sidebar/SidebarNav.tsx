@@ -5,12 +5,6 @@ import { usePathname } from "next/navigation";
 
 const items = [
   {
-    href: "/peakstats",
-    label: "Peakstats",
-    subtitle: "Rankings & public stats",
-    icon: TrophyIcon,
-  },
-  {
     href: "/pricing",
     label: "Pricing",
     subtitle: "PeakPlus & paid plans",
@@ -156,3 +150,4 @@ function TrophyIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+

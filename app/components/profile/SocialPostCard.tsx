@@ -50,13 +50,15 @@ export function SocialPostCard({
               {peak.handle}
             </ProfileLink>
             <span className="text-zinc-300 dark:text-zinc-600">·</span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">{when}</span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400" suppressHydrationWarning>
+              {when}
+            </span>
           </div>
           {isRepeak ? (
             <p className="mt-1 text-[11px] font-medium text-sky-600 dark:text-sky-400">Repeaked</p>
           ) : repeakedAt ? (
             <p className="mt-1 text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-              Saved · {formatMarketPostedAt(repeakedAt)}
+              Saved · <span suppressHydrationWarning>{formatMarketPostedAt(repeakedAt)}</span>
             </p>
           ) : null}
         </div>

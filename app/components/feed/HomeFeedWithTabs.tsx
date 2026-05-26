@@ -59,6 +59,7 @@ function buildMarketsHref(opts: {
   autogen: boolean;
   count?: number;
   marketCategory: string;
+  marketSubcategory?: string;
   tz: string;
   cursor?: { createdAt: string; id: string };
 }) {
@@ -69,6 +70,7 @@ function buildMarketsHref(opts: {
     q.set("count", String(opts.count ?? 5));
   }
   if (opts.marketCategory) q.set("category", opts.marketCategory);
+  if (opts.marketSubcategory) q.set("subcategory", opts.marketSubcategory);
   if (opts.tz) q.set("tz", opts.tz);
   if (opts.cursor) {
     q.set("cursorCreatedAt", opts.cursor.createdAt);
@@ -206,7 +208,16 @@ export function HomeFeedWithTabs({
   });
 
   const marketCategory =
-    explore === "Trending" ? "" : explore === "News" ? "News" : explore === "Sports" ? "Sports" : "Culture";
+    explore === "Trending"
+      ? ""
+      : explore === "News"
+      ? "News"
+      : explore === "Sports"
+      ? "Sports"
+      : explore === "Anime"
+      ? "Anime"
+      : "Culture";
+  const marketSubcategory = explore === "Anime" ? "anime" : "";
   const tz =
     typeof Intl !== "undefined"
       ? Intl.DateTimeFormat().resolvedOptions().timeZone ?? ""
@@ -232,6 +243,7 @@ export function HomeFeedWithTabs({
             limit: 24,
             autogen: false,
             marketCategory,
+            marketSubcategory,
             tz,
           });
           const res = await fetch(href, { cache: "no-store" });
@@ -276,6 +288,7 @@ export function HomeFeedWithTabs({
         autogen: true,
         count: 4,
         marketCategory,
+        marketSubcategory,
         tz,
       });
       const res = await fetch(href, { cache: "no-store" });
@@ -322,6 +335,7 @@ export function HomeFeedWithTabs({
           limit: 14,
           autogen: false,
           marketCategory,
+          marketSubcategory,
           tz,
           cursor: { createdAt: last.createdAt, id: last.id },
         });
@@ -409,6 +423,7 @@ export function HomeFeedWithTabs({
           autogen: true,
           count: 4,
           marketCategory,
+          marketSubcategory,
           tz,
         });
         const res = await fetch(href, { cache: "no-store" });
@@ -672,7 +687,132 @@ export function HomeFeedWithTabs({
     return () => window.removeEventListener("click", spawnSparkles);
   }, []);
 
-  const feedPosts = dedupePostsById(generatedAsPosts);
+  const devMockPosts: MarketPost[] = [
+    {
+      id: "dev-1",
+      creator: "Peak AI",
+      handle: "@peak",
+      avatarHue: 220,
+      postedAt: "Just now",
+      question: "Will the price of Bitcoin exceed $100k by end of year?",
+      category: "Finance",
+      volumeUsd: 124500,
+      endsAtLabel: "Dec 31",
+      outcomes: [
+        { id: "y", label: "Yes", probability: 0.42 },
+        { id: "n", label: "No", probability: 0.58 },
+      ],
+    },
+    {
+      id: "dev-2",
+      creator: "Peak AI",
+      handle: "@peak",
+      avatarHue: 18,
+      postedAt: "1h",
+      question: "Will Team A win the championship this season?",
+      category: "Sports",
+      volumeUsd: 84500,
+      endsAtLabel: "Season",
+      outcomes: [
+        { id: "y", label: "Yes", probability: 0.33 },
+        { id: "n", label: "No", probability: 0.67 },
+      ],
+    },
+    {
+      id: "dev-3",
+      creator: "Peak AI",
+      handle: "@peak",
+      avatarHue: 98,
+      postedAt: "2h",
+      question: "Will product X launch before Q4?",
+      category: "Tech",
+      volumeUsd: 40120,
+      endsAtLabel: "Q4",
+      outcomes: [
+        { id: "y", label: "Yes", probability: 0.7 },
+        { id: "n", label: "No", probability: 0.3 },
+      ],
+    },
+    {
+      id: "dev-4",
+      creator: "Peak AI",
+      handle: "@peak",
+      avatarHue: 280,
+      postedAt: "3h",
+      question: "Will the movie win Best Picture?",
+      category: "Culture",
+      volumeUsd: 12300,
+      endsAtLabel: "Awards",
+      outcomes: [
+        { id: "y", label: "Yes", probability: 0.18 },
+        { id: "n", label: "No", probability: 0.82 },
+      ],
+    },
+    {
+      id: "dev-5",
+      creator: "Peak AI",
+      handle: "@peak",
+      avatarHue: 46,
+      postedAt: "4h",
+      question: "Will next week’s earnings beat analyst expectations?",
+      category: "Finance",
+      volumeUsd: 67200,
+      endsAtLabel: "Next Week",
+      outcomes: [
+        { id: "y", label: "Yes", probability: 0.51 },
+        { id: "n", label: "No", probability: 0.49 },
+      ],
+    },
+    {
+      id: "dev-6",
+      creator: "Peak AI",
+      handle: "@peak",
+      avatarHue: 136,
+      postedAt: "5h",
+      question: "Will the next viral app reach 10 million downloads in 30 days?",
+      category: "Tech",
+      volumeUsd: 35400,
+      endsAtLabel: "30 Days",
+      outcomes: [
+        { id: "y", label: "Yes", probability: 0.62 },
+        { id: "n", label: "No", probability: 0.38 },
+      ],
+    },
+    {
+      id: "dev-7",
+      creator: "Peak AI",
+      handle: "@peak",
+      avatarHue: 310,
+      postedAt: "6h",
+      question: "Will the new streaming series get renewed for season 2?",
+      category: "Culture",
+      volumeUsd: 29400,
+      endsAtLabel: "Season",
+      outcomes: [
+        { id: "y", label: "Yes", probability: 0.44 },
+        { id: "n", label: "No", probability: 0.56 },
+      ],
+    },
+    {
+      id: "dev-8",
+      creator: "Peak AI",
+      handle: "@peak",
+      avatarHue: 60,
+      postedAt: "7h",
+      question: "Will the environmental bill pass before the end of the month?",
+      category: "Politics",
+      volumeUsd: 26400,
+      endsAtLabel: "This Month",
+      outcomes: [
+        { id: "y", label: "Yes", probability: 0.29 },
+        { id: "n", label: "No", probability: 0.71 },
+      ],
+    },
+  ];
+
+  const feedPosts = dedupePostsById(
+    generatedAsPosts.length > 0 ? generatedAsPosts : process.env.NODE_ENV === "development" ? devMockPosts : [],
+  );
 
   const onMarqueeIndexChange = useCallback(
     (index: number) => {
@@ -730,7 +870,7 @@ export function HomeFeedWithTabs({
             data-tour="feed-explore"
             className="feed-scroll mt-3 flex items-center justify-center gap-4 overflow-x-auto pb-0.5"
           >
-              {["Trending", "News", "Sports", "Culture"].map((item) => {
+              {["Trending", "News", "Sports", "Anime", "Culture"].map((item) => {
                 const color =
                   item === "Trending"
                     ? "text-emerald-700 dark:text-emerald-300"
@@ -738,7 +878,9 @@ export function HomeFeedWithTabs({
                       ? "text-sky-700 dark:text-sky-300"
                       : item === "Sports"
                         ? "text-amber-700 dark:text-amber-300"
-                        : "text-violet-700 dark:text-violet-300";
+                        : item === "Anime"
+                          ? "text-pink-700 dark:text-pink-300"
+                          : "text-violet-700 dark:text-violet-300";
                 const inactive =
                   item === "Trending"
                     ? "text-emerald-700/60 hover:text-emerald-800 dark:text-emerald-300/65 dark:hover:text-emerald-200"
@@ -746,7 +888,9 @@ export function HomeFeedWithTabs({
                       ? "text-sky-700/60 hover:text-sky-800 dark:text-sky-300/65 dark:hover:text-sky-200"
                       : item === "Sports"
                         ? "text-amber-700/60 hover:text-amber-800 dark:text-amber-300/65 dark:hover:text-amber-200"
-                        : "text-violet-700/60 hover:text-violet-800 dark:text-violet-300/65 dark:hover:text-violet-200";
+                        : item === "Anime"
+                          ? "text-pink-700/60 hover:text-pink-800 dark:text-pink-300/65 dark:hover:text-pink-200"
+                          : "text-violet-700/60 hover:text-violet-800 dark:text-violet-300/65 dark:hover:text-violet-200";
                 return (
                 <button
                   key={item}
@@ -789,20 +933,6 @@ export function HomeFeedWithTabs({
                 </button>
                 );
               })}
-              <Link
-                href="/peakstats"
-                data-sparkle-click="true"
-                className="group sparkle-hover sparkle-hover--contained nav-chip-motion shrink-0 px-0 py-0.5 text-[12px] font-semibold tracking-tight text-fuchsia-700/65 transition hover:text-fuchsia-800 sm:text-[13px] dark:text-fuchsia-300/70 dark:hover:text-fuchsia-200"
-              >
-                <span className="sr-only">Peakstats</span>
-                <span className="slot-roll" data-slot-speed="slow" aria-hidden>
-                  <span className="slot-roll__inner">
-                    <span>Peakstats</span>
-                    <span>Peakstats</span>
-                  </span>
-                </span>
-                <span aria-hidden className="mt-1 block h-[2px] w-full rounded-full bg-transparent group-hover:bg-current/35" />
-              </Link>
           </div>
 
           <div className="mt-3 flex justify-center">

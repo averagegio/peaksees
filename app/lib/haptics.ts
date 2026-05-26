@@ -56,7 +56,8 @@ export function marketCardHaptic(
   if (typeof navigator === "undefined") return false;
 
   const now = Date.now();
-  if (kind === "scrub" && now - lastVibrateAt < 70) return false;
+  // Reduced debounce for scrub to feel more responsive on each card snap
+  if (kind === "scrub" && now - lastVibrateAt < 50) return false;
 
   let vibrated = false;
   const vibrate = navigator.vibrate?.bind(navigator);

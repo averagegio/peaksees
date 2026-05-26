@@ -261,7 +261,7 @@ export function MarketPostCard({
             ) : null}
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-            <span>{post.postedAt}</span>
+            <span suppressHydrationWarning>{post.postedAt}</span>
             {pending ? (
               <>
                 <span className="text-zinc-300 dark:text-zinc-600">·</span>
@@ -555,7 +555,7 @@ export function PeakFeed({
                       >
                         {p.displayName}
                       </ProfileLink>
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400" suppressHydrationWarning>
                         {new Date(p.createdAt).toLocaleDateString(undefined, {
                           month: "short",
                           day: "numeric",
@@ -566,7 +566,7 @@ export function PeakFeed({
                       {p.text}
                     </p>
                     {p.expiresAt ? (
-                      <p className="mt-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                      <p className="mt-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400" suppressHydrationWarning>
                         Expires {new Date(p.expiresAt).toLocaleString()}
                       </p>
                     ) : null}
@@ -622,7 +622,7 @@ export function PeakFeed({
                       >
                         {p.displayName}
                       </ProfileLink>
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400" suppressHydrationWarning>
                         {new Date(p.createdAt).toLocaleDateString(undefined, {
                           month: "short",
                           day: "numeric",
@@ -633,7 +633,7 @@ export function PeakFeed({
                       {p.text}
                     </p>
                     {p.expiresAt ? (
-                      <p className="mt-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                      <p className="mt-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400" suppressHydrationWarning>
                         Expires {new Date(p.expiresAt).toLocaleString()}
                       </p>
                     ) : null}

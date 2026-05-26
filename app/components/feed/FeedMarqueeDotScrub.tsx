@@ -12,7 +12,7 @@ import {
 import { marketCardHaptic } from "@/app/lib/haptics";
 import type { MarketPost } from "@/app/lib/mock-markets";
 
-const MOBILE_VISIBLE_DOTS = 5;
+const VISIBLE_DOTS = 3;
 /** Side inset when mapping finger X across the hit zone (wider = more responsive). */
 const SCRUB_HIT_EDGE_INSET_RATIO = 0.12;
 
@@ -24,19 +24,23 @@ type ScrubGesture = {
 
 function detectTouchScrubUi() {
   if (typeof window === "undefined") return false;
+  const touchPoints = navigator.maxTouchPoints ?? 0;
   return (
+    touchPoints > 0 ||
     window.matchMedia("(pointer: coarse)").matches ||
     window.matchMedia("(max-width: 768px)").matches
   );
 }
 
 function useTouchScrubUi() {
-  const [enabled, setEnabled] = useState(detectTouchScrubUi);
+  // Must match SSR first paint — reading window/touch here caused hydration mismatches on phones.
+  const [enabled, setEnabled] = useState(false);
 
   useLayoutEffect(() => {
     const coarse = window.matchMedia("(pointer: coarse)");
     const narrow = window.matchMedia("(max-width: 768px)");
-    const update = () => setEnabled(coarse.matches || narrow.matches);
+    const update = () => setEnabled(detectTouchScrubUi());
+
     update();
     coarse.addEventListener("change", update);
     narrow.addEventListener("change", update);
@@ -64,7 +68,7 @@ function slideWidthPx(viewport: HTMLElement) {
 
 function scrubFractionFromHit(hit: HTMLElement, clientX: number) {
   const rect = hit.getBoundingClientRect();
-  const inset = Math.max(12, rect.width * SCRUB_HIT_EDGE_INSET_RATIO);
+  const inset = Math.max(8, rect.width * SCRUB_HIT_EDGE_INSET_RATIO);
   const usable = Math.max(1, rect.width - inset * 2);
   const localX = clientX - rect.left - inset;
   return Math.max(0, Math.min(1, localX / usable));
@@ -199,7 +203,16 @@ export function FeedMarqueeDotScrub({
   const pulseScrubIndex = useCallback((ix: number) => {
     if (ix !== lastHapticIndexRef.current) {
       lastHapticIndexRef.current = ix;
+      // Snap haptic for each card with faster response
       marketCardHaptic("scrub");
+      
+      // Light visual pulse on the pill
+      const pill = pillRef.current;
+      if (pill) {
+        pill.classList.remove("feed-marquee-scrub-pill--pulse");
+        void pill.offsetWidth; // Trigger reflow
+        pill.classList.add("feed-marquee-scrub-pill--pulse");
+      }
     }
   }, []);
 
@@ -235,6 +248,7 @@ export function FeedMarqueeDotScrub({
       setCarouselPaused(true);
       setPillVisible(true);
       setPillScrubbingDom(true);
+      // Immediate haptic feedback on tap
       marketCardHaptic("press");
 
       scrubRef.current = { active: true, touchId, pointerId };
@@ -260,7 +274,7 @@ export function FeedMarqueeDotScrub({
 
   const endScrub = useCallback(() => {
     if (!scrubRef.current.active) return;
-    const el = viewportRef.current;
+    const el = viewportRef?.current;
     const pill = pillRef.current;
 
     scrubRef.current = { active: false, touchId: -1, pointerId: -1 };
@@ -298,7 +312,7 @@ export function FeedMarqueeDotScrub({
       return;
     }
 
-    const viewport = viewportRef.current;
+    const viewport = viewportRef?.current;
     const hit = hitRef.current;
     if (!viewport || !hit || posts.length < 2) return;
 
@@ -420,23 +434,13 @@ export function FeedMarqueeDotScrub({
     bindHitListeners();
   }, [bindHitListeners, isMobileUi, setPillScrubbingDom, viewportReady]);
 
-  const mobileDotIndices = visibleDotIndices(
+  const dotIndices = visibleDotIndices(
     posts.length,
     activeIndex,
-    MOBILE_VISIBLE_DOTS,
+    VISIBLE_DOTS,
   );
 
   if (posts.length < 2) return null;
-
-  if (!isMobileUi) {
-    return (
-      <div className={railClass}>
-        <div className="feed-marquee-scrub-pill pointer-events-none flex items-center justify-center gap-1.5 px-3 py-1.5">
-          <DotIndicators posts={posts} activeIndex={activeIndex} />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className={railClass}>
@@ -460,14 +464,14 @@ export function FeedMarqueeDotScrub({
           aria-valuemax={posts.length}
           aria-valuenow={activeIndex + 1}
           className={
-            "feed-marquee-scrub-pill feed-marquee-scrub-pill--idle flex items-center justify-center gap-2 rounded-full px-5 py-2.5 " +
+            "feed-marquee-scrub-pill feed-marquee-scrub-pill--idle flex items-center justify-center gap-1.5 rounded-full px-3.5 py-2 " +
             (pillVisible ? "feed-marquee-scrub-pill--scrubbing" : "")
           }
         >
           <DotIndicators
             posts={posts}
             activeIndex={activeIndex}
-            indices={mobileDotIndices}
+            indices={dotIndices}
             compact
             scrubbing={pillVisible}
           />

@@ -64,7 +64,7 @@ export function PeakpointsWalletCallout() {
             Peakpoints wallet
           </p>
           <p className="mt-0.5 text-sm leading-snug text-zinc-600 dark:text-zinc-400">
-            <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+            <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400" suppressHydrationWarning>
               {balanceLabel}
             </span>
             {" in wallet · "}
