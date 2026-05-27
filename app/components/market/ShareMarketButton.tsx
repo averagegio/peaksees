@@ -176,9 +176,12 @@ export function ShareMarketButton({
         const intentUrl = xTweetIntentUrl(tweetText, shareUrl);
 
         if (isMobileShareEnv()) {
-          void ensureCapture()
-            .then(({ blob }) => uploadShareImage(blob))
-            .catch(() => {});
+          try {
+            const { blob } = await ensureCapture();
+            await uploadShareImage(blob);
+          } catch {
+            // Image upload failed; fall back to the server-generated OG preview.
+          }
           window.location.assign(intentUrl);
           setMenuOpen(false);
           return;
