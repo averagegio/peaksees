@@ -36,8 +36,8 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
-    "tailwindcss": "^4",
     "postcss-nesting": "^11.0.0",
+    "tailwindcss": "^4",
     "typescript": "^5"
   }
 }

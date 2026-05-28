@@ -294,6 +294,33 @@ export function PeakpointsClient() {
         </div>
       ) : null}
 
+      {withdrawals.length > 0 ? (
+        <div className="mt-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Withdrawals
+          </p>
+          <div className="mt-2 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
+            <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              {withdrawals.map((w) => (
+                <li key={w.id} className="p-4 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-semibold capitalize text-zinc-900 dark:text-zinc-100">
+                      {w.status}
+                    </span>
+                    <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                      {formatUsdCents(w.amountCents)} → {formatUsdCents(w.payoutCents)}
+                    </span>
+                  </div>
+                  {w.note ? (
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">{w.note}</p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : null}
+
       <div className="mt-6">
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           Activity

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/constants";
 import { isSessionCookieValid } from "@/lib/auth/verify-middleware";
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const authed = await isSessionCookieValid(token);
   const { pathname } = req.nextUrl;
