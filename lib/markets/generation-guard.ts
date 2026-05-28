@@ -17,10 +17,10 @@ export function forwardLookingMarketRules(now = new Date()): string {
     `Today is ${todayIso} (UTC).`,
     "Only create markets about outcomes that are still OPEN and uncertain as of today.",
     "Do NOT create markets about events that already finished (completed games, past elections, announced winners, released products, historical facts).",
-    'Phrase every question in forward-looking form ("Will…", "By [future date]…", "Before…").',
+    'Prefer forward-looking phrasing but allow flexible resolution phrasing ("Will…", "By [future date]…", "Within N days", "Before next [event]").',
     `Do not anchor questions to calendar years before ${year}.`,
     "If a signal describes something that already occurred, skip it or reframe to a related FUTURE outcome (next game, next vote, next release).",
-    "Prefer resolution windows 7–45 days ahead unless the news cites a specific later deadline.",
+    "Provide a mix of resolution horizons: include short (7–14 days), medium (15–45 days), and occasionally longer (46–90 days) windows so the feed is not always date-granular.",
   ].join("\n");
 }
 

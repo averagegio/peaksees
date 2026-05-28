@@ -317,11 +317,12 @@ export async function fetchTrendSignals(input: { tavilyKey: string; category?: s
     return cached.signals;
   }
 
-  const baseQueries = [
-    `top breaking headlines today ${now}`,
-    `viral trending topics today ${now}${tz ? ` ${tz}` : ""}`,
-    `upcoming events and deadlines next 60 days ${now}`,
-  ];
+    const baseQueries = [
+      `top breaking headlines and emerging narratives ${now}`,
+      `viral trending topics and rising angles ${now}${tz ? ` ${tz}` : ""}`,
+      `ongoing stories likely to evolve in the next 30–60 days ${now}`,
+      `signals, risks, and deadlines journalists and analysts are watching ${now}`,
+    ];
   const categoryQueries =
     category === "News"
       ? [`geopolitics and macro headlines today ${now}`]
