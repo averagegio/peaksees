@@ -23,6 +23,12 @@ const items = [
     icon: CoinIcon,
   },
   {
+    href: "/peakstats",
+    label: "Peakstats",
+    subtitle: "Leaderboard by balance",
+    icon: TrophyIcon,
+  },
+  {
     href: "/bookmarks",
     label: "Bookmarks",
     subtitle: "Posts you saved",
