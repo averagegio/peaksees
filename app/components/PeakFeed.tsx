@@ -9,7 +9,6 @@ import { MarketTradeBox } from "@/app/components/market/MarketTradeBox";
 import { PeakOpinionChip } from "@/app/components/market/PeakOpinionChip";
 import { MarketInsightUncover } from "@/app/components/market/MarketInsightUncover";
 import { ShareMarketButton } from "@/app/components/market/ShareMarketButton";
-import { TwitchStreamSetup } from "@/app/components/twitch/TwitchStreamSetup";
 import { useMarketInsightReveal } from "@/app/hooks/useMarketInsightReveal";
 import { marketCardHaptic } from "@/app/lib/haptics";
 import { FollowUserButton } from "@/app/components/profile/FollowUserButton";
@@ -188,7 +187,8 @@ export function MarketPostCard({
       }}
       data-sparkle-click={interactive ? "true" : undefined}
       className={
-        "rounded-2xl border border-zinc-200/90 bg-white/[0.97] p-4 shadow-sm backdrop-blur-md dark:border-zinc-700 dark:bg-zinc-900/95 " +
+        "rounded-2xl border border-zinc-200/90 bg-white/[0.97] shadow-sm backdrop-blur-md dark:border-zinc-700 dark:bg-zinc-900/95 " +
+        (marqueeMode && fillHeight ? "p-3 sm:p-3.5 " : "p-4 ") +
         (fillHeight ? "flex h-full min-h-0 flex-col overflow-hidden " : "") +
         (peakGenerated && !pending ? "relative z-0 overflow-hidden " : "") +
         (insight.isPulling ? "market-insight-gesture-active select-none " : "") +
@@ -473,16 +473,13 @@ export function MarketPostCard({
       ) : null}
 
       {interactive ? (
-        <div className="mt-3 flex flex-col gap-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <ShareMarketButton
-              getNode={() => cardRef.current}
-              filenameBase={post.question}
-              marketId={post.id}
-              question={post.question}
-            />
-          </div>
-          <TwitchStreamSetup marketId={post.id} />
+        <div className="mt-3">
+          <ShareMarketButton
+            getNode={() => cardRef.current}
+            filenameBase={post.question}
+            marketId={post.id}
+            question={post.question}
+          />
         </div>
       ) : null}
 

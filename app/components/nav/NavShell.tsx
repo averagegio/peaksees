@@ -79,21 +79,21 @@ export function NavShell({
         <Link
           href="/feed"
           data-tour="tour-header-banner"
-          className="flex w-full items-center justify-center bg-white px-2 py-0.5 sm:px-3 sm:py-1 dark:bg-zinc-950"
+          className="flex w-full items-center justify-center bg-white px-2 py-0 dark:bg-zinc-950 sm:px-3"
           onClick={() => setOpen(false)}
         >
           <PeakseesHeaderBanner
-            className="h-auto w-full max-h-[44px] max-w-md object-contain sm:max-h-[52px] sm:max-w-lg"
+            className="h-auto w-full max-h-[40px] max-w-md object-contain sm:max-h-[48px] sm:max-w-lg"
             sizes="(max-width: 768px) 100vw, 32rem"
             priority
           />
         </Link>
 
-        <p className="border-t border-zinc-100 bg-white px-3 py-0.5 text-center text-[10px] leading-tight tracking-tight text-zinc-500 sm:text-[11px] dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+        <p className="border-t border-zinc-100 bg-white px-3 py-0 text-center text-[10px] leading-tight tracking-tight text-zinc-500 sm:text-[11px] dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
           {FEED_MISSION}
         </p>
 
-        <div className="flex items-center justify-between gap-2 border-t border-zinc-100 px-2 py-1 dark:border-zinc-800">
+        <div className="flex items-center justify-between gap-2 border-t border-zinc-100 px-2 py-0.5 dark:border-zinc-800">
           <div className="flex items-center gap-1.5">
             {showBackButton && (
               <BackButton fallbackHref="/feed" label="Back" iconOnly />
@@ -131,13 +131,10 @@ export function NavShell({
 
           <div className="min-w-0 flex-1" aria-hidden />
 
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-1">
             {session ? (
               <>
-                <div className="flex flex-col items-end gap-1">
-                  <PeakpointsWalletBadge compact />
-                  <ThemeToggle />
-                </div>
+                <PeakpointsWalletBadge compact className="!h-9 !px-2 !text-[10px] sm:!px-2.5 sm:!text-[11px]" />
                 <Link
                   href="/dashboard"
                   className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold text-white ring-2 ring-emerald-500/30"

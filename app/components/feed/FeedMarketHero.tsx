@@ -42,7 +42,7 @@ export function FeedMarketHero({
         aria-hidden
       />
       <div className="relative mx-auto w-full max-w-[100rem] px-0">
-        <div className="flex items-end justify-between gap-3 px-4 pb-2 pt-4 sm:px-6 sm:pt-5">
+        <div className="flex items-end justify-between gap-3 px-3 pb-1.5 pt-2 sm:px-4 sm:pt-3">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400">
               Markets
@@ -58,7 +58,7 @@ export function FeedMarketHero({
           ) : null}
         </div>
 
-        <div className="feed-hero__stage h-[min(54dvh,34rem)] min-h-[300px] w-full">
+        <div className="feed-hero__stage h-[min(72dvh,44rem)] min-h-[360px] w-full">
           <FeedMarketMarquee
             posts={posts}
             viewerUserId={viewerUserId}

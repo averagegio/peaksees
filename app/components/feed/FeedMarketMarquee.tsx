@@ -585,7 +585,7 @@ export function FeedMarketMarquee({
                 <div
                   className={
                     isHero
-                      ? "h-full min-h-0 px-4 py-4 sm:px-8 sm:py-5"
+                      ? "h-full min-h-0 px-1.5 py-1 sm:px-2 sm:py-1.5"
                       : "h-full min-h-0 px-1 sm:px-1.5"
                   }
                 >

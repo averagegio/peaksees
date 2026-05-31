@@ -4,6 +4,11 @@ import { toBlob } from "html-to-image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import {
+  TwitchIcon,
+  TwitchStreamSetupPanel,
+} from "@/app/components/twitch/TwitchStreamSetupPanel";
+
 type NavWithShare = Navigator & {
   share?: (data: {
     title?: string;
@@ -86,6 +91,7 @@ export function ShareMarketButton({
 }) {
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPanel, setMenuPanel] = useState<"share" | "twitch">("share");
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const captureRef = useRef<{ blob: Blob; file: File } | null>(null);
@@ -101,7 +107,10 @@ export function ShareMarketButton({
   useEffect(() => setPortalReady(true), []);
 
   useEffect(() => {
-    if (!menuOpen) return undefined;
+    if (!menuOpen) {
+      setMenuPanel("share");
+      return undefined;
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMenuOpen(false);
     };
@@ -298,14 +307,25 @@ export function ShareMarketButton({
             >
               <header className="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
                 <div className="min-w-0">
+                  {menuPanel === "twitch" ? (
+                    <button
+                      type="button"
+                      className="mb-1 text-[11px] font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                      onClick={() => setMenuPanel("share")}
+                    >
+                      ← Back
+                    </button>
+                  ) : null}
                   <p
                     id="share-market-title"
                     className="text-sm font-semibold text-zinc-900 dark:text-zinc-100"
                   >
-                    Share market
+                    {menuPanel === "twitch" ? "Twitch / OBS" : "Share market"}
                   </p>
                   <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
-                    Export image and open the app you want
+                    {menuPanel === "twitch"
+                      ? "Pin market and copy overlay URLs"
+                      : "Export image and open the app you want"}
                   </p>
                 </div>
                 <button
@@ -321,6 +341,10 @@ export function ShareMarketButton({
               </header>
 
               <div className="max-h-[calc(85dvh-8rem)] overflow-y-auto p-3">
+                {menuPanel === "twitch" ? (
+                  <TwitchStreamSetupPanel marketId={marketId} />
+                ) : (
+                  <>
                 <p className="mb-3 rounded-xl bg-zinc-50 px-3 py-2 text-[13px] leading-snug text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
                   {tweetText.slice(0, 120)}
                   {tweetText.length > 120 ? "..." : ""}
@@ -375,6 +399,18 @@ export function ShareMarketButton({
                     </span>
                     TikTok
                   </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={busy}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-zinc-800 hover:bg-zinc-50 disabled:opacity-60 dark:text-zinc-100 dark:hover:bg-zinc-900"
+                    onClick={() => setMenuPanel("twitch")}
+                  >
+                    <span className="flex w-8 shrink-0 items-center justify-center text-[#9146FF]">
+                      <TwitchIcon />
+                    </span>
+                    Twitch / OBS overlay
+                  </button>
                 </div>
 
                 {systemShareAvailable ? (
@@ -398,6 +434,8 @@ export function ShareMarketButton({
                     {error}
                   </p>
                 ) : null}
+                  </>
+                )}
               </div>
             </div>
           </div>,

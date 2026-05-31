@@ -15,7 +15,17 @@ function absoluteUrl(pathOrUrl: string) {
   return new URL(pathOrUrl, window.location.origin).href;
 }
 
-export function TwitchStreamSetup({ marketId }: { marketId: string }) {
+export function TwitchIcon({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+      <path d="M4 3 2 6v12h5v3l3-3h4l6-6V3H4zm15 10-4 4h-4l-3 3v-3H6V5h13v8z" />
+      <path d="M14 7h2v5h-2V7zm-4 0h2v5h-2V7z" />
+    </svg>
+  );
+}
+
+/** Compact Twitch pin + OBS link panel for share menu or popovers. */
+export function TwitchStreamSetupPanel({ marketId }: { marketId: string }) {
   const [channel, setChannel] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,21 +74,18 @@ export function TwitchStreamSetup({ marketId }: { marketId: string }) {
   const previewPanel = panelUrl ?? marketEmbedPath(marketId, "panel");
 
   return (
-    <div className="mt-3 rounded-xl border border-[#9146FF]/35 bg-[#9146FF]/[0.06] p-3 dark:bg-[#9146FF]/10">
-      <p className="text-xs font-semibold uppercase tracking-wide text-[#9146FF]">
-        Twitch live widget
+    <div className="space-y-3">
+      <p className="text-[12px] leading-snug text-zinc-600 dark:text-zinc-400">
+        Pin this market to your Twitch channel, then paste the OBS overlay URL as a Browser Source
+        (1920×120).
       </p>
-      <p className="mt-1 text-[12px] text-zinc-600 dark:text-zinc-400">
-        Pin this market to your channel, then add the overlay URL as an OBS Browser Source (1920×120).
-        Viewers bet via the panel link or peaksees on their phone.
-      </p>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
         <input
           type="text"
           value={channel}
           onChange={(e) => setChannel(e.target.value.replace(/^@/, ""))}
-          placeholder="your_twitch_login"
-          className="min-w-[140px] flex-1 rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-950"
+          placeholder="twitch_login"
+          className="min-w-[120px] flex-1 rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-950"
         />
         <button
           type="button"
@@ -86,13 +93,13 @@ export function TwitchStreamSetup({ marketId }: { marketId: string }) {
           onClick={() => void pinAndShowUrls()}
           className="rounded-lg bg-[#9146FF] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
         >
-          {busy ? "Pinning…" : "Pin to channel"}
+          {busy ? "Pinning…" : "Pin"}
         </button>
       </div>
-      {error ? <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p> : null}
-      <div className="mt-3 space-y-2">
+      {error ? <p className="text-xs text-red-600 dark:text-red-400">{error}</p> : null}
+      <div className="space-y-2">
         <div>
-          <p className="text-[11px] font-semibold text-zinc-500">OBS overlay (transparent)</p>
+          <p className="text-[11px] font-semibold text-zinc-500">OBS overlay</p>
           <button
             type="button"
             onClick={() => void copyText("overlay", previewOverlay)}
@@ -102,7 +109,7 @@ export function TwitchStreamSetup({ marketId }: { marketId: string }) {
           </button>
         </div>
         <div>
-          <p className="text-[11px] font-semibold text-zinc-500">Viewer panel (bet on phone)</p>
+          <p className="text-[11px] font-semibold text-zinc-500">Viewer panel</p>
           <button
             type="button"
             onClick={() => void copyText("panel", previewPanel)}

@@ -839,7 +839,7 @@ export function HomeFeedWithTabs({
       <div ref={sparkleLayerRef} className="pointer-events-none fixed inset-0 z-[120]" />
 
       <header className="relative z-20 shrink-0 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/90">
-        <div className="mx-auto w-full max-w-4xl px-4 py-3 sm:px-6">
+        <div className="mx-auto w-full max-w-4xl px-3 py-2 sm:px-4">
           <div
             role="tablist"
             aria-label="Feed tabs"
