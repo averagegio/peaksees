@@ -868,7 +868,7 @@ export function HomeFeedWithTabs({
 
           <div
             data-tour="feed-explore"
-            className="feed-scroll mt-3 flex items-center justify-center gap-4 overflow-x-auto pb-0.5"
+            className={`feed-scroll mt-3 flex items-center justify-center gap-4 overflow-x-auto pb-0.5 ${tab === "live" ? "hidden" : ""}`}
           >
               {["Trending", "News", "Sports", "Anime", "Culture"].map((item) => {
                 const color =
@@ -974,16 +974,12 @@ export function HomeFeedWithTabs({
 
       <div
         ref={pageScrollRef}
-        className="feed-scroll feed-page-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain"
+        className={`feed-scroll feed-page-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain${tab === "live" ? " flex flex-col" : ""}`}
         data-tour="feed-scroll"
       >
         {tab === "live" ? (
-          <section className="feed-hero relative w-full shrink-0 overflow-hidden">
-            <div className="feed-hero__stage flex h-[min(38dvh,24rem)] min-h-[200px] w-full items-stretch px-4 py-4 sm:px-6 sm:py-5">
-              <div className="h-full w-full overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-md dark:border-zinc-700 dark:bg-zinc-900/95">
-                <LiveStreamPanel compact />
-              </div>
-            </div>
+          <section className="live-page flex min-h-full w-full flex-1 flex-col">
+            <LiveStreamPanel layout="page" />
           </section>
         ) : (
           <FeedMarketHero
@@ -1003,7 +999,7 @@ export function HomeFeedWithTabs({
           />
         )}
 
-        <FeedSiteSection />
+        {tab !== "live" ? <FeedSiteSection /> : null}
       </div>
     </div>
   );

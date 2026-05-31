@@ -26,7 +26,14 @@ type TokenResponse = {
   error?: string;
 };
 
-export function LiveStreamPanel({ compact = false }: { compact?: boolean }) {
+export function LiveStreamPanel({
+  compact = false,
+  layout,
+}: {
+  compact?: boolean;
+  layout?: "compact" | "card" | "page";
+}) {
+  const resolvedLayout = layout ?? (compact ? "compact" : "card");
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<LiveConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -194,23 +201,43 @@ export function LiveStreamPanel({ compact = false }: { compact?: boolean }) {
     }
   }
 
-  const videoShell = compact
-    ? "overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700"
-    : "overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700";
-  const videoClass = compact
-    ? "h-[4.75rem] w-full bg-black object-cover sm:h-[5.5rem]"
-    : "aspect-video w-full bg-black object-cover";
-  const previewCol = compact ? "w-full max-w-[9.5rem] sm:max-w-[11rem]" : undefined;
+  const videoShell =
+    resolvedLayout === "page"
+      ? "overflow-hidden border-y border-zinc-200 dark:border-zinc-800"
+      : resolvedLayout === "compact"
+        ? "overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700"
+        : "overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700";
+  const videoClass =
+    resolvedLayout === "page"
+      ? "aspect-video w-full min-h-[min(52vw,58vh)] bg-black object-cover sm:min-h-[min(48vw,62vh)]"
+      : resolvedLayout === "compact"
+        ? "h-[4.75rem] w-full bg-black object-cover sm:h-[5.5rem]"
+        : "aspect-video w-full bg-black object-cover";
+  const previewCol =
+    resolvedLayout === "compact"
+      ? "w-full max-w-[9.5rem] sm:max-w-[11rem]"
+      : resolvedLayout === "page"
+        ? "w-full"
+        : undefined;
+  const previewGrid =
+    resolvedLayout === "page"
+      ? "mt-4 grid w-full gap-6"
+      : resolvedLayout === "compact"
+        ? "mt-2 flex flex-wrap justify-center gap-3"
+        : "mt-3 grid gap-3 sm:grid-cols-2";
+  const sectionClass =
+    resolvedLayout === "page"
+      ? "flex min-h-full w-full flex-col bg-white dark:bg-zinc-950"
+      : resolvedLayout === "compact"
+        ? "flex h-full min-h-0 flex-col overflow-y-auto p-2 sm:p-3"
+        : "mb-4 rounded-2xl border border-zinc-200/90 bg-white/95 p-3 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/90 sm:p-4";
+  const headerPad = resolvedLayout === "page" ? "px-4 pt-4 sm:px-6" : "";
+  const controlsPad = resolvedLayout === "page" ? "px-4 sm:px-6" : "";
+  const footerPad = resolvedLayout === "page" ? "px-4 pb-8 sm:px-6" : "";
 
   return (
-    <section
-      className={
-        compact
-          ? "flex h-full min-h-0 flex-col overflow-y-auto p-2 sm:p-3"
-          : "mb-4 rounded-2xl border border-zinc-200/90 bg-white/95 p-3 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/90 sm:p-4"
-      }
-    >
-      <div className={`flex items-center justify-between gap-2 ${compact ? "mb-2" : "mb-3"}`}>
+    <section className={sectionClass}>
+      <div className={`flex items-center justify-between gap-2 ${resolvedLayout === "compact" ? "mb-2" : "mb-3"} ${headerPad}`}>
         <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
           Live (LiveKit)
         </h2>
@@ -226,11 +253,11 @@ export function LiveStreamPanel({ compact = false }: { compact?: boolean }) {
       </div>
 
       {loading ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
+        <p className={`text-sm text-zinc-500 dark:text-zinc-400 ${controlsPad}`}>Loading…</p>
       ) : null}
 
       {!loading && config && !config.configured ? (
-        <div className="space-y-2 rounded-xl border border-dashed border-amber-300/80 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/40">
+        <div className={`space-y-2 rounded-xl border border-dashed border-amber-300/80 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/40 ${controlsPad}`}>
           <p className="font-medium text-amber-950 dark:text-amber-100">
             LiveKit is not configured
           </p>
@@ -259,67 +286,94 @@ export function LiveStreamPanel({ compact = false }: { compact?: boolean }) {
 
       {!loading && config?.configured ? (
         <>
-          <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
-            Room: <span className="font-mono text-zinc-700 dark:text-zinc-300">{config.roomName}</span>
-          </p>
+          <div className={controlsPad}>
+            <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
+              Room:{" "}
+              <span className="font-mono text-zinc-700 dark:text-zinc-300">{config.roomName}</span>
+            </p>
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              className="rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
-              onClick={() => void connectAs("publisher")}
-              disabled={busy !== null || connectedRole !== null}
-            >
-              {busy === "publisher" ? "Connecting…" : "Go live (camera)"}
-            </button>
-            <button
-              type="button"
-              className="rounded-full border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-800"
-              onClick={() => void connectAs("viewer")}
-              disabled={busy !== null || connectedRole !== null}
-            >
-              {busy === "viewer" ? "Connecting…" : "Watch live"}
-            </button>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                className="rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                onClick={() => void connectAs("publisher")}
+                disabled={busy !== null || connectedRole !== null}
+              >
+                {busy === "publisher" ? "Connecting…" : "Go live (camera)"}
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-zinc-300 bg-white px-3 py-2 text-xs font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                onClick={() => void connectAs("viewer")}
+                disabled={busy !== null || connectedRole !== null}
+              >
+                {busy === "viewer" ? "Connecting…" : "Watch live"}
+              </button>
+            </div>
+
+            {connectedRole ? (
+              <button
+                type="button"
+                className="mt-2 w-full rounded-full border border-red-300/80 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/70"
+                onClick={() => void disconnectRoom()}
+              >
+                Leave room
+              </button>
+            ) : null}
+
+            {resolvedLayout !== "page" ? (
+              <div className={previewGrid}>
+                <div className={previewCol}>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    {connectedRole === "publisher" ? "Your stream" : "Preview (publisher)"}
+                  </p>
+                  <div className={videoShell}>
+                    <video ref={localVideoRef} muted playsInline className={videoClass} />
+                  </div>
+                </div>
+                <div className={previewCol}>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    {connectedRole === "viewer" ? "Live feed" : "Remote (when watching)"}
+                  </p>
+                  <div className={videoShell}>
+                    <video ref={remoteVideoRef} playsInline className={videoClass} />
+                  </div>
+                  <audio ref={remoteAudioRef} className="hidden" autoPlay playsInline />
+                </div>
+              </div>
+            ) : null}
+
+            {connectedRole === "viewer" && resolvedLayout !== "page" ? (
+              <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                Waiting for someone to go live, or connect as publisher in another window to test.
+              </p>
+            ) : null}
           </div>
 
-          {connectedRole ? (
-            <button
-              type="button"
-              className="mt-2 w-full rounded-full border border-red-300/80 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/70"
-              onClick={() => void disconnectRoom()}
-            >
-              Leave room
-            </button>
+          {resolvedLayout === "page" ? (
+            <div className={previewGrid}>
+              <div className={previewCol}>
+                <p className="mb-1 px-4 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 sm:px-6">
+                  {connectedRole === "publisher" ? "Your stream" : "Preview (publisher)"}
+                </p>
+                <div className={videoShell}>
+                  <video ref={localVideoRef} muted playsInline className={videoClass} />
+                </div>
+              </div>
+              <div className={previewCol}>
+                <p className="mb-1 px-4 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 sm:px-6">
+                  {connectedRole === "viewer" ? "Live feed" : "Remote (when watching)"}
+                </p>
+                <div className={videoShell}>
+                  <video ref={remoteVideoRef} playsInline className={videoClass} />
+                </div>
+                <audio ref={remoteAudioRef} className="hidden" autoPlay playsInline />
+              </div>
+            </div>
           ) : null}
 
-          <div
-            className={
-              compact
-                ? "mt-2 flex flex-wrap justify-center gap-3"
-                : "mt-3 grid gap-3 sm:grid-cols-2"
-            }
-          >
-            <div className={previewCol}>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                {connectedRole === "publisher" ? "Your stream" : "Preview (publisher)"}
-              </p>
-              <div className={videoShell}>
-                <video ref={localVideoRef} muted playsInline className={videoClass} />
-              </div>
-            </div>
-            <div className={previewCol}>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                {connectedRole === "viewer" ? "Live feed" : "Remote (when watching)"}
-              </p>
-              <div className={videoShell}>
-                <video ref={remoteVideoRef} playsInline className={videoClass} />
-              </div>
-              <audio ref={remoteAudioRef} className="hidden" autoPlay playsInline />
-            </div>
-          </div>
-
-          {connectedRole === "viewer" ? (
-            <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+          {connectedRole === "viewer" && resolvedLayout === "page" ? (
+            <p className={`mt-3 text-xs text-zinc-500 dark:text-zinc-400 ${footerPad}`}>
               Waiting for someone to go live, or connect as publisher in another window to test.
             </p>
           ) : null}
@@ -327,7 +381,9 @@ export function LiveStreamPanel({ compact = false }: { compact?: boolean }) {
       ) : null}
 
       {error ? (
-        <p className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">{error}</p>
+        <p className={`mt-2 text-xs font-medium text-red-600 dark:text-red-400 ${footerPad || controlsPad}`}>
+          {error}
+        </p>
       ) : null}
     </section>
   );
