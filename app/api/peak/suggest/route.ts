@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
 import { getSession } from "@/lib/auth/session";
+import { openAIMarketModel } from "@/lib/markets/openai-model";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
   if (!openaiKey) {
     return NextResponse.json({ error: "Missing OPENAI_API_KEY" }, { status: 500 });
   }
-  const model = (process.env.OPENAI_MODEL ?? "gpt-4o-mini").trim();
+  const model = openAIMarketModel();
   const tavilyKey = (process.env.TAVILY_API_KEY ?? "").trim();
 
   let seed = "";

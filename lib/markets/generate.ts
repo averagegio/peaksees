@@ -7,11 +7,13 @@ import { db } from "@/lib/db";
 import {
   forwardLookingMarketRules,
   isRetroactiveMarketQuestion,
+  isTemplatedMarketQuestion,
   isVagueMarketQuestion,
   marketGenerationDateContext,
   scoreMarketQuestionFocus,
   sharpMarketQuestionGuide,
 } from "@/lib/markets/generation-guard";
+import { openAIMarketModel } from "@/lib/markets/openai-model";
 import { createMarket, listMarkets, type Market } from "@/lib/markets/store";
 
 const postgresUrl = process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? "";
@@ -57,7 +59,7 @@ export async function maybeGenerateMarketsOnRefresh(input: {
 }): Promise<{ generated: number }> {
   const openaiKey = (process.env.OPENAI_API_KEY ?? "").trim();
   if (!openaiKey) return { generated: 0 };
-  const model = (process.env.OPENAI_MODEL ?? "gpt-4o-mini").trim();
+  const model = openAIMarketModel();
   const tavilyKey = (process.env.TAVILY_API_KEY ?? "").trim();
   let category =
     typeof input.category === "string" && input.category.trim()
@@ -109,6 +111,7 @@ export async function maybeGenerateMarketsOnRefresh(input: {
   const system =
     "You are Peak, an expert prediction-market market maker. " +
     "Generate crisp YES/NO markets that are culturally relevant and time-bounded. " +
+    "Headline-style titles (Polymarket/Kalshi), not repetitive Will-by-date templates. " +
     "No slurs, explicit sexual content, or private personal data. " +
     "Questions must be specific and resolve within 90 days. " +
     "Every market must be anchored to a concrete, timely signal.\n\n" +
@@ -176,7 +179,7 @@ export async function generateMarketFromPeak(input: {
   if (text.length < 4) return null;
 
   const openaiKey = (process.env.OPENAI_API_KEY ?? "").trim();
-  const model = (process.env.OPENAI_MODEL ?? "gpt-4o-mini").trim();
+  const model = openAIMarketModel();
   const fallback = heuristicMarketFromPeak(text);
 
   if (!openaiKey) {
@@ -201,7 +204,9 @@ export async function generateMarketFromPeak(input: {
           role: "system",
           content:
             "Convert social posts into YES/NO prediction market questions. " +
-            "Be specific, time-bounded (1-90 days), no slurs or private data. " +
+            "Headline-style (Polymarket/Kalshi): named entity + checkable outcome. " +
+            "Put timing in daysToResolve, not always in the question text. " +
+            "No slurs or private data. " +
             forwardLookingMarketRules() +
             "\n" +
             sharpMarketQuestionGuide() +
@@ -222,7 +227,7 @@ export async function generateMarketFromPeak(input: {
       typeof parsed?.question === "string" && parsed.question.trim().length >= 8
         ? parsed.question.trim().slice(0, 240)
         : fallback.question;
-    if (isRetroactiveMarketQuestion(question) || isVagueMarketQuestion(question)) {
+    if (isRetroactiveMarketQuestion(question) || isVagueMarketQuestion(question) || isTemplatedMarketQuestion(question)) {
       question = fallback.question;
     }
     const rawCategory =
@@ -265,10 +270,11 @@ export async function generateMarketFromPeak(input: {
 }
 
 function heuristicMarketFromPeak(text: string) {
-  let question = text.trim();
-  if (!/[?]$/.test(question)) {
-    question = `Will this happen: ${question.slice(0, 200)}?`;
-  }
+  const core = text.trim().replace(/[?.!]+$/, "").slice(0, 180);
+  const question =
+    core.length >= 8
+      ? `${core}?`
+      : "Something notable happens from this peak?";
   return {
     question: question.slice(0, 240),
     category: "Culture",
@@ -466,6 +472,7 @@ async function persistRankedFeedMarkets(input: {
 
     if (question.length < 8) continue;
     if (isRetroactiveMarketQuestion(question)) continue;
+    if (isTemplatedMarketQuestion(question)) continue;
     if (isVagueMarketQuestion(question)) continue;
     if (daysToResolve < 1 || daysToResolve > 90) continue;
     if (!Number.isFinite(yesProbability) || yesProbability < 0.05 || yesProbability > 0.95) {

@@ -3,10 +3,11 @@ import "server-only";
 import OpenAI from "openai";
 
 import type { Market, MarketSide } from "@/lib/markets/store";
+import { openAIMarketModel } from "@/lib/markets/openai-model";
 
 export async function determineMarketOutcome(market: Market): Promise<MarketSide> {
   const openaiKey = (process.env.OPENAI_API_KEY ?? "").trim();
-  const model = (process.env.OPENAI_MODEL ?? "gpt-4o-mini").trim();
+  const model = openAIMarketModel();
   const tavilyKey = (process.env.TAVILY_API_KEY ?? "").trim();
 
   if (!openaiKey) {

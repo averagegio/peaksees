@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ThemeInitScript } from "./components/ThemeInitScript";
 import { ThemeProvider } from "./providers";
 import "./globals.css";
 
@@ -32,13 +32,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
-        <Script
-          id="theme-init"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var savedTheme=localStorage.getItem('theme');var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;var theme=savedTheme|| (prefersDark ? 'dark':'light');var html=document.documentElement;html.classList.toggle('dark', theme==='dark');html.classList.toggle('light', theme==='light');}catch(e){}})();`,
-          }}
-        />
+        <ThemeInitScript />
         <ThemeProvider>{children}</ThemeProvider>
       </body>
       

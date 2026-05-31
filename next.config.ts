@@ -15,6 +15,14 @@ const nextConfig: NextConfig = {
   // Required for npm run dev:lan — without this, client JS is blocked on the LAN IP
   // and login/forms only work on localhost.
   ...(devLanHosts.length > 0 ? { allowedDevOrigins: devLanHosts } : {}),
+  async headers() {
+    return [
+      {
+        source: "/embed/:path*",
+        headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

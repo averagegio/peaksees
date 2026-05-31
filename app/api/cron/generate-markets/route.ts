@@ -7,11 +7,13 @@ import { fetchTrendSignals } from "@/lib/markets/generate";
 import {
   forwardLookingMarketRules,
   isRetroactiveMarketQuestion,
+  isTemplatedMarketQuestion,
   isVagueMarketQuestion,
   marketGenerationDateContext,
   scoreMarketQuestionFocus,
   sharpMarketQuestionGuide,
 } from "@/lib/markets/generation-guard";
+import { openAIMarketModel } from "@/lib/markets/openai-model";
 import { createMarket, listMarkets } from "@/lib/markets/store";
 
 export const runtime = "nodejs";
@@ -29,7 +31,7 @@ async function runGenerateMarkets(count: number) {
   if (!openaiKey) {
     return NextResponse.json({ error: "Missing OPENAI_API_KEY" }, { status: 500 });
   }
-  const model = (process.env.OPENAI_MODEL ?? "gpt-4o-mini").trim();
+  const model = openAIMarketModel();
   const tavilyKey = (process.env.TAVILY_API_KEY ?? "").trim();
 
   const signals = await fetchTrendSignals({ tavilyKey });
@@ -39,6 +41,7 @@ async function runGenerateMarkets(count: number) {
   const system =
     "You are Peak, an expert prediction-market market maker. " +
     "Generate crisp YES/NO markets that are culturally relevant and time-bounded. " +
+    "Headline-style titles (Polymarket/Kalshi), not repetitive Will-by-date templates. " +
     "Do not include slurs, explicit sexual content, or private personal data. " +
     "Questions must be specific and resolve by a date within 90 days.\n\n" +
     forwardLookingMarketRules() +
@@ -98,6 +101,7 @@ async function runGenerateMarkets(count: number) {
     const yesProbability = Number(item.yesProbability ?? 0.5);
     if (question.length < 8) continue;
     if (isRetroactiveMarketQuestion(question)) continue;
+    if (isTemplatedMarketQuestion(question)) continue;
     if (isVagueMarketQuestion(question)) continue;
     if (daysToResolve < 1 || daysToResolve > 90) continue;
     if (!Number.isFinite(yesProbability) || yesProbability < 0.05 || yesProbability > 0.95)

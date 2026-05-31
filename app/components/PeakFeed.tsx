@@ -9,6 +9,7 @@ import { MarketTradeBox } from "@/app/components/market/MarketTradeBox";
 import { PeakOpinionChip } from "@/app/components/market/PeakOpinionChip";
 import { MarketInsightUncover } from "@/app/components/market/MarketInsightUncover";
 import { ShareMarketButton } from "@/app/components/market/ShareMarketButton";
+import { TwitchStreamSetup } from "@/app/components/twitch/TwitchStreamSetup";
 import { useMarketInsightReveal } from "@/app/hooks/useMarketInsightReveal";
 import { marketCardHaptic } from "@/app/lib/haptics";
 import { FollowUserButton } from "@/app/components/profile/FollowUserButton";
@@ -472,13 +473,16 @@ export function MarketPostCard({
       ) : null}
 
       {interactive ? (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <ShareMarketButton
-            getNode={() => cardRef.current}
-            filenameBase={post.question}
-            marketId={post.id}
-            question={post.question}
-          />
+        <div className="mt-3 flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <ShareMarketButton
+              getNode={() => cardRef.current}
+              filenameBase={post.question}
+              marketId={post.id}
+              question={post.question}
+            />
+          </div>
+          <TwitchStreamSetup marketId={post.id} />
         </div>
       ) : null}
 

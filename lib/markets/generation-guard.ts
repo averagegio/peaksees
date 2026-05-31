@@ -17,10 +17,12 @@ export function forwardLookingMarketRules(now = new Date()): string {
     `Today is ${todayIso} (UTC).`,
     "Only create markets about outcomes that are still OPEN and uncertain as of today.",
     "Do NOT create markets about events that already finished (completed games, past elections, announced winners, released products, historical facts).",
-    'Prefer forward-looking phrasing but allow flexible resolution phrasing ("Will…", "By [future date]…", "Within N days", "Before next [event]").',
+    "Put the resolution window in daysToResolve — do NOT paste a calendar deadline into every question.",
+    "Avoid the repetitive template \"Will [vague thing] happen by [date]?\". Use headline-style titles like Polymarket/Kalshi.",
+    "Vary openings: \"Does…\", \"Is…\", \"Can…\", \"[Name/team] to…\", \"Above/below…\", \"Who wins…\", \"Will…\" (use Will for ≤40% of a batch).",
     `Do not anchor questions to calendar years before ${year}.`,
     "If a signal describes something that already occurred, skip it or reframe to a related FUTURE outcome (next game, next vote, next release).",
-    "Provide a mix of resolution horizons: include short (7–14 days), medium (15–45 days), and occasionally longer (46–90 days) windows so the feed is not always date-granular.",
+    "Mix horizons via daysToResolve (short 7–14d, medium 15–45d, long 46–90d) without always stating the date in the question text.",
   ].join("\n");
 }
 
@@ -58,6 +60,17 @@ export function isRetroactiveMarketQuestion(question: string, now = new Date()):
   return false;
 }
 
+/** Lazy fallback / model slop we never want on a card. */
+export function isTemplatedMarketQuestion(question: string): boolean {
+  const q = question.trim();
+  if (!q) return true;
+  if (/^will this happen:/i.test(q)) return true;
+  if (/^will .+\bby\b.+\?$/i.test(q) && /\b(january|february|march|april|may|june|july|august|september|october|november|december|\d{1,2}[\/-]\d{1,2}|\d{4})\b/i.test(q)) {
+    return true;
+  }
+  return false;
+}
+
 const VAGUE_PATTERNS: RegExp[] = [
   /\bwill (ai|crypto|things|it|this|that|technology|the world|the economy|the market|markets in general)\b/i,
   /\b(someone|something|somewhere|everyone|people|folks|stuff)\b/i,
@@ -73,23 +86,16 @@ export function scoreMarketQuestionFocus(question: string): number {
   if (!q || isRetroactiveMarketQuestion(q)) return 0;
 
   let score = 42;
-  if (q.length >= 48 && q.length <= 220) score += 14;
-  if (q.length < 36) score -= 18;
+  if (q.length >= 40 && q.length <= 200) score += 16;
+  if (q.length < 32) score -= 18;
 
-  if (/\b(by|before|on or before|no later than)\s+/i.test(q)) score += 12;
-  if (
-    /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(
-      q,
-    )
-  ) {
-    score += 8;
-  }
-  if (/\b\d{1,2}[\/-]\d{1,2}|\bQ[1-4]\b|\b\d+%\b|\$[\d,]+/i.test(q)) score += 10;
+  if (/\b\d+%\b|\$[\d,]+|\b\d+\+?\s*(points|goals|episodes|seats|bps)\b/i.test(q)) score += 12;
+  if (/\b(above|below|at least|more than|fewer than|over|under)\b/i.test(q)) score += 10;
 
   const words = q.split(/\s+/);
   let proper = 0;
   for (const w of words) {
-    if (/^[A-Z][a-z]{2,}/.test(w) && !/^(Will|By|Before|Does|Is|The|A|An|In|On|At)$/.test(w)) {
+    if (/^[A-Z][a-z]{2,}/.test(w) && !/^(Will|By|Before|Does|Is|The|A|An|In|On|At|Can|Who)$/.test(w)) {
       proper += 1;
     }
   }
@@ -97,7 +103,11 @@ export function scoreMarketQuestionFocus(question: string): number {
   else if (proper === 1) score += 10;
   else score -= 20;
 
-  if (!/\?/.test(q)) score -= 12;
+  if (!/\?/.test(q) && !/ — yes or no\?$/i.test(q)) score -= 8;
+
+  if (/^will .+\bby\b/i.test(q)) score -= 16;
+  if (/^will this happen:/i.test(q)) score -= 40;
+
   for (const re of VAGUE_PATTERNS) {
     if (re.test(q)) score -= 14;
   }
@@ -106,6 +116,7 @@ export function scoreMarketQuestionFocus(question: string): number {
 }
 
 export function isVagueMarketQuestion(question: string, minScore = 58): boolean {
+  if (isTemplatedMarketQuestion(question)) return true;
   return scoreMarketQuestionFocus(question) < minScore;
 }
 
@@ -113,10 +124,14 @@ export function isVagueMarketQuestion(question: string, minScore = 58): boolean 
 export function sharpMarketQuestionGuide(): string {
   return [
     "Question quality bar (strict):",
-    '- GOOD: "Will the Fed cut rates by at least 25bp before July 31, 2026?"',
-    '- GOOD: "Will Netflix renew Squid Game for a third season before Dec 31, 2026?"',
-    '- BAD: "Will AI change everything?" / "Will crypto go up?" / "Will things improve?"',
-    "Every question MUST name a specific entity (person, company, team, bill, index, show) and one checkable outcome with an implicit or explicit deadline.",
-    "Ban vague subjects: \"things\", \"it\", \"this\", \"people\", \"the economy\", \"the industry\" without naming who/what.",
+    "- Write like a Polymarket/Kalshi card title — concrete entity + one checkable outcome.",
+    "- Deadline lives in daysToResolve; the question text should NOT always say \"by [month day, year]\".",
+    '- GOOD: "Does OpenAI ship GPT-5.2 to ChatGPT Plus before summer?"',
+    '- GOOD: "Lakers make the 2026 NBA playoffs?"',
+    '- GOOD: "Fed cuts rates at the June FOMC meeting?"',
+    '- GOOD: "Squid Game renewed for season 3?"',
+    '- BAD: "Will AI change everything?" / "Will crypto go up?" / "Will this happen: …"',
+    '- BAD: "Will Netflix do something big by December 31, 2026?" (vague + date-stuffed template)',
+    "Ban vague subjects without naming who/what. No \"Will this happen:\" prefix.",
   ].join("\n");
 }

@@ -839,3 +839,9 @@ body {
     animation-duration: 1ms;
   }
 }
+
+/* OBS / Twitch browser sources — transparent backdrop */
+html.embed-transparent,
+html.embed-transparent body {
+  background: transparent !important;
+}

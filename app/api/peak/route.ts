@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import OpenAI from "openai";
 
+import { openAIMarketModel } from "@/lib/markets/openai-model";
+
 function clamp01(x: number) {
   return Math.max(0, Math.min(1, x));
 }
@@ -56,7 +58,7 @@ export async function POST(request: Request) {
   const crowdYes = yes;
 
   const openaiKey = process.env.OPENAI_API_KEY ?? "";
-  const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+  const model = openAIMarketModel();
   const tavilyKey = process.env.TAVILY_API_KEY ?? "";
 
   // Optional live web pull via Tavily (fast, simple).

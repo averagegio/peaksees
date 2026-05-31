@@ -229,6 +229,14 @@ function ensureSqliteSchema(conn: SqliteDb) {
       note TEXT
     );
     CREATE INDEX IF NOT EXISTS withdrawals_user_created_at_idx ON withdrawals(user_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS twitch_channel_pins (
+      channel_login TEXT PRIMARY KEY,
+      market_id TEXT NOT NULL,
+      updated_by_user_id TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS twitch_channel_pins_market_idx ON twitch_channel_pins(market_id);
   `);
 
   try {
