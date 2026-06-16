@@ -23,6 +23,7 @@ export default async function FeedPage({
         highlightMarketId={highlightMarket}
         highlightPeakId={highlightPeak}
         viewerUserId={session.user.id}
+        viewerMemberPlan={session.user.memberPlan}
       />
     </FeedChrome>
   );

@@ -121,9 +121,10 @@ export default function PricingPage({
             plan="peakplus"
             cta="Choose PeakPlus"
             features={[
+              "PeakPlus member badge on your posts",
+              "Delete your own market cards",
               "Priority @peak replies",
               "Enhanced feed filters",
-              "Early access to new market types",
             ]}
           />
           <PriceCard
@@ -134,6 +135,8 @@ export default function PricingPage({
             highlight
             features={[
               "Everything in PeakPlus",
+              "PeakPro badge on your posts",
+              "Upload Peak Anime episodes (AI-original)",
               "Live creator tools + analytics",
               "Higher Peakpoints limits",
               "Faster Peak response time",
@@ -146,6 +149,7 @@ export default function PricingPage({
             cta="Choose PeakEnterprise"
             features={[
               "Everything in PeakPro",
+              "Enterprise badge on your posts",
               "Team dashboards",
               "Advanced moderation controls",
               "SLA support (email)",

@@ -10,6 +10,7 @@ import {
   validateHandle,
 } from "@/lib/auth/handle";
 import { isPeakAiHandle } from "@/lib/peak-ai/profile";
+import { normalizeMemberPlan, type MemberPlan } from "@/lib/membership/plans";
 import { Pool } from "pg";
 
 export type StoredUser = {
@@ -24,6 +25,7 @@ export type StoredUser = {
   avatarUrl: string;
   bannerUrl: string;
   interactiveFeedTourV1At: string | null;
+  memberPlan: MemberPlan;
 };
 
 export type ProfileUpdateResult =
@@ -47,9 +49,10 @@ type SqliteUserRow = {
   banner_url: string | null;
   interactive_feed_tour_v1_at: string | null;
   handle: string | null;
+  member_plan: string | null;
 };
 
-const USER_SELECT = `id, email, display_name, password_hash, created_at, bio, avatar_url, banner_url, interactive_feed_tour_v1_at, handle`;
+const USER_SELECT = `id, email, display_name, password_hash, created_at, bio, avatar_url, banner_url, interactive_feed_tour_v1_at, handle, member_plan`;
 
 const postgresUrl = process.env.POSTGRES_URL ?? process.env.DATABASE_URL ?? "";
 const usePostgres = postgresUrl.length > 0;
@@ -88,6 +91,7 @@ function toStoredUser(row: SqliteUserRow): StoredUser {
       row.interactive_feed_tour_v1_at.trim()
         ? row.interactive_feed_tour_v1_at.trim()
         : null,
+    memberPlan: normalizeMemberPlan(row.member_plan),
   };
 }
 
@@ -194,6 +198,11 @@ async function ensureUsersSchema() {
         )
         .then(() =>
           postgresPool.query(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS member_plan TEXT NOT NULL DEFAULT 'free'",
+          ),
+        )
+        .then(() =>
+          postgresPool.query(
             "CREATE UNIQUE INDEX IF NOT EXISTS users_handle_lower_idx ON users (lower(handle))",
           ),
         )
@@ -225,6 +234,7 @@ export async function createUser(input: {
       avatarUrl: "",
       bannerUrl: "",
       interactiveFeedTourV1At: null,
+      memberPlan: "free",
     };
 
     const result = await postgresPool.query<SqliteUserRow>(
@@ -269,6 +279,7 @@ export async function createUser(input: {
     avatarUrl: "",
     bannerUrl: "",
     interactiveFeedTourV1At: null,
+    memberPlan: "free",
   };
 
   db.prepare(
@@ -375,7 +386,57 @@ export function toPublicUser(user: StoredUser) {
     avatarUrl: user.avatarUrl,
     bannerUrl: user.bannerUrl,
     interactiveFeedTourV1Completed: Boolean(user.interactiveFeedTourV1At?.trim()),
+    memberPlan: user.memberPlan,
   };
+}
+
+export async function setUserMemberPlan(
+  userId: string,
+  plan: MemberPlan,
+): Promise<void> {
+  await ensureUsersSchema();
+  const normalized = normalizeMemberPlan(plan);
+  if (postgresPool) {
+    await postgresPool.query(`UPDATE users SET member_plan = $2 WHERE id = $1`, [
+      userId,
+      normalized,
+    ]);
+    return;
+  }
+  db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS member_plan TEXT NOT NULL DEFAULT 'free'`);
+  db.prepare(`UPDATE users SET member_plan = ? WHERE id = ?`).run(normalized, userId);
+}
+
+export async function getMemberPlansForUserIds(
+  userIds: string[],
+): Promise<Record<string, MemberPlan>> {
+  const unique = [...new Set(userIds.map((id) => id.trim()).filter(Boolean))];
+  const out: Record<string, MemberPlan> = {};
+  if (unique.length === 0) return out;
+
+  await ensureUsersSchema();
+
+  if (postgresPool) {
+    const placeholders = unique.map((_, i) => `$${i + 1}`).join(", ");
+    const result = await postgresPool.query<{ id: string; member_plan: string | null }>(
+      `SELECT id, member_plan FROM users WHERE id IN (${placeholders})`,
+      unique,
+    );
+    for (const row of result.rows) {
+      out[row.id] = normalizeMemberPlan(row.member_plan);
+    }
+    return out;
+  }
+
+  db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS member_plan TEXT NOT NULL DEFAULT 'free'`);
+  const placeholders = unique.map(() => "?").join(", ");
+  const rows = db
+    .prepare(`SELECT id, member_plan FROM users WHERE id IN (${placeholders})`)
+    .all(...unique) as { id: string; member_plan: string | null }[];
+  for (const row of rows) {
+    out[row.id] = normalizeMemberPlan(row.member_plan);
+  }
+  return out;
 }
 
 export async function updateUserProfile(

@@ -23,4 +23,6 @@ export type MarketPost = {
   profileUserId?: string;
   /** DB `markets.source` — peak_post, peak_refresh, etc. */
   marketSource?: string;
+  /** Paid tier badge for user-created cards. */
+  creatorMemberPlan?: "peakplus" | "peakpro" | "peakenterprise";
 };

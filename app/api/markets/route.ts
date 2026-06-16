@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth/session";
+import { enrichMarketsWithPeakAuthors } from "@/lib/markets/peak-author";
 import { listMarkets, type MarketCursor } from "@/lib/markets/store";
 import { feedAutogenMinIntervalMs, maybeGenerateMarketsOnRefresh } from "@/lib/markets/generate";
 
@@ -44,6 +45,8 @@ export async function GET(request: Request) {
     subcategory: subcategory || undefined,
     cursor,
   });
-  return NextResponse.json({ markets });
+  const authors = await enrichMarketsWithPeakAuthors(markets);
+  const peakAuthors = Object.fromEntries(authors.entries());
+  return NextResponse.json({ markets, peakAuthors });
 }
 

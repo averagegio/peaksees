@@ -13,6 +13,7 @@ import { MarketPostCard } from "@/app/components/PeakFeed";
 import { FeedMarqueeDotScrub } from "@/app/components/feed/FeedMarqueeDotScrub";
 import { PullRefreshRail, pullDisplacement } from "@/app/components/feed/pull-refresh-rail";
 import type { MarketPost } from "@/app/lib/mock-markets";
+import type { MemberPlan } from "@/lib/membership/plans";
 
 const MARQUEE_PAUSE_MS = 4_200;
 const MARQUEE_TRANSITION_MS = 520;
@@ -53,6 +54,8 @@ type PullMode = "horizontal" | "vertical";
 export function FeedMarketMarquee({
   posts = [],
   viewerUserId,
+  viewerMemberPlan,
+  onMarketDeleted,
   tourMarketPostIndex = 0,
   viewportRef,
   sentinelRef,
@@ -65,6 +68,8 @@ export function FeedMarketMarquee({
 }: {
   posts?: MarketPost[];
   viewerUserId?: string;
+  viewerMemberPlan?: MemberPlan;
+  onMarketDeleted?: (marketId: string) => void;
   tourMarketPostIndex?: number;
   viewportRef: RefObject<HTMLDivElement | null>;
   sentinelRef: RefObject<HTMLDivElement | null>;
@@ -593,6 +598,8 @@ export function FeedMarketMarquee({
                     post={post}
                     isTourAnchor={i === tourMarketPostIndex}
                     viewerUserId={viewerUserId}
+                    viewerMemberPlan={viewerMemberPlan}
+                    onMarketDeleted={onMarketDeleted}
                     fillHeight
                     marqueeMode
                   />

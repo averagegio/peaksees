@@ -570,6 +570,20 @@ export async function listMarketsDueForResolution(input: {
     .slice(0, limit);
 }
 
+export async function deleteMarketById(id: string): Promise<boolean> {
+  const marketId = id.trim();
+  if (!marketId) return false;
+
+  if (postgresPool) {
+    await ensureSchema();
+    const result = await postgresPool.query(`DELETE FROM markets WHERE id = $1`, [marketId]);
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  const info = db.prepare(`DELETE FROM markets WHERE id = ?`).run(marketId);
+  return info.changes > 0;
+}
+
 export async function listMarketsByPeakIds(peakIds: string[]): Promise<Map<string, Market>> {
   const unique = [...new Set(peakIds.map((id) => id.trim()).filter(Boolean))];
   const out = new Map<string, Market>();

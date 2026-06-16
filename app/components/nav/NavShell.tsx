@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BackButton } from "@/app/components/BackButton";
 import { LogoutButton } from "@/app/components/LogoutButton";
 import { PeakpointsWalletBadge } from "@/app/components/peakpoints/PeakpointsWalletBadge";
+import { PeakPlusBadge } from "@/app/components/membership/PeakPlusBadge";
 import { SidebarNav } from "@/app/components/sidebar/SidebarNav";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
 import { FEED_MISSION } from "@/lib/brand";
@@ -230,6 +231,9 @@ export function NavShell({
                   <div className="min-w-0 pt-0.5">
                     <p className="truncate font-semibold text-zinc-900 dark:text-white">
                       {session.user.displayName}
+                      {session.user.memberPlan && session.user.memberPlan !== "free" ? (
+                        <PeakPlusBadge plan={session.user.memberPlan} className="ml-1.5 align-middle" />
+                      ) : null}
                     </p>
                     <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">
                       {session.user.atHandle ?? `@${session.user.handle}`}

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { getSession } from "@/lib/auth/session";
+import { deleteOwnedUserMarket } from "@/lib/membership/delete-market";
 import { normalizeMarketId } from "@/lib/markets/id";
 import { getMarketById } from "@/lib/markets/store";
 import { isMarketTradingOpen } from "@/lib/markets/market-status";
@@ -48,4 +50,27 @@ export async function GET(_request: Request, context: RouteContext) {
     },
     { headers: { "Cache-Control": "public, max-age=10, s-maxage=30" } },
   );
+}
+
+/** PeakPlus: delete own user-created market (no trades, unresolved). */
+export async function DELETE(_request: Request, context: RouteContext) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await context.params;
+  const marketId = normalizeMarketId(decodeURIComponent(id ?? "").trim());
+  if (!marketId) {
+    return NextResponse.json({ error: "Missing market id" }, { status: 400 });
+  }
+
+  const result = await deleteOwnedUserMarket({
+    marketId,
+    userId: session.user.id,
+  });
+
+  if ("error" in result) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
+  }
+
+  return NextResponse.json({ ok: true });
 }

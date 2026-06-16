@@ -3,6 +3,7 @@ import Stripe from "stripe";
 
 import { getStripe } from "@/lib/stripe/server";
 import { fulfillWalletTopupCheckout } from "@/lib/stripe/wallet-topup";
+import { fulfillSubscriptionCheckout } from "@/lib/stripe/subscription-fulfillment";
 
 export const runtime = "nodejs";
 
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
   if (event.type === "checkout.session.completed") {
     const checkout = event.data.object as Stripe.Checkout.Session;
     await fulfillWalletTopupCheckout(checkout);
+    await fulfillSubscriptionCheckout(checkout);
   }
 
   return NextResponse.json({ received: true });

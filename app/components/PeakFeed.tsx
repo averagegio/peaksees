@@ -9,8 +9,11 @@ import { MarketTradeBox } from "@/app/components/market/MarketTradeBox";
 import { PeakOpinionChip } from "@/app/components/market/PeakOpinionChip";
 import { MarketInsightUncover } from "@/app/components/market/MarketInsightUncover";
 import { ShareMarketButton } from "@/app/components/market/ShareMarketButton";
+import { PeakPlusBadge } from "@/app/components/membership/PeakPlusBadge";
 import { useMarketInsightReveal } from "@/app/hooks/useMarketInsightReveal";
 import { marketCardHaptic } from "@/app/lib/haptics";
+import { hasPeakPlusTier, type MemberPlan } from "@/lib/membership/plans";
+import { safeJson } from "@/lib/http";
 import { FollowUserButton } from "@/app/components/profile/FollowUserButton";
 import { ProfileLink } from "@/app/components/profile/ProfileLink";
 import { isPeakGeneratedMarketCard } from "@/lib/markets/is-peak-market";
@@ -138,6 +141,8 @@ export function MarketPostCard({
   isTourAnchor = false,
   readOnly = false,
   viewerUserId,
+  viewerMemberPlan = "free",
+  onMarketDeleted,
   fillHeight = false,
   marqueeMode = false,
 }: {
@@ -148,6 +153,8 @@ export function MarketPostCard({
   readOnly?: boolean;
   /** Logged-in viewer — enables follow on real user cards. */
   viewerUserId?: string;
+  viewerMemberPlan?: MemberPlan;
+  onMarketDeleted?: (marketId: string) => void;
   /** Size to the horizontal feed slide height with internal scroll. */
   fillHeight?: boolean;
   /** Full-width marquee slide — no hover scale (prevents overlap). */
@@ -156,6 +163,8 @@ export function MarketPostCard({
   const pending = Boolean(post.pending);
   const interactive = !readOnly && !pending;
   const [selected, setSelected] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   /** Unlocks tapping the peaksees badge to fetch Peak disagree score */
   const [hasPlacedBet, setHasPlacedBet] = useState(false);
   const [peakScoreRevealed, setPeakScoreRevealed] = useState(false);
@@ -165,6 +174,32 @@ export function MarketPostCard({
   const cardRef = useRef<HTMLElement | null>(null);
   const peakBadgeRef = useRef<HTMLButtonElement | null>(null);
   const peakGenerated = isPeakGeneratedMarketCard(post);
+  const isOwnUserMarket =
+    Boolean(viewerUserId) &&
+    Boolean(post.profileUserId) &&
+    post.profileUserId === viewerUserId &&
+    post.marketSource?.startsWith("peak_post:");
+  const canDeleteOwnMarket = isOwnUserMarket && hasPeakPlusTier(viewerMemberPlan);
+
+  async function deleteOwnMarket() {
+    if (!canDeleteOwnMarket || deleteBusy) return;
+    if (!window.confirm("Delete this market from the feed? This cannot be undone.")) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/markets/${encodeURIComponent(post.id)}`, { method: "DELETE" });
+      const data = (await safeJson<{ error?: string }>(res)) ?? {};
+      if (!res.ok) {
+        setDeleteError(data.error ?? "Could not delete market");
+        return;
+      }
+      onMarketDeleted?.(post.id);
+    } catch {
+      setDeleteError("Could not delete market");
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
   const insight = useMarketInsightReveal(post.id, peakGenerated && !pending, {
     pullGesture: !marqueeMode,
   });
@@ -246,6 +281,9 @@ export function MarketPostCard({
               >
                 {post.creator}
               </ProfileLink>
+              {post.creatorMemberPlan ? (
+                <PeakPlusBadge plan={post.creatorMemberPlan} className="ml-0.5" />
+              ) : null}
               <ProfileLink
                 href={profileHref}
                 className="text-sm text-zinc-500 hover:underline dark:text-zinc-400"
@@ -473,14 +511,27 @@ export function MarketPostCard({
       ) : null}
 
       {interactive ? (
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <ShareMarketButton
             getNode={() => cardRef.current}
             filenameBase={post.question}
             marketId={post.id}
             question={post.question}
           />
+          {canDeleteOwnMarket ? (
+            <button
+              type="button"
+              disabled={deleteBusy}
+              onClick={() => void deleteOwnMarket()}
+              className="inline-flex items-center gap-1.5 rounded-full border border-red-300/80 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-800 hover:bg-red-100 disabled:opacity-60 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/60"
+            >
+              {deleteBusy ? "Deleting…" : "Delete market"}
+            </button>
+          ) : null}
         </div>
+      ) : null}
+      {deleteError ? (
+        <p className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">{deleteError}</p>
       ) : null}
 
       {interactive ? (

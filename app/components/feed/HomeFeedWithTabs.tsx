@@ -4,8 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { FeedMarketHero } from "@/app/components/feed/FeedMarketHero";
 import { FeedSiteSection } from "@/app/components/feed/FeedSiteSection";
+import { PeakAnimeClient } from "@/app/components/anime/PeakAnimeClient";
 import { LiveStreamPanel } from "@/app/components/live/LiveStreamPanel";
 import { safeJson } from "@/lib/http";
+import type { MemberPlan } from "@/lib/membership/plans";
+import { hasPeakPlusTier } from "@/lib/membership/plans";
 import type { Peak } from "@/lib/peaks/store";
 import type { Market } from "@/lib/markets/store";
 import type { MarketPost } from "@/app/lib/mock-markets";
@@ -85,7 +88,40 @@ type PeakMarketMeta = {
   avatarHue: number;
   postedAt: string;
   profileUserId?: string;
+  memberPlan?: MemberPlan;
 };
+
+type ApiPeakAuthor = {
+  userId: string;
+  displayName: string;
+  handle: string;
+  avatarHue: number;
+  memberPlan: MemberPlan;
+};
+
+function mergePeakAuthorsIntoMeta(
+  markets: Market[],
+  peakAuthors: Record<string, ApiPeakAuthor> | undefined,
+  setPeakMarketMeta: React.Dispatch<React.SetStateAction<Record<string, PeakMarketMeta>>>,
+) {
+  if (!peakAuthors || Object.keys(peakAuthors).length === 0) return;
+  setPeakMarketMeta((prev) => {
+    const next = { ...prev };
+    for (const m of markets) {
+      const a = peakAuthors[m.id];
+      if (!a) continue;
+      next[m.id] = {
+        creator: a.displayName,
+        handle: a.handle,
+        avatarHue: a.avatarHue,
+        postedAt: prev[m.id]?.postedAt ?? formatMarketPostedAt(m.createdAt),
+        profileUserId: a.userId,
+        memberPlan: a.memberPlan !== "free" ? a.memberPlan : prev[m.id]?.memberPlan,
+      };
+    }
+    return next;
+  });
+}
 
 function mergeNovelMarkets(prev: Market[], incoming: Market[]): Market[] {
   const seen = new Set(prev.map((m) => m.id));
@@ -124,11 +160,13 @@ export function HomeFeedWithTabs({
   highlightMarketId,
   highlightPeakId,
   viewerUserId,
+  viewerMemberPlan = "free",
 }: {
   highlightMarketId?: string;
   highlightPeakId?: string;
   viewerUserId?: string;
-} = {}) {
+  viewerMemberPlan?: MemberPlan;
+}) {
   const [tab, setTab] = useState<"foryou" | "following" | "live">("foryou");
   const [explore, setExplore] = useState("Trending");
   const [showLatestPeaks, setShowLatestPeaks] = useState(
@@ -180,6 +218,18 @@ export function HomeFeedWithTabs({
     marketsAtEndRef.current = marketsAtEnd;
   }, [marketsAtEnd]);
 
+  const handleMarketDeleted = useCallback((marketId: string) => {
+    setGeneratedMarkets((prev) =>
+      prev.filter((m) => m.id !== marketId && m.id !== `market:${marketId}`),
+    );
+    setPeakMarketMeta((prev) => {
+      const next = { ...prev };
+      delete next[marketId];
+      delete next[`market:${marketId}`];
+      return next;
+    });
+  }, []);
+
   const generatedAsPosts: MarketPost[] = generatedMarkets.map((m) => {
     const yesP = Number(m.yesProbability) || 0.5;
     const noP = Number(m.noProbability) || 1 - yesP;
@@ -200,6 +250,10 @@ export function HomeFeedWithTabs({
       pending: isPending,
       profileUserId: meta?.profileUserId,
       marketSource: m.source,
+      creatorMemberPlan:
+        meta?.memberPlan && meta.memberPlan !== "free"
+          ? meta.memberPlan
+          : undefined,
       outcomes: [
         { id: "y", label: "Yes", probability: yesP },
         { id: "n", label: "No", probability: noP },
@@ -247,9 +301,13 @@ export function HomeFeedWithTabs({
             tz,
           });
           const res = await fetch(href, { cache: "no-store" });
-          const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
+          const data =
+            (await safeJson<{ markets?: Market[]; peakAuthors?: Record<string, ApiPeakAuthor> }>(
+              res,
+            )) ?? {};
           if (session !== feedSessionRef.current) return;
           const incoming = Array.isArray(data.markets) ? data.markets : [];
+          mergePeakAuthorsIntoMeta(incoming, data.peakAuthors, setPeakMarketMeta);
           let didPrepend = false;
           setGeneratedMarkets((prev) => {
             const merged = mergeNovelMarkets(prev, incoming);
@@ -292,8 +350,12 @@ export function HomeFeedWithTabs({
         tz,
       });
       const res = await fetch(href, { cache: "no-store" });
-      const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
+      const data =
+        (await safeJson<{ markets?: Market[]; peakAuthors?: Record<string, ApiPeakAuthor> }>(
+          res,
+        )) ?? {};
       const incoming = Array.isArray(data.markets) ? data.markets : [];
+      mergePeakAuthorsIntoMeta(incoming, data.peakAuthors, setPeakMarketMeta);
 
       let didPrepend = false;
       setGeneratedMarkets((prev) => {
@@ -340,7 +402,10 @@ export function HomeFeedWithTabs({
           cursor: { createdAt: last.createdAt, id: last.id },
         });
         const res = await fetch(href, { cache: "no-store" });
-        const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
+        const data =
+          (await safeJson<{ markets?: Market[]; peakAuthors?: Record<string, ApiPeakAuthor> }>(
+            res,
+          )) ?? {};
         if (session !== feedSessionRef.current) {
           loadingMoreRef.current = false;
           setLoadMoreBusy(false);
@@ -349,6 +414,7 @@ export function HomeFeedWithTabs({
         }
 
         const chunk = Array.isArray(data.markets) ? data.markets : [];
+        mergePeakAuthorsIntoMeta(chunk, data.peakAuthors, setPeakMarketMeta);
 
         loadingMoreRef.current = false;
         setLoadMoreBusy(false);
@@ -427,9 +493,15 @@ export function HomeFeedWithTabs({
           tz,
         });
         const res = await fetch(href, { cache: "no-store" });
-        const data = (await safeJson<{ markets?: Market[] }>(res)) ?? {};
+        const data =
+          (await safeJson<{ markets?: Market[]; peakAuthors?: Record<string, ApiPeakAuthor> }>(
+            res,
+          )) ?? {};
         if (session !== feedSessionRef.current) return;
-        if (Array.isArray(data.markets)) setGeneratedMarkets(data.markets);
+        if (Array.isArray(data.markets)) {
+          setGeneratedMarkets(data.markets);
+          mergePeakAuthorsIntoMeta(data.markets, data.peakAuthors, setPeakMarketMeta);
+        }
         scheduleAutogenFollowUpRef.current(session);
       } catch {
         // ignore
@@ -484,6 +556,8 @@ export function HomeFeedWithTabs({
             avatarHue: user.avatarHue,
             postedAt: "Just now",
             profileUserId: user.id,
+            memberPlan:
+              viewerMemberPlan !== "free" ? viewerMemberPlan : undefined,
           },
         }));
         setGeneratedMarkets((prev) => mergeNovelMarkets(prev, [market]));
@@ -532,6 +606,10 @@ export function HomeFeedWithTabs({
             avatarHue: peak.avatarHue,
             postedAt: "Just now",
             profileUserId: peak.userId,
+            memberPlan:
+              peak.userId === viewerUserId && viewerMemberPlan !== "free"
+                ? viewerMemberPlan
+                : undefined,
           };
           return next;
         });
@@ -978,14 +1056,21 @@ export function HomeFeedWithTabs({
         data-tour="feed-scroll"
       >
         {tab === "live" ? (
-          <section className="live-page flex min-h-full w-full flex-1 flex-col">
-            <LiveStreamPanel layout="page" />
+          <section className="live-page flex min-h-full w-full flex-1 flex-col gap-6 pb-8">
+            <div className="px-3 pt-3 sm:px-4">
+              <PeakAnimeClient memberPlan={viewerMemberPlan} compact />
+            </div>
+            <div className="border-t border-zinc-200 px-3 pt-4 dark:border-zinc-800 sm:px-4">
+              <LiveStreamPanel layout="page" />
+            </div>
           </section>
         ) : (
           <FeedMarketHero
             key={explore}
             posts={feedPosts}
             viewerUserId={viewerUserId}
+            viewerMemberPlan={viewerMemberPlan}
+            onMarketDeleted={handleMarketDeleted}
             tourMarketPostIndex={0}
             viewportRef={scrollRef}
             sentinelRef={sentinelRef}

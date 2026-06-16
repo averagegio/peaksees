@@ -55,6 +55,9 @@ function ensureSqliteSchema(conn: SqliteDb) {
   if (!userColumns.some((column) => column.name === "handle")) {
     conn.exec("ALTER TABLE users ADD COLUMN handle TEXT");
   }
+  if (!userColumns.some((column) => column.name === "member_plan")) {
+    conn.exec("ALTER TABLE users ADD COLUMN member_plan TEXT NOT NULL DEFAULT 'free'");
+  }
   try {
     conn.exec(
       "CREATE UNIQUE INDEX IF NOT EXISTS users_handle_lower_idx ON users (lower(handle)) WHERE handle IS NOT NULL",
@@ -237,7 +240,29 @@ function ensureSqliteSchema(conn: SqliteDb) {
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS twitch_channel_pins_market_idx ON twitch_channel_pins(market_id);
+
+    CREATE TABLE IF NOT EXISTS anime_episodes (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      creator_name TEXT NOT NULL,
+      creator_handle TEXT NOT NULL,
+      series_title TEXT NOT NULL,
+      title TEXT NOT NULL,
+      episode_number INTEGER NOT NULL DEFAULT 1,
+      description TEXT NOT NULL DEFAULT '',
+      mime_type TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      storage_key TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS anime_episodes_created_at_idx ON anime_episodes(created_at DESC);
+    CREATE INDEX IF NOT EXISTS anime_episodes_user_idx ON anime_episodes(user_id, created_at DESC);
   `);
+
+  const animeColumns = conn.prepare("PRAGMA table_info(anime_episodes)").all() as SqliteColumnInfo[];
+  if (!animeColumns.some((column) => column.name === "storage_key")) {
+    conn.exec("ALTER TABLE anime_episodes ADD COLUMN storage_key TEXT");
+  }
 
   try {
     conn.exec(

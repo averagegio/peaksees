@@ -4,10 +4,13 @@ import type { RefObject } from "react";
 
 import { FeedMarketMarquee } from "@/app/components/feed/FeedMarketMarquee";
 import type { MarketPost } from "@/app/lib/mock-markets";
+import type { MemberPlan } from "@/lib/membership/plans";
 
 export function FeedMarketHero({
   posts,
   viewerUserId,
+  viewerMemberPlan,
+  onMarketDeleted,
   tourMarketPostIndex,
   viewportRef,
   sentinelRef,
@@ -21,6 +24,8 @@ export function FeedMarketHero({
 }: {
   posts: MarketPost[];
   viewerUserId?: string;
+  viewerMemberPlan?: MemberPlan;
+  onMarketDeleted?: (marketId: string) => void;
   tourMarketPostIndex?: number;
   viewportRef: RefObject<HTMLDivElement | null>;
   sentinelRef: RefObject<HTMLDivElement | null>;
@@ -62,6 +67,8 @@ export function FeedMarketHero({
           <FeedMarketMarquee
             posts={posts}
             viewerUserId={viewerUserId}
+            viewerMemberPlan={viewerMemberPlan}
+            onMarketDeleted={onMarketDeleted}
             tourMarketPostIndex={tourMarketPostIndex}
             viewportRef={viewportRef}
             sentinelRef={sentinelRef}

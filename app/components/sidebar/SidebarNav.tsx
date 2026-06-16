@@ -5,6 +5,12 @@ import { usePathname } from "next/navigation";
 
 const items = [
   {
+    href: "/peak-anime",
+    label: "Peak Anime",
+    subtitle: "AI-original episodes",
+    icon: AnimeIcon,
+  },
+  {
     href: "/pricing",
     label: "Pricing",
     subtitle: "PeakPlus & paid plans",
@@ -95,6 +101,15 @@ export function SidebarNav({
         );
       })}
     </nav>
+  );
+}
+
+function AnimeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.65}>
+      <path d="M4 5h16v14H4z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 9l3 6 3-6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
