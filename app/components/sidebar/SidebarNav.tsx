@@ -1,7 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
+import { PEAKSLOP_ICON } from "@/lib/brand";
 
 const items = [
   {
@@ -106,10 +109,14 @@ export function SidebarNav({
 
 function AnimeIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.65}>
-      <path d="M4 5h16v14H4z" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M9 9l3 6 3-6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <Image
+      src={PEAKSLOP_ICON}
+      alt=""
+      width={20}
+      height={20}
+      className={`object-contain ${className ?? ""}`}
+      aria-hidden
+    />
   );
 }
 

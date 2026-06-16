@@ -1,10 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { PeakPlusBadge } from "@/app/components/membership/PeakPlusBadge";
 import { safeJson } from "@/lib/http";
+import { PEAKSLOP_ARTWORK } from "@/lib/brand";
 import type { MemberPlan } from "@/lib/membership/plans";
 import { hasPeakProTier } from "@/lib/membership/plans";
 
@@ -236,9 +238,25 @@ export function PeakAnimeClient({
           </div>
         </div>
       ) : !loading ? (
-        <p className="rounded-xl border border-dashed border-zinc-300 px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-          No episodes yet. PeakPro creators can upload the first one.
-        </p>
+        <div className="overflow-hidden rounded-2xl border border-pink-500/25 bg-gradient-to-br from-zinc-950 via-violet-950/40 to-zinc-950 shadow-lg dark:border-pink-500/20">
+          <div className="relative flex aspect-video w-full items-center justify-center bg-[radial-gradient(circle_at_50%_45%,rgba(236,72,153,0.12),transparent_55%)] px-6 py-8">
+            <Image
+              src={PEAKSLOP_ARTWORK}
+              alt="Peak Anime placeholder"
+              width={640}
+              height={480}
+              className="h-auto w-full max-w-md object-contain drop-shadow-2xl"
+            />
+          </div>
+          <div className="border-t border-zinc-800 bg-zinc-950 px-4 py-3 text-center">
+            <p className="text-xs font-semibold uppercase tracking-wide text-pink-300">
+              Coming soon
+            </p>
+            <p className="mt-1 text-sm text-zinc-300">
+              No episodes yet. PeakPro creators can upload the first one.
+            </p>
+          </div>
+        </div>
       ) : null}
 
       {canUpload ? (

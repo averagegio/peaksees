@@ -28,7 +28,7 @@ export default async function Home() {
             alt="peaksees hero"
             width={900}
             height={700}
-            className="mx-auto h-auto w-full max-w-[320px] rounded-2xl border border-zinc-300/80 object-cover shadow-xl shadow-zinc-900/15 dark:border-zinc-700 dark:shadow-black/30 sm:max-w-[420px] lg:max-w-[520px]"
+            className="mx-auto h-auto w-full max-w-[320px] object-contain drop-shadow-lg sm:max-w-[420px] lg:max-w-[520px]"
             priority
           />
         </div>
