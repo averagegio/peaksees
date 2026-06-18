@@ -1,10 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import { PeakseesHeaderBanner } from "@/app/components/PeakseesHeaderBanner";
 import { SiteFooter } from "@/app/components/marketing/SiteFooter";
 import { getSession } from "@/lib/auth/session";
-import { PEAKSEES_BG_LOOP, PEAKSEES_LANDING_HERO } from "@/lib/brand";
+import { PEAKSEES_BG_LOOP } from "@/lib/brand";
 
 export default async function Home() {
   const session = await getSession();
@@ -21,18 +20,7 @@ export default async function Home() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_24%_50%,rgba(2,132,199,0.12),transparent_42%),radial-gradient(circle_at_70%_25%,rgba(16,185,129,0.12),transparent_35%)] dark:bg-[radial-gradient(circle_at_24%_50%,rgba(14,116,144,0.20),transparent_42%),radial-gradient(circle_at_70%_25%,rgba(16,185,129,0.20),transparent_35%)]" />
       </div>
 
-      <section className="relative z-10 mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 items-center gap-10 px-6 py-10 lg:grid-cols-[1fr_460px] lg:gap-14 lg:px-10">
-        <div className="mx-auto w-full max-w-md lg:max-w-xl">
-          <Image
-            src={PEAKSEES_LANDING_HERO}
-            alt="peaksees hero"
-            width={900}
-            height={700}
-            className="mx-auto h-auto w-full max-w-[320px] object-contain drop-shadow-lg sm:max-w-[420px] lg:max-w-[520px]"
-            priority
-          />
-        </div>
-
+      <section className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 items-center justify-center px-6 py-10 lg:px-10">
         <div className="mx-auto w-full max-w-md">
           <h1 className="text-5xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-6xl">
             Happening now

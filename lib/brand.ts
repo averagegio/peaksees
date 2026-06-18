@@ -10,9 +10,6 @@ export const PEAKSEES_BG_LOOP = "/peaksees-bg-loop.gif";
 /** Circular eye + candlestick artwork for compose FAB (transparent PNG). */
 export const PEAKFAB_PRINT = "/peakprint-transparent.png";
 
-/** Landing page left hero image (transparent PNG). */
-export const PEAKSEES_LANDING_HERO = "/peakslop-transparent.png";
-
 /** Peak Anime branding — full artwork + compact menu icon. */
 export const PEAKSLOP_ARTWORK = "/peakslop-transparent.png";
 export const PEAKSLOP_ICON = "/peakslop-icon.png";
