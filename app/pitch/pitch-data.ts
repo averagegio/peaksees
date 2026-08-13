@@ -7,11 +7,11 @@ export const TAM = {
 } as const;
 
 export const MAU_SERIES = [
-  { year: "Y1", mau: 120_000, label: "120K" },
-  { year: "Y2", mau: 480_000, label: "480K" },
-  { year: "Y3", mau: 1_400_000, label: "1.4M" },
-  { year: "Y4", mau: 3_200_000, label: "3.2M" },
-  { year: "Y5", mau: 6_500_000, label: "6.5M" },
+  { year: "Y1", mau: 120_000, label: "120K", growth: null as string | null, note: "Launch cohort — Peak AI fills the marquee" },
+  { year: "Y2", mau: 480_000, label: "480K", growth: "4.0×", note: "Embeds + first creator markets compound" },
+  { year: "Y3", mau: 1_400_000, label: "1.4M", growth: "2.9×", note: "Weekly traders become the habit layer" },
+  { year: "Y4", mau: 3_200_000, label: "3.2M", growth: "2.3×", note: "Global feeds + Peak Anime acquisition" },
+  { year: "Y5", mau: 6_500_000, label: "6.5M", growth: "2.0×", note: "Category density across topics & regions" },
 ] as const;
 
 export const FUNNEL = [
