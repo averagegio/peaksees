@@ -12,6 +12,8 @@ type PeakseesHeaderBannerProps = {
   className?: string;
   sizes?: string;
   priority?: boolean;
+  /** Always render the light asset (ignore theme). */
+  lightOnly?: boolean;
 };
 
 /** Light + dark header assets (dark PNG has transparent letter counters). */
@@ -22,7 +24,22 @@ export function PeakseesHeaderBanner({
   className = "h-auto w-full object-contain",
   sizes,
   priority = false,
+  lightOnly = false,
 }: PeakseesHeaderBannerProps) {
+  if (lightOnly) {
+    return (
+      <Image
+        src={PEAKSEES_HEADER_BANNER}
+        alt={alt}
+        width={width}
+        height={height}
+        className={className}
+        sizes={sizes}
+        priority={priority}
+      />
+    );
+  }
+
   return (
     <>
       <Image
