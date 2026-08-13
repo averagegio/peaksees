@@ -1,0 +1,137 @@
+@keyframes pitch-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pitch-bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes pitch-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes pitch-grid-drift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 48px 48px;
+  }
+}
+
+.pitch-root {
+  --pitch-ink: #0c1412;
+  --pitch-fog: #e8f2ee;
+  --pitch-mint: #1fa97a;
+  --pitch-mint-deep: #0d6b4c;
+  --pitch-gold: #c4a35a;
+  --pitch-panel: rgba(12, 20, 18, 0.72);
+  --pitch-line: rgba(232, 242, 238, 0.14);
+  --font-pitch-display: var(--font-pitch-display), ui-sans-serif, sans-serif;
+  --font-pitch-body: var(--font-pitch-body), ui-sans-serif, sans-serif;
+  color: var(--pitch-fog);
+  font-family: var(--font-pitch-body);
+  background: var(--pitch-ink);
+}
+
+.pitch-atmosphere {
+  background:
+    radial-gradient(ellipse 80% 55% at 15% 20%, rgba(31, 169, 122, 0.28), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 85% 10%, rgba(196, 163, 90, 0.18), transparent 50%),
+    radial-gradient(ellipse 70% 60% at 60% 90%, rgba(13, 107, 76, 0.35), transparent 55%),
+    linear-gradient(165deg, #07110e 0%, #0c1412 45%, #10201a 100%);
+}
+
+.pitch-grid {
+  background-image:
+    linear-gradient(rgba(232, 242, 238, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 242, 238, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: pitch-grid-drift 28s linear infinite;
+  mask-image: radial-gradient(ellipse 70% 70% at 50% 40%, black 20%, transparent 75%);
+}
+
+.pitch-display {
+  font-family: var(--font-pitch-display);
+  letter-spacing: -0.03em;
+}
+
+.pitch-enter > * {
+  animation: pitch-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pitch-enter > *:nth-child(1) {
+  animation-delay: 0.02s;
+}
+.pitch-enter > *:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.pitch-enter > *:nth-child(3) {
+  animation-delay: 0.18s;
+}
+.pitch-enter > *:nth-child(4) {
+  animation-delay: 0.26s;
+}
+.pitch-enter > *:nth-child(5) {
+  animation-delay: 0.34s;
+}
+.pitch-enter > *:nth-child(6) {
+  animation-delay: 0.42s;
+}
+
+.pitch-bar {
+  transform-origin: bottom;
+  animation: pitch-bar-grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pitch-bar-x {
+  transform-origin: left center;
+  animation: pitch-bar-grow-x 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes pitch-bar-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.pitch-brand-glow {
+  background: linear-gradient(
+    110deg,
+    rgba(31, 169, 122, 0.15),
+    rgba(196, 163, 90, 0.25),
+    rgba(31, 169, 122, 0.15)
+  );
+  background-size: 200% 100%;
+  animation: pitch-shimmer 8s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pitch-grid,
+  .pitch-brand-glow,
+  .pitch-enter > *,
+  .pitch-bar,
+  .pitch-bar-x {
+    animation: none !important;
+  }
+}
