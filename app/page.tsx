@@ -29,14 +29,15 @@ export default async function Home() {
             Join peaksees today.
           </p>
 
-          <div className="mt-6 rounded-2xl border border-zinc-300/80 bg-white/85 p-5 shadow-lg shadow-zinc-900/8 backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/85 dark:shadow-black/25">
+          <div className="mt-6 rounded-2xl border border-zinc-300/80 bg-white/85 p-5 text-zinc-950 shadow-lg shadow-zinc-900/8 backdrop-blur-sm">
             <PeakseesHeaderBanner
               alt="peaksees"
               width={520}
               height={160}
               className="h-auto w-full object-contain"
+              lightOnly
             />
-            <p className="mt-4 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+            <p className="mt-4 text-sm leading-relaxed text-zinc-600">
               A social feed where people trade on opinions instead of just
               posting them.
             </p>
@@ -45,7 +46,7 @@ export default async function Home() {
               {session ? (
                 <Link
                   href="/feed"
-                  className="rounded-full bg-zinc-900 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                  className="rounded-full bg-zinc-900 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-zinc-800"
                 >
                   Enter feed
                 </Link>
@@ -53,13 +54,13 @@ export default async function Home() {
                 <>
                   <Link
                     href="/signup"
-                    className="rounded-full bg-zinc-900 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                    className="rounded-full bg-zinc-900 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-zinc-800"
                   >
                     Create account
                   </Link>
                   <Link
                     href="/login"
-                    className="rounded-full border border-zinc-300 px-5 py-3 text-center text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                    className="rounded-full border border-zinc-300 px-5 py-3 text-center text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100"
                   >
                     Log in
                   </Link>
