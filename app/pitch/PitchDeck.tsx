@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { PEAKSEES_BG_LOOP, PEAKSEES_HEADER_BANNER_DARK } from "@/lib/brand";
+import { PEAKSEES_BG_LOOP, PEAKSEES_HEADER_BANNER_DARK, FEED_TAGLINE } from "@/lib/brand";
 import {
   FUNNEL,
   FUNDING_ROUNDS,
@@ -48,37 +48,30 @@ function SlideShell({
 
 function HeroSlide() {
   return (
-    <div className="relative flex h-full w-full items-end overflow-hidden sm:items-center">
+    <div className="relative flex h-full w-full items-center overflow-hidden">
       <div className="pointer-events-none absolute inset-0" aria-hidden>
         {/* eslint-disable-next-line @next/next/no-img-element -- animated GIF atmosphere */}
         <img
           src={PEAKSEES_BG_LOOP}
           alt=""
-          className="h-full w-full object-cover opacity-35 saturate-125"
+          className="h-full w-full object-cover opacity-40 saturate-125"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--pitch-ink)] via-[var(--pitch-ink)]/75 to-[var(--pitch-ink)]/35" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--pitch-ink)] via-[var(--pitch-ink)]/70 to-[var(--pitch-ink)]/30" />
         <div className="pitch-brand-glow absolute inset-x-0 bottom-0 h-1/2 opacity-70" />
       </div>
 
-      <div className="pitch-enter relative z-10 mx-auto w-full max-w-5xl px-5 py-16 sm:px-10">
+      <div className="pitch-enter relative z-10 mx-auto flex w-full max-w-5xl flex-col items-start justify-center px-5 py-16 sm:px-10">
         <Image
           src={PEAKSEES_HEADER_BANNER_DARK}
           alt="peaksees"
           width={720}
           height={220}
           priority
-          className="h-auto w-[min(100%,28rem)] object-contain drop-shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
+          className="h-auto w-[min(100%,26rem)] object-contain drop-shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
         />
-        <p className="pitch-display mt-8 max-w-xl text-2xl font-medium leading-snug text-[var(--pitch-fog)] sm:text-4xl">
-          Trade opinions. Not just posts.
-        </p>
-        <p className="mt-4 max-w-md text-base leading-relaxed text-[var(--pitch-fog)]/75 sm:text-lg">
-          Investor deck — Peak AI, TAM, growth, market depth, Peakpoints, and the
-          path from pre-seed to Series M.
-        </p>
-        <p className="mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--pitch-gold)]">
-          Pre-seed raise · {PRESEED_ASK.amount}
-        </p>
+        <h1 className="pitch-display mt-10 max-w-3xl text-3xl font-semibold leading-[1.08] text-[var(--pitch-fog)] sm:text-5xl lg:text-6xl">
+          {FEED_TAGLINE}
+        </h1>
       </div>
     </div>
   );
@@ -499,7 +492,7 @@ function CloseSlide() {
 }
 
 const SLIDES = [
-  { id: "hero", label: "Title", render: () => <HeroSlide /> },
+  { id: "hero", label: "Motto", render: () => <HeroSlide /> },
   { id: "tam", label: "TAM", render: () => <TamSlide /> },
   { id: "mau", label: "MAU", render: () => <MauSlide /> },
   { id: "funnel", label: "Funnel", render: () => <FunnelSlide /> },
