@@ -126,6 +126,26 @@
   animation: pitch-shimmer 8s ease-in-out infinite alternate;
 }
 
+.pitch-mau-scrub::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--pitch-mint);
+  border: 2px solid var(--pitch-fog);
+  cursor: pointer;
+}
+
+.pitch-mau-scrub::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--pitch-mint);
+  border: 2px solid var(--pitch-fog);
+  cursor: pointer;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pitch-grid,
   .pitch-brand-glow,

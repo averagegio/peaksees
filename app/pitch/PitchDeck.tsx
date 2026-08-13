@@ -110,35 +110,141 @@ function TamSlide() {
 
 function MauSlide() {
   const max = MAU_SERIES[MAU_SERIES.length - 1]!.mau;
+  const lastIndex = MAU_SERIES.length - 1;
+  const [active, setActive] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  const activeRow = MAU_SERIES[active]!;
+  const prevRow = active > 0 ? MAU_SERIES[active - 1] : null;
+
+  useEffect(() => {
+    if (!playing) return undefined;
+    if (active >= lastIndex) {
+      const pause = window.setTimeout(() => setPlaying(false), 900);
+      return () => window.clearTimeout(pause);
+    }
+    const id = window.setTimeout(() => setActive((i) => Math.min(lastIndex, i + 1)), 1100);
+    return () => window.clearTimeout(id);
+  }, [playing, active, lastIndex]);
+
   return (
     <SlideShell kicker="Traction model" title="Monthly active users">
-      <div className="flex h-56 items-end gap-3 sm:h-72 sm:gap-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--pitch-fog)]/45">
+            Selected horizon
+          </p>
+          <p className="pitch-display mt-1 text-4xl font-semibold text-[var(--pitch-mint)] sm:text-5xl">
+            {activeRow.label}
+            <span className="ml-3 text-lg font-medium text-[var(--pitch-fog)]/55 sm:text-xl">
+              MAU · {activeRow.year}
+            </span>
+          </p>
+          {activeRow.growth && prevRow ? (
+            <p className="mt-2 text-sm text-[var(--pitch-gold)]">
+              {activeRow.growth} vs {prevRow.year} ({prevRow.label} → {activeRow.label})
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-[var(--pitch-fog)]/55">Baseline year — growth compounds from here</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (active >= lastIndex) setActive(0);
+              setPlaying((p) => !p || active >= lastIndex);
+            }}
+            className="border border-[var(--pitch-line)] bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition hover:bg-white/10"
+            aria-pressed={playing}
+          >
+            {playing && active < lastIndex ? "Pause" : active >= lastIndex ? "Replay growth" : "Play growth"}
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="mt-6 flex h-52 items-end gap-2 sm:h-64 sm:gap-4"
+        role="listbox"
+        aria-label="MAU by year"
+        aria-activedescendant={`mau-${activeRow.year}`}
+      >
         {MAU_SERIES.map((row, i) => {
-          const height = Math.max(12, Math.round((row.mau / max) * 100));
+          const height = Math.max(10, Math.round((row.mau / max) * 100));
+          const revealed = i <= active;
+          const isActive = i === active;
           return (
-            <div key={row.year} className="flex flex-1 flex-col items-center gap-3">
-              <p className="text-sm font-semibold text-[var(--pitch-fog)]">{row.label}</p>
-              <div className="relative flex h-full w-full items-end justify-center">
-                <div
-                  className="pitch-bar w-full max-w-[4.5rem] rounded-t-md bg-gradient-to-t from-[var(--pitch-mint-deep)] to-[var(--pitch-mint)]"
-                  style={{
-                    height: `${height}%`,
-                    animationDelay: `${0.15 + i * 0.08}s`,
-                  }}
+            <button
+              key={row.year}
+              id={`mau-${row.year}`}
+              type="button"
+              role="option"
+              aria-selected={isActive}
+              onClick={() => {
+                setPlaying(false);
+                setActive(i);
+              }}
+              className={
+                "group flex flex-1 flex-col items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--pitch-mint)] " +
+                (revealed ? "opacity-100" : "opacity-35")
+              }
+            >
+              <span
+                className={
+                  "text-sm font-semibold transition " +
+                  (isActive ? "text-[var(--pitch-mint)]" : "text-[var(--pitch-fog)]/70")
+                }
+              >
+                {revealed ? row.label : "—"}
+              </span>
+              <span className="relative flex h-full w-full items-end justify-center">
+                <span
+                  className={
+                    "w-full max-w-[4.5rem] rounded-t-md transition-[height,opacity,filter] duration-500 ease-out " +
+                    (isActive
+                      ? "bg-gradient-to-t from-[var(--pitch-mint-deep)] to-[var(--pitch-mint)] shadow-[0_0_24px_rgba(31,169,122,0.35)]"
+                      : revealed
+                        ? "bg-gradient-to-t from-[var(--pitch-mint-deep)]/70 to-[var(--pitch-mint)]/70"
+                        : "bg-[var(--pitch-fog)]/15")
+                  }
+                  style={{ height: revealed ? `${height}%` : "8%" }}
                 />
-              </div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--pitch-fog)]/55">
+              </span>
+              <span
+                className={
+                  "text-xs font-semibold uppercase tracking-[0.14em] " +
+                  (isActive ? "text-[var(--pitch-fog)]" : "text-[var(--pitch-fog)]/45")
+                }
+              >
                 {row.year}
-              </p>
-            </div>
+              </span>
+            </button>
           );
         })}
       </div>
-      <p className="mt-8 max-w-2xl text-sm leading-relaxed text-[var(--pitch-fog)]/65">
-        Growth compounds from feed habit → first trade → Peakpoints deposits →
-        returning depth traders. Y5 target assumes embeds, creator markets, and
-        Peak Anime as acquisition surfaces.
-      </p>
+
+      <div className="mt-6">
+        <label className="flex items-center gap-3 text-xs text-[var(--pitch-fog)]/55">
+          <span className="shrink-0 uppercase tracking-[0.14em]">Scrub</span>
+          <input
+            type="range"
+            min={0}
+            max={lastIndex}
+            step={1}
+            value={active}
+            onChange={(e) => {
+              setPlaying(false);
+              setActive(Number(e.target.value));
+            }}
+            className="pitch-mau-scrub h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-[var(--pitch-mint)]"
+            aria-label="Scrub MAU growth by year"
+          />
+          <span className="shrink-0 font-semibold text-[var(--pitch-fog)]/80">{activeRow.year}</span>
+        </label>
+        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[var(--pitch-fog)]/65">
+          {activeRow.note}. Growth compounds from feed habit → first trade → Peakpoints
+          deposits → returning depth traders.
+        </p>
+      </div>
     </SlideShell>
   );
 }
@@ -517,6 +623,14 @@ export function PitchDeck() {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.closest("input, textarea, select, [contenteditable=true]") ||
+          (target.tagName === "BUTTON" && target.getAttribute("role") === "option"))
+      ) {
+        return;
+      }
       if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") {
         e.preventDefault();
         setIndex((i) => Math.min(SLIDE_COUNT - 1, i + 1));
