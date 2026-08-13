@@ -10,11 +10,10 @@ import {
   FUNDING_ROUNDS,
   GROWTH_ALLOCATION,
   MAU_SERIES,
+  PEAK_AI,
   PRESEED_ASK,
   TAM,
 } from "@/app/pitch/pitch-data";
-
-const SLIDE_COUNT = 11;
 
 function SlideShell({
   kicker,
@@ -74,8 +73,8 @@ function HeroSlide() {
           Trade opinions. Not just posts.
         </p>
         <p className="mt-4 max-w-md text-base leading-relaxed text-[var(--pitch-fog)]/75 sm:text-lg">
-          Investor deck — TAM, growth, market depth, Peakpoints, and the path from
-          pre-seed to Series M.
+          Investor deck — Peak AI, TAM, growth, market depth, Peakpoints, and the
+          path from pre-seed to Series M.
         </p>
         <p className="mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--pitch-gold)]">
           Pre-seed raise · {PRESEED_ASK.amount}
@@ -175,6 +174,30 @@ function FunnelSlide() {
           </li>
         ))}
       </ol>
+    </SlideShell>
+  );
+}
+
+function PeakAiSlide() {
+  return (
+    <SlideShell kicker="Intelligence" title="Peak AI">
+      <p className="max-w-2xl text-sm leading-relaxed text-[var(--pitch-fog)]/75">
+        {PEAK_AI.tagline}. Handle {PEAK_AI.handle} is the always-on publisher that
+        turns live signals into tradeable feed inventory.
+      </p>
+      <div className="mt-8 grid gap-8 lg:grid-cols-3">
+        {PEAK_AI.pillars.map((pillar) => (
+          <div key={pillar.title} className="border-t border-[var(--pitch-line)] pt-5">
+            <p className="pitch-display text-2xl text-[var(--pitch-mint)]">{pillar.title}</p>
+            <p className="mt-3 text-sm leading-relaxed text-[var(--pitch-fog)]/70">
+              {pillar.body}
+            </p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-10 max-w-2xl text-sm leading-relaxed text-[var(--pitch-fog)]/60">
+        {PEAK_AI.flywheel}
+      </p>
     </SlideShell>
   );
 }
@@ -453,8 +476,9 @@ function CloseSlide() {
         {PRESEED_ASK.amount} pre-seed
       </h2>
       <p className="mt-5 max-w-xl text-lg leading-relaxed text-[var(--pitch-fog)]/75">
-        Build the feed where conviction is liquid — depth on every card, Peakpoints
-        that settle cleanly, and a growth engine from scroll to stake.
+        Build the feed where conviction is liquid — Peak AI stocking every scroll,
+        depth on every card, Peakpoints that settle cleanly, and a growth engine
+        from signal to stake.
       </p>
       <div className="mt-10 flex flex-wrap gap-4">
         <Link
@@ -479,6 +503,7 @@ const SLIDES = [
   { id: "tam", label: "TAM", render: () => <TamSlide /> },
   { id: "mau", label: "MAU", render: () => <MauSlide /> },
   { id: "funnel", label: "Funnel", render: () => <FunnelSlide /> },
+  { id: "peak-ai", label: "Peak AI", render: () => <PeakAiSlide /> },
   { id: "depth", label: "Depth", render: () => <DepthCardsSlide /> },
   { id: "books", label: "Books", render: () => <OrderBookSlide /> },
   { id: "points", label: "Points", render: () => <PeakpointsSlide /> },
@@ -487,6 +512,8 @@ const SLIDES = [
   { id: "alloc", label: "Growth $", render: () => <AllocationSlide /> },
   { id: "close", label: "Ask", render: () => <CloseSlide /> },
 ] as const;
+
+const SLIDE_COUNT = SLIDES.length;
 
 export function PitchDeck() {
   const [index, setIndex] = useState(0);

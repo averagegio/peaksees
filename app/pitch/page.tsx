@@ -19,7 +19,7 @@ const body = Figtree({
 export const metadata: Metadata = {
   title: "peaksees — investor pitch deck",
   description:
-    "TAM, MAU, sales funnel, market depth, Peakpoints, withdrawals, and funding from pre-seed to Series M.",
+    "Peak AI, TAM, MAU, sales funnel, market depth, Peakpoints, withdrawals, and funding from pre-seed to Series M.",
 };
 
 export default function PitchPage() {
