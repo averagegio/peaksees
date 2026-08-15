@@ -178,11 +178,12 @@ export async function POST(request: Request) {
     }
   }
 
-  // Heuristic Peak: dissent from comment-thread lean when available, else push against the crowd.
+  // Heuristic Peak: take the opposite side of comment-thread lean (or crowd) as a second opinion.
   const dissentFrom =
     commentYesLean != null ? commentYesLean : crowdYes;
-  const shift = dissentFrom >= 0.5 ? -0.18 : 0.18;
-  const probYes = clamp01(dissentFrom + shift);
+  // Mirror around 50% with a soft floor/ceiling so Peak isn't 0%/100% absolute.
+  const mirrored = 0.5 - (dissentFrom - 0.5) * 1.1;
+  const probYes = clamp01(Math.min(0.88, Math.max(0.12, mirrored)));
   const confidence =
     Math.abs(probYes - 0.5) > 0.2
       ? "high"
