@@ -497,7 +497,7 @@ export function MarketPostCard({
       {hasPlacedBet && !peakScoreRevealed && interactive ? (
         <p className="mt-3 rounded-xl border border-violet-200/80 bg-violet-500/[0.07] px-3 py-2 text-center text-[12px] font-medium text-violet-800 dark:border-violet-500/35 dark:bg-violet-500/10 dark:text-violet-200">
           Tap <span className="font-bold">peaksees</span> at the top of this card to see Peak&apos;s
-          disagree score versus the crowd.
+          disagree score versus the crowd and comment sentiment.
         </p>
       ) : null}
 
@@ -505,6 +505,7 @@ export function MarketPostCard({
         <PeakOpinionChip
           question={post.question}
           crowdYes={yesP}
+          postKey={`market:${post.id}`}
           enabled={peakScoreRevealed && !pending}
           refetchNonce={peakRefetchNonce}
         />
