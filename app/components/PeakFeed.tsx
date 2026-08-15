@@ -165,9 +165,23 @@ export function MarketPostCard({
   const [selected, setSelected] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  /** Unlocks tapping the peaksees badge to fetch Peak disagree score */
-  const [hasPlacedBet, setHasPlacedBet] = useState(false);
-  const [peakScoreRevealed, setPeakScoreRevealed] = useState(false);
+  /** Unlocks tapping the peaksees badge to fetch Peak disagree score (persists across marquee remounts). */
+  const betUnlockKey = `peaksees:bet-unlock:${post.id}`;
+  const peakRevealKey = `peaksees:peak-reveal:${post.id}`;
+  const [hasPlacedBet, setHasPlacedBet] = useState(() => {
+    try {
+      return sessionStorage.getItem(betUnlockKey) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [peakScoreRevealed, setPeakScoreRevealed] = useState(() => {
+    try {
+      return sessionStorage.getItem(peakRevealKey) === "1";
+    } catch {
+      return false;
+    }
+  });
   const [peakRefetchNonce, setPeakRefetchNonce] = useState(0);
   const [yes, no] = post.outcomes;
   const yesP = Number(yes?.probability ?? 0.5);
@@ -337,6 +351,11 @@ export function MarketPostCard({
               onClick={() => {
                 if (!interactive || !hasPlacedBet) return;
                 setPeakScoreRevealed(true);
+                try {
+                  sessionStorage.setItem(peakRevealKey, "1");
+                } catch {
+                  // ignore
+                }
                 setPeakRefetchNonce((n) => n + 1);
                 peakBadgeRef.current?.scrollIntoView({
                   behavior: "smooth",
@@ -490,7 +509,14 @@ export function MarketPostCard({
         <MarketTradeBox
           marketId={post.id}
           yesProbability={yesP}
-          onTradeSuccess={() => setHasPlacedBet(true)}
+          onTradeSuccess={() => {
+            setHasPlacedBet(true);
+            try {
+              sessionStorage.setItem(betUnlockKey, "1");
+            } catch {
+              // ignore
+            }
+          }}
         />
       )}
 
