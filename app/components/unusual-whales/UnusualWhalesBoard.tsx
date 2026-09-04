@@ -44,6 +44,7 @@ export function UnusualWhalesBoard({
     try {
       const res = await fetch(`/api/unusual-whales/dashboard?desk=${desk}`, {
         cache: "no-store",
+        credentials: "include",
       });
       const data = await safeJson<DashboardSnapshot & { error?: string }>(res);
       if (!res.ok) {

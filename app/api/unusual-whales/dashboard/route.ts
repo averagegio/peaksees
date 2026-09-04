@@ -4,6 +4,8 @@ import { requireDeskAccess } from "@/lib/unusual-whales/access";
 import { fetchDashboardSnapshot } from "@/lib/unusual-whales/client";
 import type { UnusualWhalesDesk } from "@/lib/unusual-whales/types";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const deskParam = url.searchParams.get("desk");

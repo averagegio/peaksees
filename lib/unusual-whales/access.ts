@@ -1,6 +1,5 @@
 import "server-only";
 
-import { timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 
@@ -13,7 +12,10 @@ import {
   getMcpBearerSecret,
   getPersonalAccessToken,
 } from "./config";
+import { tokensMatch } from "./token-compare";
 import type { UnusualWhalesDesk } from "./types";
+
+export { tokensMatch };
 
 function jwtSecret() {
   const s = process.env.JWT_SECRET || process.env.AUTH_SECRET;
@@ -40,13 +42,6 @@ export async function hasValidPersonalDeskCookie(): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-export function tokensMatch(provided: string, expected: string): boolean {
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
 }
 
 export async function isOwnerSession(): Promise<boolean> {
@@ -84,7 +79,7 @@ export async function requireDeskAccess(desk: UnusualWhalesDesk): Promise<DeskAc
         status: 503,
         code: "not_configured",
         error:
-          "Personal desk is not configured. Set UW_PERSONAL_ACCESS_TOKEN and/or ADMIN_EMAILS.",
+          "Unlock isn't configured. Set UW_PERSONAL_ACCESS_TOKEN (not the Unusual Whales API key) and/or ADMIN_EMAILS.",
       };
     }
     return {

@@ -1,14 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { unlockWithToken } from "./WhalesDesk";
 import { RegisterWhalesServiceWorker } from "./RegisterWhalesServiceWorker";
 
 export function WhalesUnlockForm({ tokenConfigured }: { tokenConfigured: boolean }) {
-  const router = useRouter();
   const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -19,10 +17,9 @@ export function WhalesUnlockForm({ tokenConfigured }: { tokenConfigured: boolean
     setError(null);
     try {
       await unlockWithToken(token);
-      router.refresh();
+      window.location.assign("/whales");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unlock failed");
-    } finally {
       setBusy(false);
     }
   }
@@ -35,15 +32,21 @@ export function WhalesUnlockForm({ tokenConfigured }: { tokenConfigured: boolean
       </p>
       <h1 className="mt-2 text-3xl font-extrabold tracking-tight">Peak Flow</h1>
       <p className="mt-2 text-sm text-zinc-400">
-        Personal Unusual Whales desk. Sign in with an admin Peaksees account, or enter the
-        personal access token.
+        Personal Unusual Whales desk at <code className="text-zinc-200">/whales</code>. Vercel
+        preview login is not enough — enter the Peak Flow owner token, or sign in with an admin
+        Peaksees account.
       </p>
 
       {tokenConfigured ? (
         <form onSubmit={(e) => void submit(e)} className="mt-8 flex flex-col gap-3">
           <label className="text-sm font-medium text-zinc-200" htmlFor="uw-token">
-            Access token
+            Peak Flow owner token
           </label>
+          <p className="text-xs text-zinc-500">
+            Paste <code className="text-emerald-300">UW_PERSONAL_ACCESS_TOKEN</code>. This is{" "}
+            <span className="font-semibold text-zinc-300">not</span> your Unusual Whales API key (
+            <code className="text-zinc-400">UNUSUAL_WHALES_API_KEY</code>).
+          </p>
           <input
             id="uw-token"
             type="password"
@@ -64,8 +67,10 @@ export function WhalesUnlockForm({ tokenConfigured }: { tokenConfigured: boolean
         </form>
       ) : (
         <p className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-300">
-          Set <code className="text-emerald-300">UW_PERSONAL_ACCESS_TOKEN</code> or{" "}
-          <code className="text-emerald-300">ADMIN_EMAILS</code> to unlock this app.
+          Unlock isn&apos;t configured. Set{" "}
+          <code className="text-emerald-300">UW_PERSONAL_ACCESS_TOKEN</code> (a dedicated owner
+          password, not the Unusual Whales API key) and/or{" "}
+          <code className="text-emerald-300">ADMIN_EMAILS</code>, then redeploy.
         </p>
       )}
 

@@ -1,7 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-
 import { UnusualWhalesBoard } from "@/app/components/unusual-whales/UnusualWhalesBoard";
 import { safeJson } from "@/lib/http";
 import type { DashboardSnapshot } from "@/lib/unusual-whales/types";
@@ -9,11 +7,13 @@ import type { DashboardSnapshot } from "@/lib/unusual-whales/types";
 import { RegisterWhalesServiceWorker } from "./RegisterWhalesServiceWorker";
 
 export function WhalesDesk({ initial }: { initial: DashboardSnapshot }) {
-  const router = useRouter();
-
   async function lock() {
-    await fetch("/api/whales/logout", { method: "POST" });
-    router.refresh();
+    await fetch("/api/whales/logout", {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+    });
+    window.location.assign("/whales");
   }
 
   return (
@@ -53,8 +53,10 @@ export async function unlockWithToken(token: string) {
   const res = await fetch("/api/whales/unlock", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    cache: "no-store",
     body: JSON.stringify({ token }),
   });
-  const data = (await safeJson<{ error?: string }>(res)) ?? {};
+  const data = (await safeJson<{ error?: string; code?: string }>(res)) ?? {};
   if (!res.ok) throw new Error(data.error ?? "Unlock failed");
 }
