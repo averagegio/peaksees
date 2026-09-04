@@ -1,4 +1,5 @@
 import { createTtlCache, cacheKey } from "./cache.ts";
+import { getUnusualWhalesApiKey, isUnusualWhalesDemoMode } from "./config.ts";
 import { demoDashboardSnapshot } from "./demo-data.ts";
 import { formatCompact, formatUsd } from "./format.ts";
 import {
@@ -93,6 +94,47 @@ export async function testFormatUsd() {
   assert(formatCompact(4200).length > 0, "compact");
 }
 
+export async function testLiveVsDemoEnvContract() {
+  const prev = {
+    UNUSUAL_WHALES_API_KEY: process.env.UNUSUAL_WHALES_API_KEY,
+    UW_API_KEY: process.env.UW_API_KEY,
+    UW_DEMO_MODE: process.env.UW_DEMO_MODE,
+  };
+  const restore = () => {
+    for (const [name, value] of Object.entries(prev)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  };
+  try {
+    delete process.env.UNUSUAL_WHALES_API_KEY;
+    delete process.env.UW_API_KEY;
+    delete process.env.UW_DEMO_MODE;
+    assert(getUnusualWhalesApiKey() === null, "missing key is null");
+    assert(isUnusualWhalesDemoMode() === true, "no key => demo");
+
+    process.env.UNUSUAL_WHALES_API_KEY = "   ";
+    assert(getUnusualWhalesApiKey() === null, "whitespace key is ignored");
+
+    process.env.UNUSUAL_WHALES_API_KEY = "test-not-a-real-key";
+    assert(isUnusualWhalesDemoMode() === false, "key => live");
+
+    process.env.UW_DEMO_MODE = "true";
+    assert(isUnusualWhalesDemoMode() === true, "UW_DEMO_MODE=true forces demo");
+
+    process.env.UW_DEMO_MODE = "false";
+    assert(isUnusualWhalesDemoMode() === false, "UW_DEMO_MODE=false keeps live");
+
+    delete process.env.UNUSUAL_WHALES_API_KEY;
+    delete process.env.UW_DEMO_MODE;
+    process.env.UW_API_KEY = "test-alias-key";
+    assert(getUnusualWhalesApiKey() === "test-alias-key", "UW_API_KEY alias");
+    assert(isUnusualWhalesDemoMode() === false, "alias key => live");
+  } finally {
+    restore();
+  }
+}
+
 const tests = [
   testParseFlowAlerts,
   testParseDarkPoolAndCongress,
@@ -100,6 +142,7 @@ const tests = [
   testCacheTtlAndKey,
   testDemoSnapshotShape,
   testFormatUsd,
+  testLiveVsDemoEnvContract,
 ];
 
 async function main() {
