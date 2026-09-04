@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { BackButton } from "@/app/components/BackButton";
+import { MEMBER_PLAN_MONTHLY_PRICE } from "@/lib/membership/plans";
 
 function PriceCard({
   title,
@@ -117,7 +118,7 @@ export default function PricingPage({
         <section className="grid gap-5 md:grid-cols-3">
           <PriceCard
             title="PeakPlus"
-            price="$10"
+            price={MEMBER_PLAN_MONTHLY_PRICE.peakplus}
             plan="peakplus"
             cta="Choose PeakPlus"
             features={[
@@ -130,7 +131,7 @@ export default function PricingPage({
           />
           <PriceCard
             title="PeakPro"
-            price="$30"
+            price={MEMBER_PLAN_MONTHLY_PRICE.peakpro}
             plan="peakpro"
             cta="Choose PeakPro"
             highlight
@@ -145,7 +146,7 @@ export default function PricingPage({
           />
           <PriceCard
             title="PeakEnterprise"
-            price="$50"
+            price={MEMBER_PLAN_MONTHLY_PRICE.peakenterprise}
             plan="peakenterprise"
             cta="Choose PeakEnterprise"
             features={[

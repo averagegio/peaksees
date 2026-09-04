@@ -3,7 +3,11 @@ import Stripe from "stripe";
 
 import { getStripe } from "@/lib/stripe/server";
 import { fulfillWalletTopupCheckout } from "@/lib/stripe/wallet-topup";
-import { fulfillSubscriptionCheckout } from "@/lib/stripe/subscription-fulfillment";
+import {
+  fulfillStripeSubscription,
+  fulfillSubscriptionCheckout,
+  subscriptionIdFromInvoice,
+} from "@/lib/stripe/subscription-fulfillment";
 
 export const runtime = "nodejs";
 
@@ -33,6 +37,26 @@ export async function POST(request: Request) {
     const checkout = event.data.object as Stripe.Checkout.Session;
     await fulfillWalletTopupCheckout(checkout);
     await fulfillSubscriptionCheckout(checkout);
+  }
+
+  if (
+    event.type === "customer.subscription.created" ||
+    event.type === "customer.subscription.updated"
+  ) {
+    await fulfillStripeSubscription(event.data.object as Stripe.Subscription);
+  }
+
+  if (event.type === "invoice.paid") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const subscriptionId = subscriptionIdFromInvoice(invoice);
+    if (subscriptionId) {
+      try {
+        const sub = await stripe.subscriptions.retrieve(subscriptionId);
+        await fulfillStripeSubscription(sub);
+      } catch {
+        // Invoice paid without a retrievable subscription — ignore.
+      }
+    }
   }
 
   return NextResponse.json({ received: true });

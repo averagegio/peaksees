@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getBalanceCents, listLedger } from "@/lib/peakpoints/ledger";
 import { getStripe } from "@/lib/stripe/server";
+import { fulfillSubscriptionCheckout } from "@/lib/stripe/subscription-fulfillment";
 import { fulfillWalletTopupCheckout } from "@/lib/stripe/wallet-topup";
 
 export const runtime = "nodejs";
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
   }
 
   const result = await fulfillWalletTopupCheckout(checkout);
+  await fulfillSubscriptionCheckout(checkout);
   const balanceCents = await getBalanceCents(session.user.id);
   const ledger = await listLedger(session.user.id);
 

@@ -13,7 +13,14 @@ export default async function LoginPage({
 }) {
   const sp = await searchParams;
   const session = await getSession();
-  if (session) redirect("/feed");
+  if (session) {
+    const next = sp?.next;
+    redirect(
+      typeof next === "string" && next.startsWith("/") && !next.startsWith("//")
+        ? next
+        : "/feed",
+    );
+  }
 
   const jar = await cookies();
   if (jar.get(SESSION_COOKIE)?.value) {
@@ -27,7 +34,9 @@ export default async function LoginPage({
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Welcome back</h1>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Sign in to go straight to your feed
+            {typeof sp?.next === "string" && sp.next.startsWith("/whales")
+              ? "Sign in with a PeakPlus account to open Peak Flow"
+              : "Sign in to go straight to your feed"}
           </p>
         </div>
         <LoginForm nextPath={typeof sp?.next === "string" ? sp.next : undefined} />

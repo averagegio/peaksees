@@ -15,6 +15,9 @@ import { getSession } from "@/lib/auth/session";
 import { listMarketsByPeakIds } from "@/lib/markets/store";
 import { getFollowCounts } from "@/lib/social/follows-store";
 import { buildProfileFeedItems } from "@/lib/profile-feed";
+import { getStripe } from "@/lib/stripe/server";
+import { fulfillSubscriptionCheckout } from "@/lib/stripe/subscription-fulfillment";
+import { resolveEffectiveMemberPlan } from "@/lib/stripe/subscription-sync";
 
 function formatJoined(iso: string) {
   try {
@@ -27,9 +30,32 @@ function formatJoined(iso: string) {
   }
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const session = await getSession();
   if (!session) redirect("/login");
+
+  const sp = searchParams ? await searchParams : {};
+  const upgrade = typeof sp.upgrade === "string" ? sp.upgrade : "";
+  const sessionId = typeof sp.session_id === "string" ? sp.session_id.trim() : "";
+  if (upgrade === "success") {
+    if (sessionId) {
+      try {
+        const stripe = getStripe();
+        const checkout = await stripe.checkout.sessions.retrieve(sessionId);
+        const ownerId = String(checkout.metadata?.userId ?? checkout.client_reference_id ?? "");
+        if (ownerId === session.user.id) {
+          await fulfillSubscriptionCheckout(checkout);
+        }
+      } catch {
+        // Stripe may be unset in local/dev; fall through to email lookup.
+      }
+    }
+    await resolveEffectiveMemberPlan(session.user);
+  }
 
   const u = session.user;
   const followCounts = await getFollowCounts(u.id);

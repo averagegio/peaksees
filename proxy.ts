@@ -7,8 +7,8 @@ import { isSessionCookieValid } from "@/lib/auth/verify-middleware";
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Peak Flow personal desk (/whales) uses UW_PERSONAL_ACCESS_TOKEN or ADMIN_EMAILS,
-  // not a Peaksees session. Never redirect the unlock page to /login.
+  // Peak Flow personal desk (/whales) uses owner token, ADMIN_EMAILS, or a
+  // PeakPlus session. Never redirect the unlock page to /login.
   if (pathname.startsWith("/whales") || pathname.startsWith("/api/whales")) {
     return NextResponse.next();
   }
@@ -29,6 +29,8 @@ export async function proxy(req: NextRequest) {
       u.searchParams.set("next", pathname);
       return NextResponse.redirect(u);
     }
+    // Signed-in /peakflow still plan-gates in the page: free → upgrade CTA.
+    // ADMIN_EMAILS / UW personal token must not unlock subscriber Peakflow.
     return NextResponse.next();
   }
 
