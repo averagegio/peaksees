@@ -8,7 +8,6 @@ import {
   highestPaidPlan,
   normalizeMemberPlan,
   planFromActiveSubscription,
-  planFromStripePriceId,
   type MemberPlan,
 } from "@/lib/membership/plans";
 import { getStripe } from "./server";
@@ -68,34 +67,8 @@ async function lookupActiveStripePlanUncached(input: {
     } catch {
       // Search is not enabled on every Stripe account.
     }
-
-    try {
-      const found = await stripe.checkout.sessions.search({
-        query: `metadata["userId"]:"${userId.replace(/"/g, "")}" AND status:"complete"`,
-        limit: 10,
-      });
-      for (const checkout of found.data) {
-        if (checkout.mode !== "subscription") continue;
-        const fromMeta = normalizeMemberPlan(checkout.metadata?.plan);
-        if (hasPeakPlusTier(fromMeta)) {
-          plans.push(fromMeta);
-          continue;
-        }
-        const linePrice =
-          checkout.line_items?.data?.[0]?.price &&
-          typeof checkout.line_items.data[0].price !== "string"
-            ? checkout.line_items.data[0].price.id
-            : null;
-        plans.push(
-          planFromStripePriceId(linePrice) ??
-            (checkout.payment_status === "paid" || checkout.status === "complete"
-              ? "peakplus"
-              : null),
-        );
-      }
-    } catch {
-      // Search is not enabled on every Stripe account.
-    }
+    // Stripe Node v22 types Checkout Sessions without `.search()`.
+    // Paid access is recovered via subscription search + customer email below.
   }
 
   if (email) {
