@@ -19,14 +19,28 @@ export function PeakAiReplyBody({
     <div>
       <p className="whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200">
         {parts.map((part, index) => {
-          if (part === "/peakflow" || part === "/pricing") {
+          if (part === "/peakflow") {
+            if (alreadyOnPeakflow) {
+              return <span key={`${part}-${index}`}>Peakflow</span>;
+            }
             return (
               <Link
                 key={`${part}-${index}`}
                 href={part}
                 className="font-semibold text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-300"
               >
-                {part === "/peakflow" ? "Open Peakflow" : "Upgrade to PeakPlus"}
+                Open Peakflow
+              </Link>
+            );
+          }
+          if (part === "/pricing") {
+            return (
+              <Link
+                key={`${part}-${index}`}
+                href={part}
+                className="font-semibold text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-300"
+              >
+                Upgrade to PeakPlus
               </Link>
             );
           }
