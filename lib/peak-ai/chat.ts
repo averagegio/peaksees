@@ -8,6 +8,7 @@ import {
   executePeakAiUwTool,
   finalizePeakAiUwReply,
   peakAiUnusualWhalesOpenAiTools,
+  unusualWhalesMetaFromResults,
   type PeakAiUwCaller,
   type PeakAiUwExecuteResult,
 } from "@/lib/unusual-whales/tool-catalog";
@@ -129,7 +130,7 @@ export async function runPeakAiChat(input: {
       const reply = finalizePeakAiUwReply(message.content?.trim() || "", results);
       return {
         reply,
-        unusualWhales: summarizeUwMeta(results),
+        unusualWhales: unusualWhalesMetaFromResults(results),
       };
     }
 
@@ -161,22 +162,6 @@ export async function runPeakAiChat(input: {
       "I pulled the tape — open Peakflow for the full desk → /peakflow",
       results,
     ),
-    unusualWhales: summarizeUwMeta(results),
-  };
-}
-
-function summarizeUwMeta(results: PeakAiUwExecuteResult[]): {
-  used: boolean;
-  gated: boolean;
-  demo: boolean;
-  tools: string[];
-  peakflowUrl: "/peakflow";
-} {
-  return {
-    used: results.some((r) => r.status === "ok"),
-    gated: results.some((r) => r.status === "gated"),
-    demo: results.some((r) => r.source === "demo"),
-    tools: results.map((r) => r.tool),
-    peakflowUrl: "/peakflow",
+    unusualWhales: unusualWhalesMetaFromResults(results),
   };
 }

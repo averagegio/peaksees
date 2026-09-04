@@ -3,7 +3,9 @@ import { looksLikeUnusualWhalesPrompt, peakAiToolStatusLabel } from "../peak-ai/
 import {
   executePeakAiUwTool,
   finalizePeakAiUwReply,
+  inferPeakAiUwTool,
   peakAiUnusualWhalesOpenAiTools,
+  runPeakAiUwDeskNote,
   UW_TOOL_CATALOG,
   UW_TOOL_NAMES,
 } from "./tool-catalog.ts";
@@ -126,6 +128,58 @@ export async function testDemoModeLabelsPrints() {
   assert(/\/peakflow/i.test(reply), "final reply links Peakflow");
 }
 
+export async function testDeskNoteFreeVsPeakPlus() {
+  const inferred = inferPeakAiUwTool("what's the flow on NVDA?");
+  assert(inferred.name === "flow_alerts", "infers flow_alerts");
+  assert(inferred.ticker === "NVDA", "infers NVDA");
+  assert(inferPeakAiUwTool("dark pool in megacaps").name === "darkpool_recent", "infers dark pool");
+  assert(inferPeakAiUwTool("any congress trades?").name === "congress_recent_trades", "infers congress");
+  assert(inferPeakAiUwTool("is tide call-heavy?").name === "market_tide", "infers tide");
+
+  let freeCalls = 0;
+  const free = await runPeakAiUwDeskNote({
+    userText: "what's the flow on NVDA?",
+    canCallLive: false,
+    demoMode: false,
+    callTool: async () => {
+      freeCalls += 1;
+      return [];
+    },
+  });
+  assert(freeCalls === 0, "desk note free plan does not call client");
+  assert(free.result.status === "gated", "desk note gated");
+  assert(/PeakPlus/i.test(free.reply), "desk note asks for PeakPlus");
+  assert(!free.reply.includes("{"), "gated reply is not JSON");
+
+  let plusCalls = 0;
+  const plus = await runPeakAiUwDeskNote({
+    userText: "what's the flow on NVDA?",
+    canCallLive: true,
+    demoMode: true,
+    callTool: async (name, args) => {
+      plusCalls += 1;
+      assert(name === "flow_alerts", "desk note uses flow_alerts");
+      assert(args?.ticker === "NVDA", "desk note passes ticker");
+      return [
+        {
+          ticker: "NVDA",
+          type: "call",
+          strike: "140",
+          expiry: "2026-09-18",
+          premium: 1842500,
+        },
+      ];
+    },
+  });
+  assert(plusCalls === 1, "PeakPlus desk note calls shared client");
+  assert(plus.result.status === "ok", "desk note ok");
+  assert(/NVDA/.test(plus.reply), "desk note names NVDA");
+  assert(/\$1\.84M/.test(plus.reply), "desk note shows premium");
+  assert(/demo/i.test(plus.reply), "demo desk note says demo");
+  assert(/\/peakflow/.test(plus.reply), "desk note links Peakflow");
+  assert(!plus.reply.includes("{"), "desk note is not raw JSON");
+}
+
 export async function testLooksLikeUwPromptAndStatus() {
   assert(looksLikeUnusualWhalesPrompt("what's the flow on NVDA?") === true, "flow prompt");
   assert(looksLikeUnusualWhalesPrompt("dark pool in megacaps") === true, "dark pool");
@@ -144,6 +198,7 @@ const tests = [
   testFreePlanDoesNotCallSharedClient,
   testPeakPlusCallsSharedClient,
   testDemoModeLabelsPrints,
+  testDeskNoteFreeVsPeakPlus,
   testLooksLikeUwPromptAndStatus,
 ];
 

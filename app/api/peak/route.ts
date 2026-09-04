@@ -9,7 +9,7 @@ import { looksLikeUnusualWhalesPrompt } from "@/lib/peak-ai/uw-prompt";
 import { resolveEffectiveMemberPlan } from "@/lib/stripe/subscription-sync";
 import { isUnusualWhalesDemoMode } from "@/lib/unusual-whales/config";
 import { callMcpTool } from "@/lib/unusual-whales/mcp";
-import { PEAKFLOW_PATH, PRICING_PATH } from "@/lib/unusual-whales/tool-catalog";
+import { runPeakAiUwDeskNote, unusualWhalesMetaFromResults } from "@/lib/unusual-whales/tool-catalog";
 
 function clamp01(x: number) {
   return Math.max(0, Math.min(1, x));
@@ -133,27 +133,24 @@ export async function POST(request: Request) {
     }
   }
 
-  if (wantsChat && !canCallUw && looksLikeUnusualWhalesPrompt(`${text} ${query}`)) {
-    const reply =
-      `PeakPlus unlocks live Unusual Whales from Peak AI — flow, dark pool, congress, and tide. ` +
-      `You're on the ${planLabel} plan. Upgrade to PeakPlus (or Peakflow) to pull the tape → ${PRICING_PATH}. ` +
-      `The full desk is at ${PEAKFLOW_PATH}.`;
+  if (wantsChat && looksLikeUnusualWhalesPrompt(`${text} ${query}`)) {
+    const desk = await runPeakAiUwDeskNote({
+      userText: `${text} ${query}`,
+      canCallLive: canCallUw,
+      demoMode,
+      callTool: callMcpTool,
+    });
     return NextResponse.json({
-      reply,
+      reply: desk.reply,
       meta: {
         prob,
-        probYes: prob,
+        probYes: extractProbYesFromText(desk.reply) ?? prob,
         crowdYes,
         disagree: false,
-        used: "gated",
+        used: desk.result.status === "gated" ? "gated" : demoMode ? "demo" : "unusual-whales",
         web: Boolean(webSummary),
-        unusualWhales: {
-          used: false,
-          gated: true,
-          demo: false,
-          tools: [],
-          peakflowUrl: PEAKFLOW_PATH,
-        },
+        unusualWhales: unusualWhalesMetaFromResults([desk.result]),
+        plan: planLabel,
       },
     });
   }

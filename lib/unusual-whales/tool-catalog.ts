@@ -313,6 +313,8 @@ export function executePeakAiUwTool(input: {
     });
   }
 
+  const toolName: UwToolName = input.name;
+
   if (!input.canCallLive) {
     return Promise.resolve({
       ...base,
@@ -326,21 +328,22 @@ export function executePeakAiUwTool(input: {
     });
   }
 
+  const source: "live" | "demo" = input.demoMode ? "demo" : "live";
+
   return input
-    .callTool(input.name, input.args)
+    .callTool(toolName, input.args)
     .then((raw) => {
-      const data = applyTickerFilter(input.name, raw, tickerFilter);
-      const prints = printsForTool(input.name, data);
-      const source = input.demoMode ? "demo" : "live";
+      const data = applyTickerFilter(toolName, raw, tickerFilter);
+      const prints = printsForTool(toolName, data);
       const count = prints.length;
       const tickerBit = tickerFilter ? ` for ${tickerFilter}` : "";
       const summary =
         count > 0
-          ? `${count} ${input.name.replace(/_/g, " ")} print${count === 1 ? "" : "s"}${tickerBit}`
-          : `No matching ${input.name.replace(/_/g, " ")} prints${tickerBit}`;
-      return {
+          ? `${count} ${toolName.replace(/_/g, " ")} print${count === 1 ? "" : "s"}${tickerBit}`
+          : `No matching ${toolName.replace(/_/g, " ")} prints${tickerBit}`;
+      const ok: PeakAiUwExecuteResult = {
         ...base,
-        status: "ok" as const,
+        status: "ok",
         calledLive: true,
         source,
         summary,
@@ -350,6 +353,7 @@ export function executePeakAiUwTool(input: {
             ? "DEMO data — you MUST tell the user these are labeled demo prints, not live Unusual Whales. Summarize the prints; do not dump JSON. End with Open Peakflow → /peakflow."
             : "Summarize these prints like Peakflow cards (ticker, call/put, premium). Do not dump JSON. End with Open Peakflow → /peakflow.",
       };
+      return ok;
     })
     .catch((err: unknown) => ({
       ...base,
@@ -360,6 +364,77 @@ export function executePeakAiUwTool(input: {
       prints: [],
       note: `Say the desk pull failed and point them to ${PEAKFLOW_PATH}. Do not invent prints.`,
     }));
+}
+
+export function inferPeakAiUwTool(text: string): { name: UwToolName; ticker: string | null } {
+  const t = text.toLowerCase();
+  let name: UwToolName = "flow_alerts";
+  if (/\bdark\s*pools?\b/.test(t)) name = "darkpool_recent";
+  else if (/\bcongress|senator|representative\b/.test(t)) name = "congress_recent_trades";
+  else if (/\btide\b/.test(t)) name = "market_tide";
+  else if (/\bscreener\b/.test(t)) name = "option_screener";
+  else if (/\bheadlines?|news\b/.test(t)) name = "news_headlines";
+  else if (/\bdashboard|snapshot|desk\b/.test(t)) name = "dashboard_snapshot";
+
+  const on = text.match(/\bon\s+\$?([A-Za-z.]{1,5})\b/);
+  const dollar = text.match(/\$([A-Za-z.]{1,5})\b/);
+  const known = text.toUpperCase().match(/\b(NVDA|TSLA|AAPL|AMZN|MSFT|META|GOOG|GOOGL|SPY|QQQ|IWM|AMD)\b/);
+  const raw = on?.[1] ?? dollar?.[1] ?? known?.[1] ?? null;
+  const ticker = raw ? raw.toUpperCase() : null;
+  return { name, ticker };
+}
+
+export function formatPeakAiUwDeskNote(result: PeakAiUwExecuteResult): string {
+  if (result.status === "gated") {
+    return (
+      "PeakPlus unlocks live Unusual Whales from Peak AI — flow, dark pool, congress, and tide. " +
+      `Upgrade to PeakPlus (or Peakflow) to pull the tape → ${PRICING_PATH}. ` +
+      `The full desk is at ${PEAKFLOW_PATH}.`
+    );
+  }
+  if (result.status !== "ok") {
+    return `${result.summary} Open Peakflow → ${PEAKFLOW_PATH}`;
+  }
+  const lines = [
+    result.source === "demo" ? "Demo Unusual Whales tape (not live):" : "Unusual Whales tape:",
+    result.summary,
+    ...result.prints.slice(0, 6).map((line) => `• ${line}`),
+    `Open Peakflow for the full desk → ${PEAKFLOW_PATH}`,
+  ];
+  return lines.join("\n");
+}
+
+export async function runPeakAiUwDeskNote(input: {
+  userText: string;
+  canCallLive: boolean;
+  demoMode: boolean;
+  callTool: PeakAiUwCaller;
+}): Promise<{ reply: string; result: PeakAiUwExecuteResult }> {
+  const inferred = inferPeakAiUwTool(input.userText);
+  const result = await executePeakAiUwTool({
+    name: inferred.name,
+    args: inferred.ticker ? { ticker: inferred.ticker } : {},
+    canCallLive: input.canCallLive,
+    demoMode: input.demoMode,
+    callTool: input.callTool,
+  });
+  return { reply: formatPeakAiUwDeskNote(result), result };
+}
+
+export function unusualWhalesMetaFromResults(results: PeakAiUwExecuteResult[]): {
+  used: boolean;
+  gated: boolean;
+  demo: boolean;
+  tools: string[];
+  peakflowUrl: typeof PEAKFLOW_PATH;
+} {
+  return {
+    used: results.some((r) => r.status === "ok"),
+    gated: results.some((r) => r.status === "gated"),
+    demo: results.some((r) => r.source === "demo"),
+    tools: results.map((r) => r.tool),
+    peakflowUrl: PEAKFLOW_PATH,
+  };
 }
 
 export function finalizePeakAiUwReply(
