@@ -125,6 +125,7 @@ export default function PricingPage({
               "PeakPlus member badge on your posts",
               "Delete your own market cards",
               "Priority @peak replies",
+              "Ask @peak for Unusual Whales flow, dark pool, and congress",
               "Enhanced feed filters",
               "Peakflow Unusual Whales dashboard",
             ]}

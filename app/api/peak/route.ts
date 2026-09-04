@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
-
-import { getSession } from "@/lib/auth/session";
 import OpenAI from "openai";
 
+import { getSession } from "@/lib/auth/session";
 import { openAIMarketModel } from "@/lib/markets/openai-model";
+import { hasPeakPlusTier, memberPlanDisplayName } from "@/lib/membership/plans";
+import { runPeakAiChat } from "@/lib/peak-ai/chat";
+import { looksLikeUnusualWhalesPrompt } from "@/lib/peak-ai/uw-prompt";
+import { resolveEffectiveMemberPlan } from "@/lib/stripe/subscription-sync";
+import { isUnusualWhalesDemoMode } from "@/lib/unusual-whales/config";
+import { callMcpTool } from "@/lib/unusual-whales/mcp";
+import { PEAKFLOW_PATH, PRICING_PATH } from "@/lib/unusual-whales/tool-catalog";
 
 function clamp01(x: number) {
   return Math.max(0, Math.min(1, x));
@@ -44,6 +50,7 @@ export async function POST(request: Request) {
     text?: string;
     outcomes?: { yes?: number; no?: number };
     query?: string;
+    mode?: string;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -56,14 +63,21 @@ export async function POST(request: Request) {
   const no = clamp01(Number(body.outcomes?.no ?? 1 - yes));
   const prob = clamp01((yes + (1 - no)) / 2);
   const crowdYes = yes;
+  const query = (body.query ?? text).slice(0, 240).trim();
+  const wantsChat =
+    body.mode === "chat" || looksLikeUnusualWhalesPrompt(`${text} ${query}`);
 
   const openaiKey = process.env.OPENAI_API_KEY ?? "";
   const model = openAIMarketModel();
   const tavilyKey = process.env.TAVILY_API_KEY ?? "";
 
+  const plan = await resolveEffectiveMemberPlan(session.user);
+  const canCallUw = hasPeakPlusTier(plan);
+  const demoMode = isUnusualWhalesDemoMode();
+  const planLabel = memberPlanDisplayName(plan);
+
   // Optional live web pull via Tavily (fast, simple).
   let webSummary = "";
-  const query = (body.query ?? text).slice(0, 240).trim();
   if (tavilyKey && query) {
     try {
       const r = await fetch("https://api.tavily.com/search", {
@@ -84,7 +98,67 @@ export async function POST(request: Request) {
     }
   }
 
-  if (openaiKey) {
+  if (wantsChat && openaiKey) {
+    try {
+      const client = new OpenAI({ apiKey: openaiKey });
+      const chat = await runPeakAiChat({
+        client,
+        model,
+        userText: text,
+        query,
+        webSummary,
+        canCallUw,
+        demoMode,
+        planLabel,
+        callTool: callMcpTool,
+      });
+      if (chat.reply) {
+        const probYes = extractProbYesFromText(chat.reply) ?? prob;
+        return NextResponse.json({
+          reply: chat.reply,
+          meta: {
+            prob,
+            probYes,
+            crowdYes,
+            disagree: Math.abs(probYes - crowdYes) >= 0.08,
+            used: "openai",
+            model,
+            web: Boolean(webSummary),
+            unusualWhales: chat.unusualWhales,
+          },
+        });
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  if (wantsChat && !canCallUw && looksLikeUnusualWhalesPrompt(`${text} ${query}`)) {
+    const reply =
+      `PeakPlus unlocks live Unusual Whales from Peak AI — flow, dark pool, congress, and tide. ` +
+      `You're on the ${planLabel} plan. Upgrade to PeakPlus (or Peakflow) to pull the tape → ${PRICING_PATH}. ` +
+      `The full desk is at ${PEAKFLOW_PATH}.`;
+    return NextResponse.json({
+      reply,
+      meta: {
+        prob,
+        probYes: prob,
+        crowdYes,
+        disagree: false,
+        used: "gated",
+        web: Boolean(webSummary),
+        unusualWhales: {
+          used: false,
+          gated: true,
+          demo: false,
+          tools: [],
+          peakflowUrl: PEAKFLOW_PATH,
+        },
+      },
+    });
+  }
+
+  if (openaiKey && !wantsChat) {
     try {
       const client = new OpenAI({ apiKey: openaiKey });
       const system =
@@ -146,4 +220,3 @@ export async function POST(request: Request) {
     },
   });
 }
-
