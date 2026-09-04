@@ -1,11 +1,13 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 
 type InfoPageProps = {
   title: string;
   body: string;
+  children?: ReactNode;
 };
 
-export default function InfoPage({ title, body }: InfoPageProps) {
+export default function InfoPage({ title, body, children }: InfoPageProps) {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-zinc-100 px-4 py-10 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
       <section className="w-full max-w-2xl rounded-2xl border border-zinc-300/80 bg-white p-6 shadow-lg shadow-zinc-900/10 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-black/20 sm:p-8">
@@ -15,6 +17,7 @@ export default function InfoPage({ title, body }: InfoPageProps) {
         <p className="mt-4 text-sm leading-7 text-zinc-600 dark:text-zinc-300">
           {body}
         </p>
+        {children}
         <div className="mt-8 flex gap-3">
           <Link
             href="/"
