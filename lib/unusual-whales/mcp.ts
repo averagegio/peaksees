@@ -2,82 +2,15 @@ import "server-only";
 
 import { unusualWhalesTools } from "./client";
 import { isUnusualWhalesDemoMode } from "./config";
+import {
+  limitFromArgs,
+  UW_TOOL_CATALOG,
+  type UwToolName,
+} from "./tool-catalog";
 
-export type McpToolName = keyof typeof unusualWhalesTools;
+export type McpToolName = UwToolName;
 
-export const MCP_TOOLS: Array<{
-  name: McpToolName;
-  description: string;
-  inputSchema: Record<string, unknown>;
-}> = [
-  {
-    name: "flow_alerts",
-    description: "Unusual options flow alerts from Unusual Whales (volume/OI, premium, OTM filters).",
-    inputSchema: {
-      type: "object",
-      properties: {
-        limit: { type: "number", minimum: 1, maximum: 200 },
-      },
-    },
-  },
-  {
-    name: "darkpool_recent",
-    description: "Recent market-wide dark pool prints.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        limit: { type: "number", minimum: 1, maximum: 200 },
-      },
-    },
-  },
-  {
-    name: "congress_recent_trades",
-    description: "Recently disclosed congressional stock trades.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        limit: { type: "number", minimum: 1, maximum: 200 },
-      },
-    },
-  },
-  {
-    name: "market_tide",
-    description: "Market Tide net call vs put premium series.",
-    inputSchema: { type: "object", properties: {} },
-  },
-  {
-    name: "option_screener",
-    description: "Hottest option contracts screener.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        limit: { type: "number", minimum: 1, maximum: 200 },
-      },
-    },
-  },
-  {
-    name: "news_headlines",
-    description: "Latest Unusual Whales news headlines.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        limit: { type: "number", minimum: 1, maximum: 50 },
-      },
-    },
-  },
-  {
-    name: "dashboard_snapshot",
-    description: "Combined Peaksees Unusual Whales dashboard snapshot (flow, dark pool, congress, tide, screener, news).",
-    inputSchema: { type: "object", properties: {} },
-  },
-];
-
-function limitFromArgs(args: Record<string, unknown> | undefined, fallback: number): number {
-  const raw = args?.limit;
-  const n = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : fallback;
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(200, Math.max(1, Math.floor(n)));
-}
+export const MCP_TOOLS = UW_TOOL_CATALOG;
 
 export async function callMcpTool(
   name: string,

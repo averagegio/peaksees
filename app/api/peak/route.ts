@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
-
-import { getSession } from "@/lib/auth/session";
 import OpenAI from "openai";
 
+import { getSession } from "@/lib/auth/session";
 import { openAIMarketModel } from "@/lib/markets/openai-model";
+import { hasPeakPlusTier, memberPlanDisplayName } from "@/lib/membership/plans";
+import { runPeakAiChat } from "@/lib/peak-ai/chat";
+import { looksLikeUnusualWhalesPrompt } from "@/lib/peak-ai/uw-prompt";
+import { resolveEffectiveMemberPlan } from "@/lib/stripe/subscription-sync";
+import { getPersonalDeskEntry } from "@/lib/unusual-whales/access";
+import { isUnusualWhalesDemoMode } from "@/lib/unusual-whales/config";
+import { callMcpTool } from "@/lib/unusual-whales/mcp";
+import { runPeakAiUwDeskNote, unusualWhalesMetaFromResults } from "@/lib/unusual-whales/tool-catalog";
 
 function clamp01(x: number) {
   return Math.max(0, Math.min(1, x));
@@ -37,13 +44,12 @@ function extractProbYesFromText(text: string): number | null {
 }
 
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   let body: {
     text?: string;
     outcomes?: { yes?: number; no?: number };
     query?: string;
+    mode?: string;
+    source?: string;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -51,19 +57,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
+  const fromDesk = body.source === "desk";
+  const session = await getSession();
+  const personalDesk = fromDesk ? await getPersonalDeskEntry() : { ok: false as const };
+  if (!session && !personalDesk.ok) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const text = typeof body.text === "string" ? body.text : "";
   const yes = clamp01(Number(body.outcomes?.yes ?? 0.55));
   const no = clamp01(Number(body.outcomes?.no ?? 1 - yes));
   const prob = clamp01((yes + (1 - no)) / 2);
   const crowdYes = yes;
+  const query = (body.query ?? text).slice(0, 240).trim();
+  const wantsChat =
+    body.mode === "chat" || looksLikeUnusualWhalesPrompt(`${text} ${query}`);
 
   const openaiKey = process.env.OPENAI_API_KEY ?? "";
+  /** Same OPENAI_MODEL as market card generation (`openAIMarketModel`). */
   const model = openAIMarketModel();
   const tavilyKey = process.env.TAVILY_API_KEY ?? "";
 
+  const plan = session ? await resolveEffectiveMemberPlan(session.user) : "free";
+  const canCallUw = hasPeakPlusTier(plan) || personalDesk.ok;
+  const demoMode = isUnusualWhalesDemoMode();
+  const planLabel =
+    personalDesk.ok && !hasPeakPlusTier(plan)
+      ? "Peak Flow desk"
+      : memberPlanDisplayName(plan);
+
   // Optional live web pull via Tavily (fast, simple).
   let webSummary = "";
-  const query = (body.query ?? text).slice(0, 240).trim();
   if (tavilyKey && query) {
     try {
       const r = await fetch("https://api.tavily.com/search", {
@@ -84,7 +108,64 @@ export async function POST(request: Request) {
     }
   }
 
-  if (openaiKey) {
+  if (wantsChat && openaiKey) {
+    try {
+      const client = new OpenAI({ apiKey: openaiKey });
+      const chat = await runPeakAiChat({
+        client,
+        model,
+        userText: text,
+        query,
+        webSummary,
+        canCallUw,
+        demoMode,
+        planLabel,
+        callTool: callMcpTool,
+      });
+      if (chat.reply) {
+        const probYes = extractProbYesFromText(chat.reply) ?? prob;
+        return NextResponse.json({
+          reply: chat.reply,
+          meta: {
+            prob,
+            probYes,
+            crowdYes,
+            disagree: Math.abs(probYes - crowdYes) >= 0.08,
+            used: "openai",
+            model,
+            web: Boolean(webSummary),
+            unusualWhales: chat.unusualWhales,
+          },
+        });
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  if (wantsChat && looksLikeUnusualWhalesPrompt(`${text} ${query}`)) {
+    const desk = await runPeakAiUwDeskNote({
+      userText: `${text} ${query}`,
+      canCallLive: canCallUw,
+      demoMode,
+      callTool: callMcpTool,
+    });
+    return NextResponse.json({
+      reply: desk.reply,
+      meta: {
+        prob,
+        probYes: prob,
+        crowdYes,
+        disagree: false,
+        used: desk.result.status === "gated" ? "gated" : demoMode ? "demo" : "unusual-whales",
+        web: Boolean(webSummary),
+        unusualWhales: unusualWhalesMetaFromResults([desk.result]),
+        plan: planLabel,
+      },
+    });
+  }
+
+  if (openaiKey && !wantsChat) {
     try {
       const client = new OpenAI({ apiKey: openaiKey });
       const system =
@@ -146,4 +227,3 @@ export async function POST(request: Request) {
     },
   });
 }
-

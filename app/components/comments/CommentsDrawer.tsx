@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { safeJson } from "@/lib/http";
+import { PeakAiReplyBody } from "@/app/components/peak-ai/PeakAiReplyBody";
 import { ProfileLink } from "@/app/components/profile/ProfileLink";
+import { safeJson } from "@/lib/http";
+import { peakAiToolStatusLabel } from "@/lib/peak-ai/uw-prompt";
 
 type Comment = {
   id: string;
@@ -15,6 +17,15 @@ type Comment = {
   upvotes: number;
   viewerUpvoted: boolean;
 };
+
+function CommentBody({ text }: { text: string }) {
+  const isPeakReply = /^Peak:/i.test(text);
+  return (
+    <div className="mt-1">
+      <PeakAiReplyBody text={text} alreadyOnPeakflow={!isPeakReply} />
+    </div>
+  );
+}
 
 export function CommentsDrawer({
   open,
@@ -31,6 +42,7 @@ export function CommentsDrawer({
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [peakStatus, setPeakStatus] = useState<string | null>(null);
 
   const canSubmit = useMemo(() => text.trim().length > 0, [text]);
 
@@ -77,22 +89,34 @@ export function CommentsDrawer({
     }
 
     if (/\B@peak\b/i.test(t)) {
+      setPeakStatus(peakAiToolStatusLabel(t));
       try {
         const peakRes = await fetch("/api/peak", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ postKey, text: t, query: title }),
+          body: JSON.stringify({ postKey, text: t, query: title, mode: "chat" }),
         });
-        const peakData = (await safeJson<{ reply?: string }>(peakRes)) ?? {};
+        const peakData =
+          (await safeJson<{
+            reply?: string;
+            meta?: { unusualWhales?: { peakflowUrl?: string; used?: boolean; gated?: boolean } };
+          }>(peakRes)) ?? {};
         if (peakRes.ok && peakData.reply) {
+          const uw = peakData.meta?.unusualWhales;
+          const extra =
+            uw && !/\/peakflow/i.test(peakData.reply)
+              ? "\n\nOpen Peakflow → /peakflow"
+              : "";
           await fetch("/api/comments", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ postKey, text: `Peak: ${peakData.reply}` }),
+            body: JSON.stringify({ postKey, text: `Peak: ${peakData.reply}${extra}` }),
           });
         }
       } catch {
         // ignore
+      } finally {
+        setPeakStatus(null);
       }
     }
     // reload to pick up computed upvotes/viewer flags
@@ -193,9 +217,7 @@ export function CommentsDrawer({
                         >
                           {c.displayName}
                         </ProfileLink>
-                        <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-200">
-                          {c.text}
-                        </p>
+                        <CommentBody text={c.text} />
                       </div>
                     </div>
                     <button
@@ -218,16 +240,25 @@ export function CommentsDrawer({
         </div>
 
         <footer className="border-t border-zinc-100 p-4 dark:border-zinc-800">
+          {peakStatus ? (
+            <p
+              className="mb-2 text-xs font-semibold text-violet-700 dark:text-violet-300"
+              role="status"
+            >
+              {peakStatus}
+            </p>
+          ) : null}
           <div className="flex gap-2">
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Write a comment… (try @peak)"
+              placeholder="Write a comment… (try @peak what’s the flow on NVDA?)"
               className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+              disabled={Boolean(peakStatus)}
             />
             <button
               type="button"
-              disabled={!canSubmit}
+              disabled={!canSubmit || Boolean(peakStatus)}
               className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
               onClick={submit}
             >

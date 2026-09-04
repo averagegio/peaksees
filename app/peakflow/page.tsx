@@ -57,7 +57,7 @@ export default async function PeakflowPage() {
             </h1>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
               Unusual Whales options flow, dark pool, and congressional tape.
-              Requires a PeakPlus plan or higher.
+              Ask Peak for a ticker or option. Requires a PeakPlus plan or higher.
             </p>
           </div>
         </header>
