@@ -8,11 +8,14 @@ export function PeakOpinionChip({
   question,
   crowdYes,
   enabled,
+  postKey,
   refetchNonce = 0,
 }: {
   question: string;
   crowdYes: number;
   enabled: boolean;
+  /** When set, Peak weighs comment-thread sentiment for a dissenting take. */
+  postKey?: string;
   /** Bump to call /api/peak again (e.g. user retaps peaksees). */
   refetchNonce?: number;
 }) {
@@ -36,7 +39,11 @@ export function PeakOpinionChip({
         const res = await fetch("/api/peak", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: question, outcomes: { yes: crowdYes, no: 1 - crowdYes } }),
+          body: JSON.stringify({
+            text: question,
+            outcomes: { yes: crowdYes, no: 1 - crowdYes },
+            ...(postKey ? { postKey } : {}),
+          }),
         });
         const data =
           (await safeJson<{ meta?: { probYes?: number; disagree?: boolean } }>(res)) ??
@@ -55,7 +62,7 @@ export function PeakOpinionChip({
     return () => {
       cancelled = true;
     };
-  }, [enabled, question, crowdYes, refetchNonce]);
+  }, [enabled, question, crowdYes, postKey, refetchNonce]);
 
   if (!enabled) return null;
 

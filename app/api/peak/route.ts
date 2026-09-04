@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import OpenAI from "openai";
 
 import { openAIMarketModel } from "@/lib/markets/openai-model";
+import { listComments } from "@/lib/social/comments-store";
 
 function clamp01(x: number) {
   return Math.max(0, Math.min(1, x));
@@ -36,6 +37,26 @@ function extractProbYesFromText(text: string): number | null {
   return null;
 }
 
+/** Rough YES lean from comment thread (bullish vs bearish tokens). */
+function commentThreadYesLean(texts: string[]): number | null {
+  if (texts.length === 0) return null;
+  const yesRe =
+    /\b(yes|yep|yeah|bull|bullish|agree|likely|will happen|locks|easy|locks in|definitely|for sure|obviously)\b/i;
+  const noRe =
+    /\b(no|nah|nope|bear|bearish|disagree|unlikely|never|doubt|fade|against|no chance|overrated)\b/i;
+  let yesScore = 0;
+  let noScore = 0;
+  for (const raw of texts) {
+    const t = raw.trim();
+    if (!t || /^Peak:/i.test(t)) continue;
+    if (yesRe.test(t)) yesScore += 1;
+    if (noRe.test(t)) noScore += 1;
+  }
+  const total = yesScore + noScore;
+  if (total === 0) return null;
+  return clamp01(yesScore / total);
+}
+
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -44,6 +65,7 @@ export async function POST(request: Request) {
     text?: string;
     outcomes?: { yes?: number; no?: number };
     query?: string;
+    postKey?: string;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -56,6 +78,22 @@ export async function POST(request: Request) {
   const no = clamp01(Number(body.outcomes?.no ?? 1 - yes));
   const prob = clamp01((yes + (1 - no)) / 2);
   const crowdYes = yes;
+  const postKey = typeof body.postKey === "string" ? body.postKey.trim() : "";
+
+  let commentYesLean: number | null = null;
+  let commentCount = 0;
+  if (postKey) {
+    try {
+      const comments = await listComments({
+        postKey,
+        viewerUserId: session.user.id,
+      });
+      commentCount = comments.length;
+      commentYesLean = commentThreadYesLean(comments.map((c) => c.text));
+    } catch {
+      // ignore comment lookup failures
+    }
+  }
 
   const openaiKey = process.env.OPENAI_API_KEY ?? "";
   const model = openAIMarketModel();
@@ -84,16 +122,26 @@ export async function POST(request: Request) {
     }
   }
 
+  const commentBlurb =
+    commentYesLean == null
+      ? commentCount > 0
+        ? `Comment thread has ${commentCount} replies but no clear YES/NO lean.`
+        : "No usable comment-thread sentiment yet."
+      : `Comment-thread sentiment leans about ${(commentYesLean * 100).toFixed(0)}% YES across ${commentCount} replies.`;
+
   if (openaiKey) {
     try {
       const client = new OpenAI({ apiKey: openaiKey });
       const system =
         "You are Peak, a sharp prediction-market assistant. " +
         "Give a probability assessment and a short rationale. " +
+        "When comment-section sentiment is one-sided, deliberately offer a dissenting second opinion " +
+        "and explain what the crowd/thread may be missing. " +
         "Be concise, avoid financial advice, and clearly state uncertainty.";
       const user =
         `Market text:\n${text}\n\n` +
         `Polling snapshot: YES ${(yes * 100).toFixed(0)}%, NO ${(no * 100).toFixed(0)}%\n\n` +
+        `Comment section: ${commentBlurb}\n\n` +
         (webSummary ? `Web summary:\n${webSummary}\n\n` : "") +
         "Reply with 2-4 sentences and include an updated % estimate.";
 
@@ -116,6 +164,8 @@ export async function POST(request: Request) {
             prob,
             probYes,
             crowdYes,
+            commentYesLean,
+            commentCount,
             disagree: Math.abs(probYes - crowdYes) >= 0.08,
             used: "openai",
             model,
@@ -128,22 +178,34 @@ export async function POST(request: Request) {
     }
   }
 
+  // Heuristic Peak: take the opposite side of comment-thread lean (or crowd) as a second opinion.
+  const dissentFrom =
+    commentYesLean != null ? commentYesLean : crowdYes;
+  // Mirror around 50% with a soft floor/ceiling so Peak isn't 0%/100% absolute.
+  const mirrored = 0.5 - (dissentFrom - 0.5) * 1.1;
+  const probYes = clamp01(Math.min(0.88, Math.max(0.12, mirrored)));
   const confidence =
-    prob > 0.66 ? "high" : prob > 0.55 ? "moderate" : prob > 0.48 ? "slight" : "low";
+    Math.abs(probYes - 0.5) > 0.2
+      ? "high"
+      : Math.abs(probYes - 0.5) > 0.1
+        ? "moderate"
+        : "slight";
   const reply =
-    `Based on current polling, I'd put this at about ${(prob * 100).toFixed(0)}% ` +
-    `(${confidence} confidence). Consider what new information could swing the market.`;
+    commentYesLean != null
+      ? `Thread sentiment is running ~${(commentYesLean * 100).toFixed(0)}% YES, but I'd take the other side at about ${(probYes * 100).toFixed(0)}% YES (${confidence} confidence). The comment section looks crowded — watch for new info that could swing the quiet minority.`
+      : `Based on current polling (~${(crowdYes * 100).toFixed(0)}% YES), I'd push back to about ${(probYes * 100).toFixed(0)}% YES (${confidence} confidence). Consider what new information could swing the market.`;
 
   return NextResponse.json({
     reply,
     meta: {
       prob,
-      probYes: prob,
+      probYes,
       crowdYes,
-      disagree: Math.abs(prob - crowdYes) >= 0.08,
+      commentYesLean,
+      commentCount,
+      disagree: Math.abs(probYes - crowdYes) >= 0.08,
       used: "heuristic",
       web: Boolean(webSummary),
     },
   });
 }
-

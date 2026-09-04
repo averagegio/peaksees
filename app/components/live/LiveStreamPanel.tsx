@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  LocalAudioTrack,
+  LocalVideoTrack,
   Room,
   RoomEvent,
   Track,
@@ -10,6 +12,68 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { safeJson } from "@/lib/http";
+
+/** Synthetic A/V when the browser has no camera/mic (headless demo VMs). */
+async function createFallbackPublisherTracks(): Promise<{
+  videoTrack: LocalVideoTrack;
+  audioTrack: LocalAudioTrack;
+  stream: MediaStream;
+}> {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1280;
+  canvas.height = 720;
+  const ctx = canvas.getContext("2d");
+  let frame = 0;
+  const draw = () => {
+    if (!ctx) return;
+    frame += 1;
+    const g = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    g.addColorStop(0, "#064e3b");
+    g.addColorStop(1, "#022c22");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ecfdf5";
+    ctx.font = "bold 64px sans-serif";
+    ctx.fillText("peaksees LIVE", 80, 200);
+    ctx.font = "32px sans-serif";
+    ctx.fillStyle = "#a7f3d0";
+    ctx.fillText("Demo stream (no camera)", 80, 270);
+    ctx.fillStyle = `hsla(${(frame * 3) % 360} 70% 55% / 0.9)`;
+    ctx.beginPath();
+    ctx.arc(1100, 160, 36 + Math.sin(frame / 8) * 8, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  draw();
+  const timer = window.setInterval(draw, 100);
+  const canvasStream = canvas.captureStream(10);
+  const videoMsTrack = canvasStream.getVideoTracks()[0];
+  if (!videoMsTrack) {
+    window.clearInterval(timer);
+    throw new Error("Could not create fallback video track");
+  }
+  videoMsTrack.addEventListener("ended", () => window.clearInterval(timer));
+
+  const audioCtx = new AudioContext();
+  const oscillator = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  gain.gain.value = 0.0001; // near-silent
+  oscillator.connect(gain);
+  const dest = audioCtx.createMediaStreamDestination();
+  gain.connect(dest);
+  oscillator.start();
+  const audioMsTrack = dest.stream.getAudioTracks()[0];
+  if (!audioMsTrack) {
+    window.clearInterval(timer);
+    oscillator.stop();
+    void audioCtx.close();
+    throw new Error("Could not create fallback audio track");
+  }
+
+  const videoTrack = new LocalVideoTrack(videoMsTrack);
+  const audioTrack = new LocalAudioTrack(audioMsTrack);
+  const stream = new MediaStream([videoMsTrack, audioMsTrack]);
+  return { videoTrack, audioTrack, stream };
+}
 
 type LiveConfig = {
   configured: boolean;
@@ -168,11 +232,24 @@ export function LiveStreamPanel({
       await room.connect(data.url, data.token);
 
       if (role === "publisher") {
-        const videoTrack = await createLocalVideoTrack({
-          resolution: { width: 1280, height: 720, frameRate: 30 },
-        });
-        const audioTrack = await createLocalAudioTrack();
-        const stream = new MediaStream([videoTrack.mediaStreamTrack, audioTrack.mediaStreamTrack]);
+        let videoTrack: LocalVideoTrack;
+        let audioTrack: LocalAudioTrack;
+        let stream: MediaStream;
+        try {
+          videoTrack = await createLocalVideoTrack({
+            resolution: { width: 1280, height: 720, frameRate: 30 },
+          });
+          audioTrack = await createLocalAudioTrack();
+          stream = new MediaStream([
+            videoTrack.mediaStreamTrack,
+            audioTrack.mediaStreamTrack,
+          ]);
+        } catch {
+          const fallback = await createFallbackPublisherTracks();
+          videoTrack = fallback.videoTrack;
+          audioTrack = fallback.audioTrack;
+          stream = fallback.stream;
+        }
         localStreamRef.current = stream;
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
