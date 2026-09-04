@@ -22,9 +22,28 @@ function collapsePlanToken(raw: string | null | undefined): string {
 
 export function normalizeMemberPlan(raw: string | null | undefined): MemberPlan {
   const v = collapsePlanToken(raw);
-  if (v === "peakplus" || v === "plus" || v === "peak+") return "peakplus";
-  if (v === "peakpro" || v === "pro") return "peakpro";
-  if (v === "peakenterprise" || v === "enterprise") return "peakenterprise";
+  if (
+    v === "peakplus" ||
+    v === "plus" ||
+    v === "peak+" ||
+    v === "premium" ||
+    v === "paid" ||
+    v === "subscriber" ||
+    v === "peakplusmonthly" ||
+    v === "plusmonthly"
+  ) {
+    return "peakplus";
+  }
+  if (v === "peakpro" || v === "pro" || v === "peakpromonthly" || v === "promonthly") {
+    return "peakpro";
+  }
+  if (
+    v === "peakenterprise" ||
+    v === "enterprise" ||
+    v === "peakenterprisemonthly"
+  ) {
+    return "peakenterprise";
+  }
   return "free";
 }
 
@@ -68,6 +87,9 @@ export function evaluateSubscriberDeskAccess(input: {
   /** ADMIN_EMAILS / owner flag — ignored. Admin bypass is /whales only. */
   isAdmin?: boolean;
   hasPersonalToken?: boolean;
+  /** Active / trialing / past_due Stripe subscription — honors a paid upgrade. */
+  stripeSubscriptionActive?: boolean;
+  stripePlan?: string | null;
 }): SubscriberDeskDecision {
   if (!input.signedIn) {
     return {
@@ -78,7 +100,16 @@ export function evaluateSubscriberDeskAccess(input: {
     };
   }
 
-  const plan = normalizeMemberPlan(input.memberPlan);
+  const stored = normalizeMemberPlan(input.memberPlan);
+  const fromStripeField = normalizeMemberPlan(input.stripePlan);
+  const fromStripeActive =
+    input.stripeSubscriptionActive === true ? ("peakplus" as const) : null;
+  const plan = hasPeakPlusTier(stored)
+    ? stored
+    : hasPeakPlusTier(fromStripeField)
+      ? fromStripeField
+      : (fromStripeActive ?? stored);
+
   if (!planAllowsPeakflow(plan)) {
     return {
       ok: false,

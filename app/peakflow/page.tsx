@@ -12,13 +12,16 @@ import {
   evaluateSubscriberDeskAccess,
   normalizeMemberPlan,
 } from "@/lib/membership/plans";
+import { resolveEffectiveMemberPlan } from "@/lib/stripe/subscription-sync";
 import { fetchDashboardSnapshot } from "@/lib/unusual-whales/client";
 
 export default async function PeakflowPage() {
   const session = await getSession();
   if (!session) redirect("/login?next=/peakflow");
 
-  const currentPlan = normalizeMemberPlan(session.user.memberPlan);
+  const currentPlan = normalizeMemberPlan(
+    await resolveEffectiveMemberPlan(session.user),
+  );
   const access = evaluateSubscriberDeskAccess({
     signedIn: true,
     memberPlan: currentPlan,

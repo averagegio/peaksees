@@ -28,6 +28,10 @@ export async function testNormalizeMemberPlanAliases() {
   assert(normalizeMemberPlan("peak_plus") === "peakplus", "peak_plus");
   assert(normalizeMemberPlan("peak-plus") === "peakplus", "peak-plus");
   assert(normalizeMemberPlan("peak plus") === "peakplus", "peak plus");
+  assert(normalizeMemberPlan("premium") === "peakplus", "premium alias");
+  assert(normalizeMemberPlan("paid") === "peakplus", "paid alias");
+  assert(normalizeMemberPlan("subscriber") === "peakplus", "subscriber alias");
+  assert(normalizeMemberPlan("peakplus_monthly") === "peakplus", "peakplus_monthly");
 
   assert(normalizeMemberPlan("peakpro") === "peakpro", "canonical peakpro");
   assert(normalizeMemberPlan("PeakPro") === "peakpro", "PeakPro casing");
@@ -132,6 +136,35 @@ export async function testOwnerEmailDoesNotGrantPeakflow() {
   assert(result.code === "unsubscribed", "still unsubscribed on free plan");
 }
 
+export async function testStaleFreePlanHonorsActiveStripe() {
+  const result = evaluateSubscriberDeskAccess({
+    signedIn: true,
+    memberPlan: "free",
+    stripeSubscriptionActive: true,
+  });
+  assert(result.ok && result.plan === "peakplus", "active Stripe upgrades stale free plan");
+}
+
+export async function testStaleFreePlanHonorsStripePlanField() {
+  const result = evaluateSubscriberDeskAccess({
+    signedIn: true,
+    memberPlan: "free",
+    stripePlan: "PeakPro",
+  });
+  assert(result.ok && result.plan === "peakpro", "Stripe plan field wins over stale free");
+}
+
+export async function testPeakflowStillRequiresPeakPlusWithoutStripe() {
+  const result = evaluateSubscriberDeskAccess({
+    signedIn: true,
+    memberPlan: "free",
+    stripeSubscriptionActive: false,
+  });
+  assert(result.ok === false, "free without Stripe still gated");
+  if (result.ok) return;
+  assert(result.code === "unsubscribed", "still unsubscribed");
+}
+
 export async function testUpgradeCopyNamesPeakPlusAndPricing() {
   const copy = peakflowUpgradeCopy("free");
   assert(copy.title.toLowerCase().includes("upgrade"), "title says upgrade");
@@ -158,6 +191,9 @@ const tests = [
   testUnknownPlanIsDenied,
   testPeakPlusAndHigherAllowed,
   testOwnerEmailDoesNotGrantPeakflow,
+  testStaleFreePlanHonorsActiveStripe,
+  testStaleFreePlanHonorsStripePlanField,
+  testPeakflowStillRequiresPeakPlusWithoutStripe,
   testUpgradeCopyNamesPeakPlusAndPricing,
 ];
 

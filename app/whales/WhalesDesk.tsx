@@ -6,7 +6,13 @@ import type { DashboardSnapshot } from "@/lib/unusual-whales/types";
 
 import { RegisterWhalesServiceWorker } from "./RegisterWhalesServiceWorker";
 
-export function WhalesDesk({ initial }: { initial: DashboardSnapshot }) {
+export function WhalesDesk({
+  initial,
+  lockable = true,
+}: {
+  initial: DashboardSnapshot;
+  lockable?: boolean;
+}) {
   async function lock() {
     await fetch("/api/whales/logout", {
       method: "POST",
@@ -27,13 +33,15 @@ export function WhalesDesk({ initial }: { initial: DashboardSnapshot }) {
           <h1 className="text-2xl font-extrabold tracking-tight">Peak Flow</h1>
           <p className="mt-1 text-xs text-zinc-400">Unusual Whales desk · add to Home Screen</p>
         </div>
-        <button
-          type="button"
-          onClick={() => void lock()}
-          className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-200"
-        >
-          Lock
-        </button>
+        {lockable ? (
+          <button
+            type="button"
+            onClick={() => void lock()}
+            className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-200"
+          >
+            Lock
+          </button>
+        ) : null}
       </header>
 
       <div className="mb-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100 [@media(display-mode:standalone)]:hidden">

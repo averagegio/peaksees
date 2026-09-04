@@ -4,7 +4,9 @@ import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 
 import { getSession } from "@/lib/auth/session";
+import { evaluatePersonalDeskAccess } from "@/lib/membership/personal-desk";
 import { evaluateSubscriberDeskAccess } from "@/lib/membership/plans";
+import { resolveEffectiveMemberPlan } from "@/lib/stripe/subscription-sync";
 
 import {
   UW_PERSONAL_COOKIE,
@@ -52,20 +54,41 @@ export async function isOwnerSession(): Promise<boolean> {
   return Boolean(email && emails.includes(email));
 }
 
+export type PersonalDeskEntry =
+  | { ok: true; via: "owner" | "cookie" | "peakplus" }
+  | { ok: false };
+
+export async function getPersonalDeskEntry(): Promise<PersonalDeskEntry> {
+  if (await isOwnerSession()) return { ok: true, via: "owner" };
+  if (await hasValidPersonalDeskCookie()) return { ok: true, via: "cookie" };
+
+  const session = await getSession();
+  if (!session) return { ok: false };
+
+  const plan = await resolveEffectiveMemberPlan(session.user);
+  const access = evaluatePersonalDeskAccess({
+    signedIn: true,
+    memberPlan: plan,
+  });
+  if (!access.ok) return { ok: false };
+  return { ok: true, via: "peakplus" };
+}
+
 export async function canAccessPersonalDesk(): Promise<boolean> {
-  if (await isOwnerSession()) return true;
-  if (await hasValidPersonalDeskCookie()) return true;
-  return false;
+  return (await getPersonalDeskEntry()).ok;
 }
 
 export async function canAccessSubscriberDesk(): Promise<boolean> {
   const session = await getSession();
-  const access = evaluateSubscriberDeskAccess({
-    signedIn: Boolean(session),
-    memberPlan: session?.user.memberPlan,
-    email: session?.user.email,
-  });
-  return access.ok;
+  if (!session) {
+    return evaluateSubscriberDeskAccess({ signedIn: false }).ok;
+  }
+  const plan = await resolveEffectiveMemberPlan(session.user);
+  return evaluateSubscriberDeskAccess({
+    signedIn: true,
+    memberPlan: plan,
+    email: session.user.email,
+  }).ok;
 }
 
 export type DeskAccess =
@@ -90,17 +113,21 @@ export async function requireDeskAccess(desk: UnusualWhalesDesk): Promise<DeskAc
       ok: false,
       status: 401,
       code: "unauthorized",
-      error: "Owner sign-in or personal access token required.",
+      error: "PeakPlus sign-in, owner email, or Peak Flow owner token required.",
     };
   }
 
   // Subscriber desk (/peakflow + dashboard?desk=subscriber): plan only.
   // Do not consult ADMIN_EMAILS or UW_PERSONAL_ACCESS_TOKEN here.
   const session = await getSession();
+  if (!session) {
+    return evaluateSubscriberDeskAccess({ signedIn: false });
+  }
+  const plan = await resolveEffectiveMemberPlan(session.user);
   return evaluateSubscriberDeskAccess({
-    signedIn: Boolean(session),
-    memberPlan: session?.user.memberPlan,
-    email: session?.user.email,
+    signedIn: true,
+    memberPlan: plan,
+    email: session.user.email,
   });
 }
 
