@@ -3,13 +3,14 @@ import "server-only";
 import type Stripe from "stripe";
 
 import { setUserMemberPlan } from "@/lib/auth/users-store";
-import { hasPeakPlusTier, normalizeMemberPlan, type MemberPlan } from "@/lib/membership/plans";
-
 import {
+  hasPeakPlusTier,
   highestPaidPlan,
+  normalizeMemberPlan,
   planFromActiveSubscription,
   planFromStripePriceId,
-} from "./plan-from-subscription";
+  type MemberPlan,
+} from "@/lib/membership/plans";
 import { getStripe } from "./server";
 
 const CACHE_TTL_MS = 30_000;

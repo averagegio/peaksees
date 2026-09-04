@@ -2,10 +2,14 @@ import "server-only";
 
 import type Stripe from "stripe";
 
-import { hasPeakPlusTier, normalizeMemberPlan, type MemberPlan } from "@/lib/membership/plans";
+import {
+  hasPeakPlusTier,
+  normalizeMemberPlan,
+  planFromActiveSubscription,
+  planFromStripePriceId,
+  type MemberPlan,
+} from "@/lib/membership/plans";
 import { setUserMemberPlan } from "@/lib/auth/users-store";
-
-import { planFromActiveSubscription, planFromStripePriceId } from "./plan-from-subscription";
 
 function planFromCheckoutMetadata(
   metadata: Stripe.Metadata | null | undefined,

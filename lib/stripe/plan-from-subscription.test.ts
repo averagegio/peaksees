@@ -3,7 +3,7 @@ import {
   planFromActiveSubscription,
   planFromStripePriceId,
   highestPaidPlan,
-} from "./plan-from-subscription.ts";
+} from "../membership/plans.ts";
 
 function assert(cond: unknown, message: string): asserts cond {
   if (!cond) throw new Error(message);

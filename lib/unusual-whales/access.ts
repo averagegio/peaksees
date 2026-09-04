@@ -4,8 +4,10 @@ import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 
 import { getSession } from "@/lib/auth/session";
-import { evaluatePersonalDeskAccess } from "@/lib/membership/personal-desk";
-import { evaluateSubscriberDeskAccess } from "@/lib/membership/plans";
+import {
+  evaluatePersonalDeskAccess,
+  evaluateSubscriberDeskAccess,
+} from "@/lib/membership/plans";
 import { resolveEffectiveMemberPlan } from "@/lib/stripe/subscription-sync";
 
 import {

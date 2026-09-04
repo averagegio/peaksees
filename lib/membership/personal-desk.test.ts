@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   evaluatePersonalDeskAccess,
   whalesUnlockScreen,
-} from "./personal-desk.ts";
+} from "./plans.ts";
 
 function assert(cond: unknown, message: string): asserts cond {
   if (!cond) throw new Error(message);

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { whalesUnlockScreen } from "@/lib/membership/personal-desk";
+import { whalesUnlockScreen } from "@/lib/membership/plans";
 
 import { unlockWithToken } from "./WhalesDesk";
 import { RegisterWhalesServiceWorker } from "./RegisterWhalesServiceWorker";
