@@ -144,7 +144,7 @@ export async function POST(request: Request) {
       reply: desk.reply,
       meta: {
         prob,
-        probYes: extractProbYesFromText(desk.reply) ?? prob,
+        probYes: prob,
         crowdYes,
         disagree: false,
         used: desk.result.status === "gated" ? "gated" : demoMode ? "demo" : "unusual-whales",
