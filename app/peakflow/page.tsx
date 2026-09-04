@@ -2,18 +2,38 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BackButton } from "@/app/components/BackButton";
-import { PeakflowLocked } from "@/app/components/unusual-whales/PeakflowLocked";
+import {
+  PeakflowLocked,
+  PeakflowUnavailable,
+} from "@/app/components/unusual-whales/PeakflowLocked";
 import { UnusualWhalesBoard } from "@/app/components/unusual-whales/UnusualWhalesBoard";
 import { getSession } from "@/lib/auth/session";
+import {
+  evaluateSubscriberDeskAccess,
+  normalizeMemberPlan,
+} from "@/lib/membership/plans";
 import { fetchDashboardSnapshot } from "@/lib/unusual-whales/client";
-import { hasPeakPlusTier } from "@/lib/membership/plans";
 
 export default async function PeakflowPage() {
   const session = await getSession();
   if (!session) redirect("/login?next=/peakflow");
 
-  const allowed = hasPeakPlusTier(session.user.memberPlan);
-  const snapshot = allowed ? await fetchDashboardSnapshot() : null;
+  const currentPlan = normalizeMemberPlan(session.user.memberPlan);
+  const access = evaluateSubscriberDeskAccess({
+    signedIn: true,
+    memberPlan: currentPlan,
+    email: session.user.email,
+  });
+
+  let snapshot = null;
+  let loadError: string | null = null;
+  if (access.ok) {
+    try {
+      snapshot = await fetchDashboardSnapshot();
+    } catch (err) {
+      loadError = err instanceof Error ? err.message : "Could not load Peakflow.";
+    }
+  }
 
   return (
     <main className="min-h-dvh bg-gradient-to-b from-zinc-100 to-zinc-200/90 px-4 py-10 dark:from-zinc-950 dark:to-zinc-900">
@@ -33,15 +53,19 @@ export default async function PeakflowPage() {
               Peakflow
             </h1>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
-              Unusual Whales options flow, dark pool, and congressional tape for PeakPlus
-              members.
+              Unusual Whales options flow, dark pool, and congressional tape.
+              Requires a PeakPlus plan or higher.
             </p>
           </div>
         </header>
-        {allowed && snapshot ? (
+        {!access.ok ? (
+          <PeakflowLocked signedIn currentPlan={currentPlan} />
+        ) : snapshot ? (
           <UnusualWhalesBoard desk="subscriber" initial={snapshot} />
         ) : (
-          <PeakflowLocked signedIn />
+          <PeakflowUnavailable
+            message={loadError ?? "The Unusual Whales desk returned no data."}
+          />
         )}
       </div>
     </main>

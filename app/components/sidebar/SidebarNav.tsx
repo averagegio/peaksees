@@ -40,7 +40,7 @@ const items = [
   {
     href: "/peakflow",
     label: "Peakflow",
-    subtitle: "Unusual Whales desk",
+    subtitle: "PeakPlus Unusual Whales desk",
     icon: FlowIcon,
   },
   {

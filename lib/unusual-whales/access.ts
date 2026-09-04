@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 
 import { getSession } from "@/lib/auth/session";
-import { hasPeakPlusTier } from "@/lib/membership/plans";
+import { evaluateSubscriberDeskAccess } from "@/lib/membership/plans";
 
 import {
   UW_PERSONAL_COOKIE,
@@ -60,8 +60,12 @@ export async function canAccessPersonalDesk(): Promise<boolean> {
 
 export async function canAccessSubscriberDesk(): Promise<boolean> {
   const session = await getSession();
-  if (!session) return false;
-  return hasPeakPlusTier(session.user.memberPlan);
+  const access = evaluateSubscriberDeskAccess({
+    signedIn: Boolean(session),
+    memberPlan: session?.user.memberPlan,
+    email: session?.user.email,
+  });
+  return access.ok;
 }
 
 export type DeskAccess =
@@ -90,24 +94,14 @@ export async function requireDeskAccess(desk: UnusualWhalesDesk): Promise<DeskAc
     };
   }
 
+  // Subscriber desk (/peakflow + dashboard?desk=subscriber): plan only.
+  // Do not consult ADMIN_EMAILS or UW_PERSONAL_ACCESS_TOKEN here.
   const session = await getSession();
-  if (!session) {
-    return {
-      ok: false,
-      status: 401,
-      code: "unauthenticated",
-      error: "Sign in to view Peakflow.",
-    };
-  }
-  if (!hasPeakPlusTier(session.user.memberPlan)) {
-    return {
-      ok: false,
-      status: 403,
-      code: "unsubscribed",
-      error: "PeakPlus or higher is required for the Unusual Whales dashboard.",
-    };
-  }
-  return { ok: true };
+  return evaluateSubscriberDeskAccess({
+    signedIn: Boolean(session),
+    memberPlan: session?.user.memberPlan,
+    email: session?.user.email,
+  });
 }
 
 export async function canAccessMcp(request: Request): Promise<boolean> {

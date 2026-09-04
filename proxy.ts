@@ -29,6 +29,8 @@ export async function proxy(req: NextRequest) {
       u.searchParams.set("next", pathname);
       return NextResponse.redirect(u);
     }
+    // Signed-in /peakflow still plan-gates in the page: free → upgrade CTA.
+    // ADMIN_EMAILS / UW personal token must not unlock subscriber Peakflow.
     return NextResponse.next();
   }
 

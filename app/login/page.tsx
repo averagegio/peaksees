@@ -13,7 +13,14 @@ export default async function LoginPage({
 }) {
   const sp = await searchParams;
   const session = await getSession();
-  if (session) redirect("/feed");
+  if (session) {
+    const next = sp?.next;
+    redirect(
+      typeof next === "string" && next.startsWith("/") && !next.startsWith("//")
+        ? next
+        : "/feed",
+    );
+  }
 
   const jar = await cookies();
   if (jar.get(SESSION_COOKIE)?.value) {

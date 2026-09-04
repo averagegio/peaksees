@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types lib/unusual-whales/parse.test.ts && node --experimental-strip-types lib/unusual-whales/token-compare.test.ts"
+    "test": "node --experimental-strip-types lib/unusual-whales/parse.test.ts && node --experimental-strip-types lib/unusual-whales/token-compare.test.ts && node --experimental-strip-types lib/membership/plans.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1070.0",
