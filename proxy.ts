@@ -13,7 +13,8 @@ export async function proxy(req: NextRequest) {
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/feed") ||
     pathname.startsWith("/bookmarks") ||
-    pathname.startsWith("/mentions")
+    pathname.startsWith("/mentions") ||
+    pathname.startsWith("/peakflow")
   ) {
     if (!authed) {
       const u = req.nextUrl.clone();
@@ -34,6 +35,7 @@ export const config = {
     "/feed/:path*",
     "/bookmarks/:path*",
     "/mentions/:path*",
+    "/peakflow/:path*",
     "/login",
     "/signup",
   ],

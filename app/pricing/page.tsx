@@ -125,6 +125,7 @@ export default function PricingPage({
               "Delete your own market cards",
               "Priority @peak replies",
               "Enhanced feed filters",
+              "Peakflow Unusual Whales dashboard",
             ]}
           />
           <PriceCard

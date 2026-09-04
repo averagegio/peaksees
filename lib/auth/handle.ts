@@ -7,6 +7,8 @@ export const RESERVED_HANDLES = new Set([
   "login",
   "signup",
   "dashboard",
+  "peakflow",
+  "whales",
   "settings",
   "help",
   "support",
