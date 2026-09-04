@@ -38,6 +38,12 @@ const items = [
     icon: TrophyIcon,
   },
   {
+    href: "/peakflow",
+    label: "Peakflow",
+    subtitle: "Unusual Whales desk",
+    icon: FlowIcon,
+  },
+  {
     href: "/bookmarks",
     label: "Bookmarks",
     subtitle: "Posts you saved",
@@ -175,6 +181,15 @@ function TrophyIcon({ className }: { className?: string }) {
       <path d="M7 4h10v4a5 5 0 01-10 0V4z" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M5 6H3v2a4 4 0 004 4" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M19 6h2v2a4 4 0 01-4 4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function FlowIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.65}>
+      <path d="M4 16c3-6 5-6 8 0s5 6 8 0" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 8c3-4 5-4 8 0s5 4 8 0" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
