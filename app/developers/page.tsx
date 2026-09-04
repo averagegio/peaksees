@@ -72,9 +72,11 @@ export default function DevelopersPage() {
               /whales
             </Link>
             , plus Peak AI <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">@peak</code>{" "}
-            chat, call the same server-side client — the API key never ships to the
-            browser. PeakPlus is required for Peak AI to pull live Unusual Whales;
-            free members get an upgrade note instead of a live call.
+            comments and the Peakflow / Peak Flow composer, call the same
+            server-side client — the API key never ships to the browser. PeakPlus
+            is required for Peak AI to pull live Unusual Whales from comments;
+            Peakflow already requires PeakPlus. Free members get an upgrade note
+            instead of a live call.
           </p>
         </section>
       </div>

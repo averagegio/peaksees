@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
+import { PeakAiDeskChat } from "@/app/components/unusual-whales/PeakAiDeskChat";
 import { safeJson } from "@/lib/http";
 import { formatCompact, formatUsd, formatWhen } from "@/lib/unusual-whales/format";
 import { latestTideBias } from "@/lib/unusual-whales/parse";
@@ -98,6 +99,7 @@ export function UnusualWhalesBoard({
 
   return (
     <div className="flex flex-col gap-4">
+      <PeakAiDeskChat alreadyOnPeakflow={desk === "subscriber"} />
       {snapshot.source === "demo" ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
           Showing labeled demo data. Set{" "}

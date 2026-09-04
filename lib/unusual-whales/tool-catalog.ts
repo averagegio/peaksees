@@ -376,11 +376,15 @@ export function inferPeakAiUwTool(text: string): { name: UwToolName; ticker: str
   else if (/\bheadlines?|news\b/.test(t)) name = "news_headlines";
   else if (/\bdashboard|snapshot|desk\b/.test(t)) name = "dashboard_snapshot";
 
+  const optionPair = text.match(/\b([A-Za-z]{1,5})\s+\$?\d+(?:\.\d+)?[cp]\b/i);
   const on = text.match(/\bon\s+\$?([A-Za-z.]{1,5})\b/);
   const dollar = text.match(/\$([A-Za-z.]{1,5})\b/);
-  const known = text.toUpperCase().match(/\b(NVDA|TSLA|AAPL|AMZN|MSFT|META|GOOG|GOOGL|SPY|QQQ|IWM|AMD)\b/);
-  const raw = on?.[1] ?? dollar?.[1] ?? known?.[1] ?? null;
-  const ticker = raw ? raw.toUpperCase() : null;
+  const known = text
+    .toUpperCase()
+    .match(/\b(NVDA|TSLA|AAPL|AMZN|MSFT|META|GOOG|GOOGL|SPY|QQQ|IWM|AMD|CRWD|PLTR|COIN|NFLX)\b/);
+  const leading = text.match(/^\s*\$?([A-Za-z]{2,5})\b/);
+  const raw = optionPair?.[1] ?? on?.[1] ?? dollar?.[1] ?? known?.[1] ?? leading?.[1] ?? null;
+  const ticker = raw && !/^(on|the|is|any|for)$/i.test(raw) ? raw.toUpperCase() : null;
   return { name, ticker };
 }
 

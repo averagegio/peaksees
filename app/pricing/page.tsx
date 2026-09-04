@@ -126,6 +126,7 @@ export default function PricingPage({
               "Delete your own market cards",
               "Priority @peak replies",
               "Ask @peak for Unusual Whales flow, dark pool, and congress",
+              "Ask Peak on Peakflow for a ticker or option",
               "Enhanced feed filters",
               "Peakflow Unusual Whales dashboard",
             ]}

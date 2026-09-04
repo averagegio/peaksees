@@ -130,6 +130,10 @@ export async function testDemoModeLabelsPrints() {
 
 export async function testDeskNoteFreeVsPeakPlus() {
   const inferred = inferPeakAiUwTool("what's the flow on NVDA?");
+  assert(inferPeakAiUwTool("NVDA $140c").ticker === "NVDA", "option pair ticker");
+  assert(inferPeakAiUwTool("NVDA flow").ticker === "NVDA", "leading ticker");
+  assert(inferPeakAiUwTool("$140c").name === "flow_alerts", "option shorthand uses flow");
+  assert(inferPeakAiUwTool("$140c").ticker === null, "option shorthand is not a ticker");
   assert(inferred.name === "flow_alerts", "infers flow_alerts");
   assert(inferred.ticker === "NVDA", "infers NVDA");
   assert(inferPeakAiUwTool("dark pool in megacaps").name === "darkpool_recent", "infers dark pool");
@@ -182,6 +186,8 @@ export async function testDeskNoteFreeVsPeakPlus() {
 
 export async function testLooksLikeUwPromptAndStatus() {
   assert(looksLikeUnusualWhalesPrompt("what's the flow on NVDA?") === true, "flow prompt");
+  assert(looksLikeUnusualWhalesPrompt("NVDA flow") === true, "ticker + flow");
+  assert(looksLikeUnusualWhalesPrompt("$140c") === true, "option shorthand");
   assert(looksLikeUnusualWhalesPrompt("dark pool in megacaps") === true, "dark pool");
   assert(looksLikeUnusualWhalesPrompt("any congress trades?") === true, "congress");
   assert(looksLikeUnusualWhalesPrompt("is tide call-heavy?") === true, "tide");

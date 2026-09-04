@@ -7,6 +7,7 @@ import { hasPeakPlusTier, memberPlanDisplayName } from "@/lib/membership/plans";
 import { runPeakAiChat } from "@/lib/peak-ai/chat";
 import { looksLikeUnusualWhalesPrompt } from "@/lib/peak-ai/uw-prompt";
 import { resolveEffectiveMemberPlan } from "@/lib/stripe/subscription-sync";
+import { getPersonalDeskEntry } from "@/lib/unusual-whales/access";
 import { isUnusualWhalesDemoMode } from "@/lib/unusual-whales/config";
 import { callMcpTool } from "@/lib/unusual-whales/mcp";
 import { runPeakAiUwDeskNote, unusualWhalesMetaFromResults } from "@/lib/unusual-whales/tool-catalog";
@@ -43,19 +44,24 @@ function extractProbYesFromText(text: string): number | null {
 }
 
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   let body: {
     text?: string;
     outcomes?: { yes?: number; no?: number };
     query?: string;
     mode?: string;
+    source?: string;
   };
   try {
     body = (await request.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const fromDesk = body.source === "desk";
+  const session = await getSession();
+  const personalDesk = fromDesk ? await getPersonalDeskEntry() : { ok: false as const };
+  if (!session && !personalDesk.ok) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const text = typeof body.text === "string" ? body.text : "";
@@ -68,13 +74,17 @@ export async function POST(request: Request) {
     body.mode === "chat" || looksLikeUnusualWhalesPrompt(`${text} ${query}`);
 
   const openaiKey = process.env.OPENAI_API_KEY ?? "";
+  /** Same OPENAI_MODEL as market card generation (`openAIMarketModel`). */
   const model = openAIMarketModel();
   const tavilyKey = process.env.TAVILY_API_KEY ?? "";
 
-  const plan = await resolveEffectiveMemberPlan(session.user);
-  const canCallUw = hasPeakPlusTier(plan);
+  const plan = session ? await resolveEffectiveMemberPlan(session.user) : "free";
+  const canCallUw = hasPeakPlusTier(plan) || personalDesk.ok;
   const demoMode = isUnusualWhalesDemoMode();
-  const planLabel = memberPlanDisplayName(plan);
+  const planLabel =
+    personalDesk.ok && !hasPeakPlusTier(plan)
+      ? "Peak Flow desk"
+      : memberPlanDisplayName(plan);
 
   // Optional live web pull via Tavily (fast, simple).
   let webSummary = "";

@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import Link from "next/link";
-
-import { safeJson } from "@/lib/http";
+import { PeakAiReplyBody } from "@/app/components/peak-ai/PeakAiReplyBody";
 import { ProfileLink } from "@/app/components/profile/ProfileLink";
+import { safeJson } from "@/lib/http";
 import { peakAiToolStatusLabel } from "@/lib/peak-ai/uw-prompt";
 
 type Comment = {
@@ -19,39 +18,11 @@ type Comment = {
   viewerUpvoted: boolean;
 };
 
-const PATH_SPLIT = /(\/peakflow|\/pricing)/g;
-
 function CommentBody({ text }: { text: string }) {
-  const parts = text.split(PATH_SPLIT);
   const isPeakReply = /^Peak:/i.test(text);
-  const showPeakflow = isPeakReply && /\/peakflow|unusual whales|dark pool|congress|tide/i.test(text);
-
   return (
     <div className="mt-1">
-      <p className="whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200">
-        {parts.map((part, index) => {
-          if (part === "/peakflow" || part === "/pricing") {
-            return (
-              <Link
-                key={`${part}-${index}`}
-                href={part}
-                className="font-semibold text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-300"
-              >
-                {part === "/peakflow" ? "Open Peakflow" : "Upgrade to PeakPlus"}
-              </Link>
-            );
-          }
-          return <span key={`t-${index}`}>{part}</span>;
-        })}
-      </p>
-      {showPeakflow ? (
-        <Link
-          href="/peakflow"
-          className="mt-2 inline-flex text-xs font-semibold text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
-        >
-          Open Peakflow
-        </Link>
-      ) : null}
+      <PeakAiReplyBody text={text} alreadyOnPeakflow={!isPeakReply} />
     </div>
   );
 }
